@@ -1,0 +1,78 @@
+{
+    "servers": {
+        // "redis": {
+        //  "command": "npx",
+        //  "args": [
+        //      "-y",
+        //      "@modelcontextprotocol/server-redis"
+        //  ],
+        //  "env": {
+        //      "REDIS_URL": "${input:redis_url}"
+        //  },
+        //  "type": "stdio"
+        // },
+        "context7": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@upstash/context7-mcp@latest"
+            ],
+            "env": {
+                "CONTEXT7_API_KEY": "${input:context7_api_key}"
+            },
+            "type": "stdio"
+        },
+        "task-master-ai": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "--package=task-master-ai@latest",
+                "task-master-ai",
+                "--version"
+            ]
+        },
+        "mcp-memory": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-memory"
+            ]
+        },
+        "MCP-n8n": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@leonardsellem/n8n-mcp-server"
+            ],
+            "env": {
+                "N8N_API_URL": "${input:n8n_api_url}",
+                "N8N_API_KEY": "${input:n8n_api_key}"
+            }
+        }
+    },
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "redis_url",
+            "description": "Redis URL (e.g. redis://localhost:6379)"
+        },
+        {
+            "type": "promptString",
+            "id": "context7_api_key",
+            "description": "Context7 API Key (optional, for higher rate limits - get from context7.com/dashboard)"
+        },
+        {
+            "type": "promptString",
+            "id": "n8n_api_url",
+            "description": "n8n API URL (e.g. http://localhost:5678/api/v1)"
+        },
+        {
+            "type": "promptString",
+            "id": "n8n_api_key",
+            "description": "n8n API Key (optional, if authentication is required)"
+        }
+    ]
+}
