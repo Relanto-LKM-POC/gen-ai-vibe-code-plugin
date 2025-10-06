@@ -5,4 +5,9 @@ out/
 .DS_Store
 Thumbs.db
 *.log
-.env
+.env# Environment files
+.env*
+.env*
+# Environment files
+# Environment files
+.env*

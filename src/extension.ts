@@ -589,6 +589,53 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    const getEnhancedAWSStatusCommand = vscode.commands.registerCommand('vibeAssistant.getEnhancedAWSStatus', async () => {
+        try {
+            const enhancedStatus = await awsService.checkEnhancedConnectionStatus();
+            
+            // Transform the response to match frontend expectations
+            let status: string;
+            let details = enhancedStatus.errorMessage || '';
+            let missingFields = enhancedStatus.missingFields || [];
+            let recommendations = '';
+            
+            if (!enhancedStatus.awsConnected) {
+                status = 'aws-not-configured';
+                recommendations = 'Please configure AWS CLI credentials using "aws configure" command.';
+            } else if (!enhancedStatus.secretExists) {
+                status = 'secret-not-found';
+                recommendations = `Create the secret "${enhancedStatus.secretName}" in AWS Secrets Manager or change the secret name in settings.`;
+            } else if (!enhancedStatus.secretValid) {
+                status = 'secret-invalid';
+                recommendations = `Update the secret "${enhancedStatus.secretName}" to include the missing Salesforce fields: ${missingFields.join(', ')}.`;
+            } else {
+                status = 'ready';
+                details = `Secret "${enhancedStatus.secretName}" is valid and contains all required Salesforce fields.`;
+            }
+            
+            const transformedStatus = {
+                status,
+                details,
+                missingFields,
+                recommendations,
+                secretName: enhancedStatus.secretName,
+                availableFields: enhancedStatus.availableFields
+            };
+            
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.updateEnhancedAWSStatus();
+            }
+            return transformedStatus;
+        } catch (error) {
+            const errorStatus = {
+                status: 'error',
+                details: `Failed to check enhanced status: ${(error as Error).message}`,
+                recommendations: 'Check your AWS CLI configuration and try again.'
+            };
+            return errorStatus;
+        }
+    });
+
     const listAWSSecretsCommand = vscode.commands.registerCommand('vibeAssistant.listAWSSecrets', async () => {
         try {
             const result = await awsService.listAvailableSecrets();
@@ -1141,6 +1188,7 @@ Token will be stored securely in VS Code settings.`;
         connectAWSCommand,
         refreshAWSConnectionCommand,
         getRealTimeAWSStatusCommand,
+        getEnhancedAWSStatusCommand,
         listAWSSecretsCommand,
         retrySalesforceCredentialsCommand,
         updateJiraIssueCommand,

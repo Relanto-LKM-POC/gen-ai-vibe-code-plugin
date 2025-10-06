@@ -103,6 +103,10 @@
     background-color: #89d185;
 }
 
+.status-dot.status-warning {
+    background-color: #ffcc02;
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -291,6 +295,26 @@
     font-weight: 600;
     font-size: 13px;
     color: var(--vscode-textLink-foreground);
+}
+
+/* Enhanced AWS Status Styles */
+.enhanced-status-details {
+    background-color: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-border-color);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 11px;
+}
+
+.enhanced-status-details p {
+    margin: 5px 0;
+    line-height: 1.4;
+}
+
+.enhanced-status-details strong {
+    color: var(--vscode-textLink-foreground);
+    font-weight: 600;
 }
 
 .connection-info {

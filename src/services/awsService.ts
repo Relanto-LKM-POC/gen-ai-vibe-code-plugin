@@ -162,6 +162,99 @@ export class AWSService {
         return this.connectionStatus;
     }
 
+    /**
+     * Enhanced connection status that validates secret content for Salesforce credentials
+     */
+    public async checkEnhancedConnectionStatus(): Promise<{
+        awsConnected: boolean;
+        secretExists: boolean;
+        secretValid: boolean;
+        missingFields?: string[];
+        availableFields?: string[];
+        errorMessage?: string;
+        secretName?: string;
+    }> {
+        try {
+            // Check AWS connectivity first
+            await this.testAWSCliCredentials();
+            
+            // Get the configured secret name
+            const secretName = this.getConfiguredSalesforceSecretName();
+            
+            try {
+                // Try to fetch the secret
+                const command = this.buildAwsCommand(`aws secretsmanager get-secret-value --secret-id "${secretName}"`);
+                const { stdout } = await execAsync(command);
+                const result = JSON.parse(stdout);
+                
+                if (!result.SecretString) {
+                    return {
+                        awsConnected: true,
+                        secretExists: true,
+                        secretValid: false,
+                        secretName,
+                        errorMessage: `Secret '${secretName}' exists but has no string value`
+                    };
+                }
+                
+                const secretData = JSON.parse(result.SecretString);
+                
+                // Validate required Salesforce fields
+                const requiredFields = ['client_id', 'client_secret', 'username', 'password'];
+                const availableFields = Object.keys(secretData);
+                const missingFields = requiredFields.filter(field => !secretData[field]);
+                
+                if (missingFields.length > 0) {
+                    return {
+                        awsConnected: true,
+                        secretExists: true,
+                        secretValid: false,
+                        missingFields,
+                        availableFields,
+                        secretName,
+                        errorMessage: `Secret '${secretName}' exists but missing Salesforce fields: ${missingFields.join(', ')}. Found fields: ${availableFields.join(', ')}`
+                    };
+                }
+
+                // Secret is valid
+                return {
+                    awsConnected: true,
+                    secretExists: true,
+                    secretValid: true,
+                    secretName,
+                    availableFields
+                };
+
+            } catch (secretError: any) {
+                if (secretError.message && secretError.message.includes('ResourceNotFoundException')) {
+                    return {
+                        awsConnected: true,
+                        secretExists: false,
+                        secretValid: false,
+                        secretName,
+                        errorMessage: `Secret '${secretName}' not found in AWS Secrets Manager`
+                    };
+                } else {
+                    return {
+                        awsConnected: true,
+                        secretExists: false,
+                        secretValid: false,
+                        secretName,
+                        errorMessage: `Failed to access secret '${secretName}': ${secretError.message}`
+                    };
+                }
+            }
+
+        } catch (error: any) {
+            return {
+                awsConnected: false,
+                secretExists: false,
+                secretValid: false,
+                errorMessage: `AWS connection failed: ${error.message}`
+            };
+        }
+    }
+
     public async getRealTimeConnectionStatus(): Promise<AWSConnectionStatus> {
         try {
             await this.testAWSCliCredentials();

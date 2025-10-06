@@ -52,6 +52,10 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                     case 'getAWSStatus':
                         this.handleGetAWSStatus();
                         break;
+
+                    case 'getEnhancedAWSStatus':
+                        this.updateEnhancedAWSStatus();
+                        break;
                 }
             },
             undefined,
@@ -126,6 +130,36 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
         }
     }
 
+    /**
+     * Enhanced AWS status check that validates secret content
+     */
+    public async updateEnhancedAWSStatus() {
+        try {
+            // Get enhanced status from AWS service
+            const enhancedStatus = await vscode.commands.executeCommand('vibeAssistant.getEnhancedAWSStatus') as any;
+            
+            if (this._view) {
+                this._view.webview.postMessage({
+                    command: 'updateEnhancedAWSStatus',
+                    data: enhancedStatus
+                });
+            }
+        } catch (error) {
+            console.error('Failed to get enhanced AWS status:', error);
+            if (this._view) {
+                this._view.webview.postMessage({
+                    command: 'updateEnhancedAWSStatus',
+                    data: {
+                        awsConnected: false,
+                        secretExists: false,
+                        secretValid: false,
+                        errorMessage: `Failed to check AWS status: ${error}`
+                    }
+                });
+            }
+        }
+    }
+
 
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -168,6 +202,17 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                                 <div class="status-indicator" id="aws-status-indicator">
                                     <span class="status-dot status-disconnected"></span>
                                     <span class="status-text" id="aws-status-text">Not Connected</span>
+                                </div>
+                                
+                                <!-- Enhanced AWS Status Display -->
+                                <div class="status-indicator" id="enhanced-aws-status-indicator" style="margin-top: 10px;">
+                                    <span class="status-dot status-disconnected"></span>
+                                    <span class="status-text" id="enhanced-aws-status-text">Checking Secret Validation...</span>
+                                </div>
+                                
+                                <!-- Enhanced Status Details -->
+                                <div class="enhanced-aws-details" id="enhanced-aws-details" style="display: none;">
+                                    <!-- Details will be populated by JavaScript -->
                                 </div>
                             </div>
                             

@@ -87,6 +87,7 @@
 
         refreshBtn.addEventListener('click', () => {
             vscode.postMessage({ command: 'refreshAWSConnection' });
+            vscode.postMessage({ command: 'getEnhancedAWSStatus' });
         });
     }
 
@@ -184,6 +185,7 @@
     // Load initial data
     function loadInitialData() {
         vscode.postMessage({ command: 'getAWSStatus' });
+        vscode.postMessage({ command: 'getEnhancedAWSStatus' });
         vscode.postMessage({ command: 'getEstimationData' });
     }
 
@@ -237,6 +239,61 @@
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'none';
         }
+    }
+
+    function updateEnhancedAWSStatus(enhancedStatus) {
+        // Update the enhanced status indicators
+        const enhancedIndicator = document.getElementById('enhanced-aws-status-indicator');
+        const enhancedText = document.getElementById('enhanced-aws-status-text');
+        const enhancedDetails = document.getElementById('enhanced-aws-details');
+        
+        if (enhancedIndicator && enhancedText) {
+            const statusDot = enhancedIndicator.querySelector('.status-dot');
+            
+            // Clear existing classes
+            statusDot.className = 'status-dot';
+            
+            switch (enhancedStatus.status) {
+                case 'ready':
+                    statusDot.classList.add('status-connected');
+                    enhancedText.textContent = '🟢 Connected & Ready';
+                    break;
+                case 'secret-invalid':
+                    statusDot.classList.add('status-warning');
+                    enhancedText.textContent = '🟡 Secret Invalid - Missing Required Fields';
+                    break;
+                case 'secret-not-found':
+                    statusDot.classList.add('status-warning');
+                    enhancedText.textContent = '🟡 Secret Not Found';
+                    break;
+                case 'aws-not-configured':
+                    statusDot.classList.add('status-disconnected');
+                    enhancedText.textContent = '🔴 AWS Not Configured';
+                    break;
+                case 'error':
+                    statusDot.classList.add('status-disconnected');
+                    enhancedText.textContent = '🔴 Connection Error';
+                    break;
+                default:
+                    statusDot.classList.add('status-disconnected');
+                    enhancedText.textContent = '🔴 Status Unknown';
+            }
+        }
+        
+        // Update enhanced details if available
+        if (enhancedDetails && enhancedStatus.details) {
+            enhancedDetails.innerHTML = `
+                <div class="enhanced-status-details">
+                    <p><strong>Details:</strong> ${enhancedStatus.details}</p>
+                    ${enhancedStatus.missingFields ? `<p><strong>Missing Fields:</strong> ${enhancedStatus.missingFields.join(', ')}</p>` : ''}
+                    ${enhancedStatus.recommendations ? `<p><strong>Recommendations:</strong> ${enhancedStatus.recommendations}</p>` : ''}
+                </div>
+            `;
+            enhancedDetails.style.display = 'block';
+        }
+        
+        // Update prerequisites based on enhanced status
+        updatePrerequisites();
     }
 
     function updateConnectionDetails(status) {
@@ -468,6 +525,9 @@
             case 'updateAWSStatus':
                 updateAWSStatus(message.data);
                 break;
+            case 'updateEnhancedAWSStatus':
+                updateEnhancedAWSStatus(message.data);
+                break;
             case 'updateEstimationData':
                 updateEstimationData(message.data);
                 break;
@@ -480,6 +540,9 @@
 
             case 'awsStatusResponse':
                 updateAWSStatus(message.data);
+                break;
+            case 'enhancedAWSStatusResponse':
+                updateEnhancedAWSStatus(message.data);
                 break;
             case 'estimationDataResponse':
                 updateEstimationData(message.data);
