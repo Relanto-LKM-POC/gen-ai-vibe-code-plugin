@@ -33,7 +33,14 @@
     function initialize() {
         setupTabs();
         setupEventListeners();
+        initializeUIState();
         loadInitialData();
+    }
+
+    // Initialize UI state to prevent glitches
+    function initializeUIState() {
+        // Initialize secret validation to disconnected state
+        updateSecretValidationForDisconnected();
     }
 
     // Tab functionality
@@ -185,7 +192,7 @@
     // Load initial data
     function loadInitialData() {
         vscode.postMessage({ command: 'getAWSStatus' });
-        vscode.postMessage({ command: 'getEnhancedAWSStatus' });
+        // Only get enhanced status after AWS status is loaded to prevent premature display
         vscode.postMessage({ command: 'getEstimationData' });
     }
 
@@ -214,6 +221,10 @@
                 loading.style.display = 'none';
                 updateConnectionDetails(status);
                 updatePrerequisites();
+                // Immediately show validating state for secret validation
+                updateSecretValidationForValidating();
+                // Load enhanced status after showing validating state
+                vscode.postMessage({ command: 'getEnhancedAWSStatus' });
                 break;
             case 'connecting':
                 statusDot.classList.add('status-connecting');
@@ -222,6 +233,8 @@
                 refreshBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'block';
+                // Update secret validation to show connecting state
+                updateSecretValidationForConnecting();
                 break;
             case 'error':
                 statusDot.classList.add('status-disconnected');
@@ -230,6 +243,8 @@
                 refreshBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'none';
+                // Update secret validation to show error state
+                updateSecretValidationForError();
                 break;
             default:
                 statusDot.classList.add('status-disconnected');
@@ -238,62 +253,129 @@
                 refreshBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'none';
+                // Update secret validation to show disconnected state
+                updateSecretValidationForDisconnected();
         }
     }
 
     function updateEnhancedAWSStatus(enhancedStatus) {
-        // Update the enhanced status indicators
-        const enhancedIndicator = document.getElementById('enhanced-aws-status-indicator');
-        const enhancedText = document.getElementById('enhanced-aws-status-text');
-        const enhancedDetails = document.getElementById('enhanced-aws-details');
+        // Update the secret validation card with new structure
+        const secretIcon = document.getElementById('secret-validation-icon');
+        const secretTitle = document.getElementById('secret-validation-title');
+        const secretStatusValue = document.getElementById('secret-status-value');
+        const secretMissingFields = document.getElementById('secret-missing-fields');
+        const secretDetailsRow = document.getElementById('secret-details-row');
+        const secretDetailsValue = document.getElementById('secret-details-value');
         
-        if (enhancedIndicator && enhancedText) {
-            const statusDot = enhancedIndicator.querySelector('.status-dot');
-            
-            // Clear existing classes
-            statusDot.className = 'status-dot';
-            
+        // Always process enhanced status regardless of current connection state
+        // This allows for proper error handling and status updates
+        
+        if (secretIcon && secretTitle && secretStatusValue && secretMissingFields) {
             switch (enhancedStatus.status) {
                 case 'ready':
-                    statusDot.classList.add('status-connected');
-                    enhancedText.textContent = '🟢 Connected & Ready';
+                    secretIcon.textContent = '✅';
+                    secretTitle.textContent = 'Secret Validation Complete';
+                    secretStatusValue.textContent = 'All required fields found';
+                    secretMissingFields.textContent = 'none';
                     break;
                 case 'secret-invalid':
-                    statusDot.classList.add('status-warning');
-                    enhancedText.textContent = '🟡 Secret Invalid - Missing Required Fields';
+                    secretIcon.textContent = '⚠️';
+                    secretTitle.textContent = 'Secret Invalid';
+                    secretStatusValue.textContent = 'Missing required fields';
+                    secretMissingFields.textContent = enhancedStatus.missingFields ? enhancedStatus.missingFields.join(', ') : 'Unknown fields';
                     break;
                 case 'secret-not-found':
-                    statusDot.classList.add('status-warning');
-                    enhancedText.textContent = '🟡 Secret Not Found';
+                    secretIcon.textContent = '⚠️';
+                    secretTitle.textContent = 'Secret Not Found';
+                    secretStatusValue.textContent = 'Secret does not exist';
+                    secretMissingFields.textContent = 'N/A';
                     break;
                 case 'aws-not-configured':
-                    statusDot.classList.add('status-disconnected');
-                    enhancedText.textContent = '🔴 AWS Not Configured';
+                    secretIcon.textContent = '❌';
+                    secretTitle.textContent = 'AWS Not Configured';
+                    secretStatusValue.textContent = 'AWS CLI not configured';
+                    secretMissingFields.textContent = 'N/A';
                     break;
                 case 'error':
-                    statusDot.classList.add('status-disconnected');
-                    enhancedText.textContent = '🔴 Connection Error';
+                    secretIcon.textContent = '❌';
+                    secretTitle.textContent = 'Validation Error';
+                    secretStatusValue.textContent = 'Failed to validate secret';
+                    secretMissingFields.textContent = 'N/A';
                     break;
                 default:
-                    statusDot.classList.add('status-disconnected');
-                    enhancedText.textContent = '🔴 Status Unknown';
+                    secretIcon.textContent = '🔍';
+                    secretTitle.textContent = 'Checking Secret...';
+                    secretStatusValue.textContent = 'Validation in progress';
+                    secretMissingFields.textContent = 'Checking...';
             }
-        }
-        
-        // Update enhanced details if available
-        if (enhancedDetails && enhancedStatus.details) {
-            enhancedDetails.innerHTML = `
-                <div class="enhanced-status-details">
-                    <p><strong>Details:</strong> ${enhancedStatus.details}</p>
-                    ${enhancedStatus.missingFields ? `<p><strong>Missing Fields:</strong> ${enhancedStatus.missingFields.join(', ')}</p>` : ''}
-                    ${enhancedStatus.recommendations ? `<p><strong>Recommendations:</strong> ${enhancedStatus.recommendations}</p>` : ''}
-                </div>
-            `;
-            enhancedDetails.style.display = 'block';
+            
+            // Show details if available
+            if (enhancedStatus.details && secretDetailsRow && secretDetailsValue) {
+                secretDetailsValue.textContent = enhancedStatus.details;
+                secretDetailsRow.style.display = 'flex';
+            } else if (secretDetailsRow) {
+                secretDetailsRow.style.display = 'none';
+            }
         }
         
         // Update prerequisites based on enhanced status
         updatePrerequisites();
+    }
+
+    function updateSecretValidationForConnecting() {
+        const secretIcon = document.getElementById('secret-validation-icon');
+        const secretTitle = document.getElementById('secret-validation-title');
+        const secretStatusValue = document.getElementById('secret-status-value');
+        const secretMissingFields = document.getElementById('secret-missing-fields');
+        const secretDetailsRow = document.getElementById('secret-details-row');
+        
+        if (secretIcon) secretIcon.textContent = '🔄';
+        if (secretTitle) secretTitle.textContent = 'Preparing Validation...';
+        if (secretStatusValue) secretStatusValue.textContent = 'Establishing AWS connection';
+        if (secretMissingFields) secretMissingFields.textContent = 'Pending...';
+        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+    }
+
+    function updateSecretValidationForError() {
+        const secretIcon = document.getElementById('secret-validation-icon');
+        const secretTitle = document.getElementById('secret-validation-title');
+        const secretStatusValue = document.getElementById('secret-status-value');
+        const secretMissingFields = document.getElementById('secret-missing-fields');
+        const secretDetailsRow = document.getElementById('secret-details-row');
+        
+        if (secretIcon) secretIcon.textContent = '❌';
+        if (secretTitle) secretTitle.textContent = 'Connection Failed';
+        if (secretStatusValue) secretStatusValue.textContent = 'Unable to connect to AWS';
+        if (secretMissingFields) secretMissingFields.textContent = 'N/A';
+        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+    }
+
+    function updateSecretValidationForDisconnected() {
+        const secretIcon = document.getElementById('secret-validation-icon');
+        const secretTitle = document.getElementById('secret-validation-title');
+        const secretStatusValue = document.getElementById('secret-status-value');
+        const secretMissingFields = document.getElementById('secret-missing-fields');
+        const secretDetailsRow = document.getElementById('secret-details-row');
+        
+        if (secretIcon) secretIcon.textContent = '⏸️';
+        if (secretTitle) secretTitle.textContent = 'Not Connected';
+        if (secretStatusValue) secretStatusValue.textContent = 'Connect to AWS to validate';
+        if (secretMissingFields) secretMissingFields.textContent = 'N/A';
+        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+    }
+
+    function updateSecretValidationForValidating() {
+        const secretIcon = document.getElementById('secret-validation-icon');
+        const secretTitle = document.getElementById('secret-validation-title');
+        const secretStatusValue = document.getElementById('secret-status-value');
+        const secretMissingFields = document.getElementById('secret-missing-fields');
+        const secretDetailsRow = document.getElementById('secret-details-row');
+        
+        if (secretIcon) secretIcon.textContent = '🔍';
+        if (secretTitle) secretTitle.textContent = 'Validating Secret...';
+        if (secretStatusValue) secretStatusValue.textContent = 'Checking Salesforce credentials';
+        if (secretMissingFields) secretMissingFields.textContent = 'Validating...';
+        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
     }
 
     function updateConnectionDetails(status) {

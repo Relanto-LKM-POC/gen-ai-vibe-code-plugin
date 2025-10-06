@@ -203,17 +203,6 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                                     <span class="status-dot status-disconnected"></span>
                                     <span class="status-text" id="aws-status-text">Not Connected</span>
                                 </div>
-                                
-                                <!-- Enhanced AWS Status Display -->
-                                <div class="status-indicator" id="enhanced-aws-status-indicator" style="margin-top: 10px;">
-                                    <span class="status-dot status-disconnected"></span>
-                                    <span class="status-text" id="enhanced-aws-status-text">Checking Secret Validation...</span>
-                                </div>
-                                
-                                <!-- Enhanced Status Details -->
-                                <div class="enhanced-aws-details" id="enhanced-aws-details" style="display: none;">
-                                    <!-- Details will be populated by JavaScript -->
-                                </div>
                             </div>
                             
                             <div class="section">
@@ -223,6 +212,31 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                                     <li>• Automatic credential detection</li>
                                     <li>• Secure connection to Secrets Manager</li>
                                 </ul>
+                                
+                                <!-- Secret Validation Section - Always visible, matching Connection Details style -->
+                                <div class="secret-validation-section" id="secret-validation-section" style="margin-top: 15px;">
+                                    <h4>Secret Validation:</h4>
+                                    <div class="connection-status-card" id="secret-validation-card">
+                                        <div class="connection-header">
+                                            <span class="connection-icon" id="secret-validation-icon">🔍</span>
+                                            <span class="connection-title" id="secret-validation-title">Checking Secret...</span>
+                                        </div>
+                                        <div class="connection-info" id="secret-validation-info">
+                                            <div class="info-row">
+                                                <span class="info-label">Status:</span>
+                                                <span class="info-value" id="secret-status-value">Pending validation</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">Missing Fields:</span>
+                                                <span class="info-value" id="secret-missing-fields">Checking...</span>
+                                            </div>
+                                            <div class="info-row" id="secret-details-row" style="display: none;">
+                                                <span class="info-label">Details:</span>
+                                                <span class="info-value" id="secret-details-value">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <div class="button-group">
                                     <button class="primary-button" id="connect-aws-btn">

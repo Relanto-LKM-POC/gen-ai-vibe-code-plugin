@@ -83,6 +83,17 @@
     margin-bottom: 10px;
 }
 
+.secret-validation-section {
+    margin-top: 15px;
+}
+
+.secret-validation-section h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
 .status-dot {
     width: 8px;
     height: 8px;
