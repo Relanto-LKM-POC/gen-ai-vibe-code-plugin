@@ -13,6 +13,21 @@ export interface FeedbackData {
     includeAWSDetails: boolean;
     submitAnonymously: boolean;
     contactEmail?: string;
+    // DEVSECOPS Hub specific fields
+    estimatedEffortHours?: number;
+    acceptanceCriteria?: string;
+    epicId?: string;
+    initiativeId?: string;
+}
+
+export interface DEVSECOPSFeedbackPayload {
+    Name: string;
+    Description__c: string;
+    Estimated_Effort_Hours__c: number;
+    Type__c: string;
+    Jira_Acceptance_Criteria__c: string;
+    Initiative__c: string;
+    Epic__c: string;
 }
 
 export interface SystemInfo {
@@ -38,9 +53,11 @@ export class FeedbackService {
     private context: vscode.ExtensionContext;
     private readonly feedbackEndpoints: { [key: string]: string };
     private notificationManager: NotificationManager;
+    private awsService: any; // Will be injected for DEVSECOPS Hub integration
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor(context: vscode.ExtensionContext, awsService?: any) {
         this.context = context;
+        this.awsService = awsService;
         this.notificationManager = NotificationManager.getInstance(context);
         
         // Get endpoints from configuration manager
@@ -295,12 +312,32 @@ export class FeedbackService {
             // Ask user how they want to submit the feedback
             const choice = await vscode.window.showInformationMessage(
                 'Feedback saved! How would you like to submit it?',
+                'Submit to DEVSECOPS Hub',
                 'Create GitHub Issue',
                 'Keep Local Only',
                 'Email Developer'
             );
 
-            if (choice === 'Create GitHub Issue') {
+            if (choice === 'Submit to DEVSECOPS Hub') {
+                const devsecopsResult = await this.submitToDEVSECOPSHubInternal(payload);
+                if (devsecopsResult.success) {
+                    vscode.window.showInformationMessage(
+                        `✅ Feedback submitted to DEVSECOPS Hub successfully! Ticket ID: ${devsecopsResult.ticketId}`
+                    );
+                    return {
+                        ...localResult,
+                        message: 'Feedback submitted to DEVSECOPS Hub successfully',
+                        ticketId: devsecopsResult.ticketId
+                    };
+                } else {
+                    vscode.window.showErrorMessage(`❌ Failed to submit to DEVSECOPS Hub: ${devsecopsResult.error}`);
+                    return {
+                        ...localResult,
+                        message: 'Feedback saved locally but DEVSECOPS Hub submission failed',
+                        error: devsecopsResult.error
+                    };
+                }
+            } else if (choice === 'Create GitHub Issue') {
                 const githubResult = await this.createGitHubIssue(payload);
                 if (githubResult.success) {
                     vscode.window.showInformationMessage(
@@ -626,6 +663,480 @@ export class FeedbackService {
         };
 
         return await this.submitFeedback(quickFeedbackData);
+    }
+
+    // ====== DEVSECOPS Hub Integration Methods ======
+
+    /**
+     * Submit feedback to DEVSECOPS Hub (Salesforce) - Internal method
+     */
+    private async submitToDEVSECOPSHubInternal(payload: any): Promise<FeedbackSubmissionResult> {
+        try {
+            // Step 1: Authenticate with Salesforce
+            const accessToken = await this.authenticateWithSalesforce();
+
+            // Step 2: Get Epic and Initiative options
+            const [epicOptions, initiativeOptions] = await Promise.all([
+                this.getEpicOptionsFromSalesforce(accessToken),
+                this.getInitiativeOptionsFromSalesforce(accessToken)
+            ]);
+
+            // Step 3: Select appropriate Epic and Initiative based on component
+            const selectedEpic = this.selectEpicByComponent(epicOptions, payload.component);
+            const selectedInitiative = this.selectInitiativeByComponent(initiativeOptions, payload.component);
+
+            // Step 4: Prepare DEVSECOPS feedback payload
+            const devsecopsPayload: DEVSECOPSFeedbackPayload = {
+                Name: `[${payload.issueType.toUpperCase()}] ${payload.component} - ${payload.description.substring(0, 50)}`,
+                Description__c: await this.formatDEVSECOPSFeedbackDescription(payload),
+                Estimated_Effort_Hours__c: payload.estimatedEffortHours || this.estimateEffortFromPriority(payload.priority),
+                Type__c: this.mapIssueTypeToSalesforceType(payload.issueType),
+                Jira_Acceptance_Criteria__c: payload.acceptanceCriteria || this.generateAcceptanceCriteria(payload),
+                Initiative__c: selectedInitiative.id,
+                Epic__c: selectedEpic.id
+            };
+
+            // Step 5: Submit to Salesforce
+            const result = await this.submitToSalesforce(accessToken, devsecopsPayload);
+            return result;
+
+        } catch (error) {
+            console.error('DEVSECOPS Hub submission failed:', error);
+            return {
+                success: false,
+                message: 'Failed to submit feedback to DEVSECOPS Hub',
+                error: (error as Error).message,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    /**
+     * Authenticate with Salesforce using same method as JIRA service
+     */
+    private async authenticateWithSalesforce(): Promise<string> {
+        try {
+            if (!this.awsService) {
+                throw new Error('AWS service not available. Cannot authenticate with Salesforce.');
+            }
+
+            const salesforceCredentials = this.awsService.getSalesforceCredentials();
+            if (!salesforceCredentials) {
+                throw new Error('Salesforce credentials not available. Please connect to AWS first.');
+            }
+
+            const fullPassword = salesforceCredentials.password.length > 25 || !salesforceCredentials.security_token
+                ? salesforceCredentials.password
+                : salesforceCredentials.password + salesforceCredentials.security_token;
+
+            const authUrl = 'https://test.salesforce.com/services/oauth2/token';
+            const authParams = new URLSearchParams({
+                grant_type: 'password',
+                client_id: salesforceCredentials.client_id,
+                client_secret: salesforceCredentials.client_secret,
+                username: salesforceCredentials.username,
+                password: fullPassword
+            });
+
+            const response = await fetch(authUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cookie': this.getSalesforceCookies()
+                },
+                body: authParams.toString()
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Authentication failed: ${response.status} ${response.statusText}. ${errorText}`);
+            }
+
+            const authData = await response.json();
+            return authData.access_token;
+
+        } catch (error) {
+            console.error('Salesforce authentication failed:', error);
+            throw new Error(`Failed to authenticate with Salesforce: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Get Salesforce base URL from environment variables
+     */
+    private getSalesforceBaseUrl(): string {
+        return 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
+    }
+
+    /**
+     * Get Salesforce cookies from environment variables
+     */
+    private getSalesforceCookies(): string {
+        return 'BrowserId=Wxh7VwjWEfCrsYsz4ODIvg; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1';
+    }
+
+    /**
+     * Get Epic options from Salesforce
+     */
+    private async getEpicOptionsFromSalesforce(accessToken: string): Promise<{ id: string; name: string; teamName?: string }[]> {
+        try {
+            const baseUrl = this.getSalesforceBaseUrl();
+            const query = 'SELECT+Id%2CName%2CTeam_Name__c+FROM+Epic__c+ORDER+BY+CreatedDate+DESC';
+            const queryUrl = `${baseUrl}/services/data/v56.0/query/?q=${query}`;
+
+            const response = await fetch(queryUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Cookie': this.getSalesforceCookies()
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch Epic options: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.records.map((record: any) => ({
+                id: record.Id,
+                name: record.Name,
+                teamName: record.Team_Name__c
+            }));
+
+        } catch (error) {
+            console.error('Failed to get Epic options:', error);
+            // Return default options if API call fails
+            return [
+                { id: 'a53DV000002fCveYAE', name: 'Default Epic - Vibe Assistant' }
+            ];
+        }
+    }
+
+    /**
+     * Get Initiative Group options from Salesforce
+     */
+    private async getInitiativeOptionsFromSalesforce(accessToken: string): Promise<{ id: string; name: string }[]> {
+        try {
+            const baseUrl = this.getSalesforceBaseUrl();
+            const query = 'SELECT+Id%2CName+FROM+Initiative_Group__c';
+            const queryUrl = `${baseUrl}/services/data/v56.0/query/?q=${query}`;
+
+            const response = await fetch(queryUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Cookie': this.getSalesforceCookies()
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch Initiative options: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.records.map((record: any) => ({
+                id: record.Id,
+                name: record.Name
+            }));
+
+        } catch (error) {
+            console.error('Failed to get Initiative options:', error);
+            // Return default options if API call fails
+            return [
+                { id: 'a2sDV000001VekkYAC', name: 'Default Initiative - Vibe Assistant' }
+            ];
+        }
+    }
+
+    /**
+     * Submit feedback payload to Salesforce
+     */
+    private async submitToSalesforce(accessToken: string, payload: DEVSECOPSFeedbackPayload): Promise<FeedbackSubmissionResult> {
+        try {
+            const baseUrl = this.getSalesforceBaseUrl();
+            const createUrl = `${baseUrl}/services/data/v56.0/sobjects/Feedback__c/`;
+
+            const response = await fetch(createUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Cookie': this.getSalesforceCookies()
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Salesforce API Error ${response.status}: ${response.statusText}\n${errorText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                return {
+                    success: true,
+                    message: 'Feedback submitted to DEVSECOPS Hub successfully!',
+                    ticketId: result.id,
+                    timestamp: new Date().toISOString()
+                };
+            } else {
+                throw new Error(`Salesforce returned errors: ${JSON.stringify(result.errors)}`);
+            }
+
+        } catch (error) {
+            console.error('Salesforce submission failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Select Epic based on component
+     */
+    private selectEpicByComponent(epics: { id: string; name: string; teamName?: string }[], component: string): { id: string; name: string } {
+        switch (component) {
+            case 'aws-integration':
+                const awsEpic = epics.find(e => 
+                    e.teamName?.toLowerCase().includes('devsecops') || 
+                    e.name.toLowerCase().includes('aws') ||
+                    e.name.toLowerCase().includes('security')
+                );
+                if (awsEpic) return awsEpic;
+                break;
+            
+            case 'jira-integration':
+                const jiraEpic = epics.find(e => 
+                    e.teamName?.toLowerCase().includes('devsecops') || 
+                    e.name.toLowerCase().includes('jira') ||
+                    e.name.toLowerCase().includes('integration')
+                );
+                if (jiraEpic) return jiraEpic;
+                break;
+            
+            case 'ui':
+                const uiEpic = epics.find(e => 
+                    e.name.toLowerCase().includes('ui') ||
+                    e.name.toLowerCase().includes('interface') ||
+                    e.name.toLowerCase().includes('frontend')
+                );
+                if (uiEpic) return uiEpic;
+                break;
+        }
+
+        // Default to first DevSecOps epic or first epic
+        const defaultEpic = epics.find(e => e.teamName?.toLowerCase().includes('devsecops')) || epics[0];
+        return defaultEpic || { id: 'a53DV000002fCveYAE', name: 'Default Epic - Vibe Assistant' };
+    }
+
+    /**
+     * Select Initiative based on component
+     */
+    private selectInitiativeByComponent(initiatives: { id: string; name: string }[], component: string): { id: string; name: string } {
+        const relevantInitiative = initiatives.find(i => 
+            i.name.toLowerCase().includes('vibe') ||
+            i.name.toLowerCase().includes('assistant') ||
+            i.name.toLowerCase().includes('extension')
+        );
+
+        return relevantInitiative || initiatives[0] || { id: 'a2sDV000001VekkYAC', name: 'Default Initiative - Vibe Assistant' };
+    }
+
+    /**
+     * Format feedback description for DEVSECOPS Hub
+     */
+    private async formatDEVSECOPSFeedbackDescription(payload: any): Promise<string> {
+        let description = `**Issue Type:** ${payload.issueType}\n`;
+        description += `**Priority:** ${payload.priority}\n`;
+        description += `**Component:** ${payload.component}\n\n`;
+        description += `**Description:**\n${payload.description}\n\n`;
+
+        if (payload.systemInfo) {
+            description += `**System Information:**\n`;
+            description += `- Extension Version: ${payload.systemInfo.extensionVersion}\n`;
+            description += `- VS Code Version: ${payload.systemInfo.vscodeVersion}\n`;
+            description += `- Operating System: ${payload.systemInfo.operatingSystem}\n`;
+            description += `- Platform: ${payload.systemInfo.platform}\n`;
+            description += `- Architecture: ${payload.systemInfo.architecture}\n`;
+            description += `- Active Languages: ${payload.systemInfo.activeLanguages.join(', ')}\n\n`;
+        }
+
+        if (payload.awsDetails) {
+            description += `**AWS Configuration:**\n`;
+            description += `- Connection Status: ${payload.awsDetails.connectionStatus}\n`;
+            description += `- Profile: ${payload.awsDetails.configuredProfile || 'default'}\n`;
+            description += `- Region: ${payload.awsDetails.configuredRegion || 'us-east-1'}\n\n`;
+        }
+
+        description += `**Contact:** ${payload.contactEmail || 'Anonymous'}\n`;
+        description += `**Submitted via:** Vibe Code Assistant Extension\n`;
+        description += `**Timestamp:** ${new Date().toISOString()}`;
+
+        return description;
+    }
+
+    /**
+     * Map issue type to Salesforce Type__c values
+     */
+    private mapIssueTypeToSalesforceType(issueType: string): string {
+        switch (issueType) {
+            case 'bug':
+                return 'Bug';
+            case 'feature':
+                return 'Story';
+            case 'support':
+                return 'Task';
+            case 'feedback':
+                return 'Story';
+            default:
+                return 'Story';
+        }
+    }
+
+    /**
+     * Estimate effort hours based on priority
+     */
+    private estimateEffortFromPriority(priority: string): number {
+        switch (priority) {
+            case 'critical':
+                return 24; // 3 days
+            case 'high':
+                return 16; // 2 days
+            case 'medium':
+                return 8;  // 1 day
+            case 'low':
+                return 4;  // Half day
+            default:
+                return 8;
+        }
+    }
+
+    /**
+     * Generate acceptance criteria based on feedback
+     */
+    private generateAcceptanceCriteria(payload: any): string {
+        let criteria = `**Acceptance Criteria for ${payload.issueType}:**\n\n`;
+        
+        switch (payload.issueType) {
+            case 'bug':
+                criteria += `✅ **Given** the current system state\n`;
+                criteria += `✅ **When** the reported scenario is executed\n`;
+                criteria += `✅ **Then** the system should behave as expected without the reported issue\n\n`;
+                criteria += `**Definition of Done:**\n`;
+                criteria += `- [ ] Bug is reproduced and root cause identified\n`;
+                criteria += `- [ ] Fix is implemented and tested\n`;
+                criteria += `- [ ] Regression tests are added\n`;
+                criteria += `- [ ] Fix is verified in the affected component: ${payload.component}`;
+                break;
+                
+            case 'feature':
+                criteria += `✅ **Given** a user needs new functionality\n`;
+                criteria += `✅ **When** they use the requested feature\n`;
+                criteria += `✅ **Then** the feature should work as described\n\n`;
+                criteria += `**Definition of Done:**\n`;
+                criteria += `- [ ] Feature requirements are clarified\n`;
+                criteria += `- [ ] Feature is designed and implemented\n`;
+                criteria += `- [ ] Unit and integration tests are added\n`;
+                criteria += `- [ ] Feature is documented and released`;
+                break;
+                
+            case 'support':
+                criteria += `✅ **Given** a user needs support\n`;
+                criteria += `✅ **When** they follow the provided guidance\n`;
+                criteria += `✅ **Then** their issue should be resolved\n\n`;
+                criteria += `**Definition of Done:**\n`;
+                criteria += `- [ ] User issue is understood and documented\n`;
+                criteria += `- [ ] Solution or workaround is provided\n`;
+                criteria += `- [ ] User confirms the issue is resolved\n`;
+                criteria += `- [ ] Knowledge base is updated if needed`;
+                break;
+                
+            default:
+                criteria += `✅ **Given** the current system\n`;
+                criteria += `✅ **When** the feedback is addressed\n`;
+                criteria += `✅ **Then** the system should be improved\n\n`;
+                criteria += `**Definition of Done:**\n`;
+                criteria += `- [ ] Feedback is reviewed and prioritized\n`;
+                criteria += `- [ ] Appropriate action is taken\n`;
+                criteria += `- [ ] User is notified of the outcome`;
+        }
+
+        return criteria;
+    }
+
+    /**
+     * Public method to get Epic options for DEVSECOPS Hub
+     */
+    public async getEpicOptions(): Promise<{ id: string; name: string; teamName?: string }[]> {
+        try {
+            if (!this.awsService) {
+                return [{ id: 'a53DV000002fCveYAE', name: 'Default Epic - Vibe Assistant' }];
+            }
+
+            const accessToken = await this.authenticateWithSalesforce();
+            return await this.getEpicOptionsFromSalesforce(accessToken);
+        } catch (error) {
+            console.error('Failed to get Epic options:', error);
+            return [{ id: 'a53DV000002fCveYAE', name: 'Default Epic - Vibe Assistant' }];
+        }
+    }
+
+    /**
+     * Public method to get Initiative options for DEVSECOPS Hub
+     */
+    public async getInitiativeOptions(): Promise<{ id: string; name: string }[]> {
+        try {
+            if (!this.awsService) {
+                return [{ id: 'a2sDV000001VekkYAC', name: 'Default Initiative - Vibe Assistant' }];
+            }
+
+            const accessToken = await this.authenticateWithSalesforce();
+            return await this.getInitiativeOptionsFromSalesforce(accessToken);
+        } catch (error) {
+            console.error('Failed to get Initiative options:', error);
+            return [{ id: 'a2sDV000001VekkYAC', name: 'Default Initiative - Vibe Assistant' }];
+        }
+    }
+
+    /**
+     * Public method to submit feedback to DEVSECOPS Hub
+     */
+    public async submitToDEVSECOPSHub(data: any): Promise<FeedbackSubmissionResult> {
+        try {
+            if (!this.awsService) {
+                throw new Error('AWS service not available. Cannot submit to DEVSECOPS Hub.');
+            }
+
+            // Authenticate with Salesforce
+            const accessToken = await this.authenticateWithSalesforce();
+
+            // Prepare DEVSECOPS feedback payload matching exact API format
+            const payload: DEVSECOPSFeedbackPayload = {
+                Name: data.name,
+                Description__c: data.description,
+                Estimated_Effort_Hours__c: parseInt(data.estimatedEffortHours) || 0,
+                Type__c: data.type,
+                Jira_Acceptance_Criteria__c: data.acceptanceCriteria,
+                Initiative__c: data.initiativeId,
+                Epic__c: data.epicId
+            };
+
+            // Add optional completion date if provided (format: "2025-10-06")
+            if (data.completionDate && data.completionDate.trim()) {
+                (payload as any).Estimation_Completion_Date__c = data.completionDate;
+            }
+
+            // Submit to Salesforce
+            const result = await this.submitToSalesforce(accessToken, payload);
+            return result;
+
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Failed to submit feedback to DEVSECOPS Hub',
+                error: (error as Error).message,
+                timestamp: new Date().toISOString()
+            };
+        }
     }
 
     public dispose(): void {

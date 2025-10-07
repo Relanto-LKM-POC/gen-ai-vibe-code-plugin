@@ -569,7 +569,46 @@
     opacity: 0.8;
 }
 
+/* DEVSECOPS Hub Feedback Styles */
+.info-text {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 15px;
+    padding: 8px;
+    background-color: var(--vscode-textBlockQuote-background);
+    border-left: 3px solid var(--vscode-textLink-foreground);
+    border-radius: 2px;
+}
 
+.help-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--vscode-textCodeBlock-background);
+    border-radius: 6px;
+}
+
+.help-section h4 {
+    margin: 0 0 10px 0;
+    color: var(--vscode-textLink-foreground);
+    font-size: 13px;
+}
+
+.help-section ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.help-section li {
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.secondary-button.small {
+    padding: 4px 8px;
+    font-size: 11px;
+    margin-left: 8px;
+}
 
 .loading-indicator {
     display: flex;

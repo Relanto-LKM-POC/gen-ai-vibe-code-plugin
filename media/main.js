@@ -154,32 +154,94 @@
     }
 
     function setupFeedbackEventListeners() {
-        const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
-        const saveDraftBtn = document.getElementById('save-draft-btn');
+        const submitDevSecOpsBtn = document.getElementById('submit-devsecops-feedback-btn');
+        const clearFormBtn = document.getElementById('clear-feedback-form-btn');
 
-        submitFeedbackBtn.addEventListener('click', () => {
-            const feedbackData = {
-                issueType: document.getElementById('issue-type').value,
-                priority: document.getElementById('priority').value,
-                component: document.getElementById('component').value,
-                description: document.getElementById('feedback-description').value,
-                includeSystemInfo: document.getElementById('include-system-info').checked,
-                includeLogs: document.getElementById('include-logs').checked,
-                includeAWSDetails: document.getElementById('include-aws-details').checked,
-                submitAnonymously: document.getElementById('submit-anonymously').checked,
-                contactEmail: document.getElementById('contact-email').value
-            };
+        // Submit DEVSECOPS Hub feedback
+        if (submitDevSecOpsBtn) {
+            submitDevSecOpsBtn.addEventListener('click', () => {
+                const feedbackData = {
+                    name: document.getElementById('feedback-name').value.trim(),
+                    description: document.getElementById('feedback-description').value.trim(),
+                    estimatedEffortHours: parseFloat(document.getElementById('estimated-effort-hours').value) || 0,
+                    type: document.getElementById('feedback-type').value,
+                    acceptanceCriteria: document.getElementById('acceptance-criteria').value.trim(),
+                    epicId: document.getElementById('epic-id').value.trim(),
+                    initiativeId: document.getElementById('initiative-id').value.trim(),
+                    completionDate: document.getElementById('completion-date').value,
+                    contactEmail: document.getElementById('contact-email').value.trim(),
+                    includeSystemInfo: document.getElementById('include-system-info').checked,
+                    includeAWSDetails: document.getElementById('include-aws-details').checked
+                };
 
-            vscode.postMessage({ 
-                command: 'submitFeedback', 
-                data: feedbackData 
+                // Validate required fields
+                if (!feedbackData.name || !feedbackData.description || !feedbackData.type || 
+                    !feedbackData.acceptanceCriteria || !feedbackData.epicId || !feedbackData.initiativeId ||
+                    feedbackData.estimatedEffortHours <= 0) {
+                    showDEVSECOPSFeedbackResult({
+                        success: false,
+                        message: 'Please fill in all required fields marked with *',
+                        error: 'Missing required fields'
+                    });
+                    return;
+                }
+
+                // Validate Salesforce ID format (15 or 18 characters, alphanumeric)
+                const salesforceIdPattern = /^[a-zA-Z0-9]{15,18}$/;
+                if (!salesforceIdPattern.test(feedbackData.epicId)) {
+                    showDEVSECOPSFeedbackResult({
+                        success: false,
+                        message: 'Epic ID must be a valid Salesforce ID (15-18 alphanumeric characters)',
+                        error: 'Invalid Epic ID format'
+                    });
+                    return;
+                }
+
+                if (!salesforceIdPattern.test(feedbackData.initiativeId)) {
+                    showDEVSECOPSFeedbackResult({
+                        success: false,
+                        message: 'Initiative ID must be a valid Salesforce ID (15-18 alphanumeric characters)',
+                        error: 'Invalid Initiative ID format'
+                    });
+                    return;
+                }
+
+                // Disable button and show loading
+                submitDevSecOpsBtn.disabled = true;
+                submitDevSecOpsBtn.textContent = '🔄 Creating Feedback...';
+
+                vscode.postMessage({ 
+                    command: 'submitDEVSECOPSFeedback', 
+                    data: feedbackData 
+                });
             });
-        });
+        }
 
-        saveDraftBtn.addEventListener('click', () => {
-            // Save draft functionality (could be implemented later)
-            showFeedbackResult('Draft saved locally', 'success');
-        });
+
+
+        // Clear form
+        if (clearFormBtn) {
+            clearFormBtn.addEventListener('click', () => {
+                document.getElementById('feedback-name').value = '';
+                document.getElementById('feedback-description').value = '';
+                document.getElementById('estimated-effort-hours').value = '';
+                document.getElementById('feedback-type').value = '';
+                document.getElementById('acceptance-criteria').value = '';
+                document.getElementById('epic-id').value = '';
+                document.getElementById('initiative-id').value = '';
+                document.getElementById('completion-date').value = '';
+                document.getElementById('contact-email').value = '';
+                document.getElementById('include-system-info').checked = true;
+                document.getElementById('include-aws-details').checked = false;
+                
+                showDEVSECOPSFeedbackResult({
+                    success: true,
+                    message: 'Form cleared successfully!'
+                });
+            });
+        }
+
+        // No refresh buttons needed for manual entry form
     }
 
 
@@ -581,6 +643,63 @@
         }, 5000);
     }
 
+    // DEVSECOPS Hub Feedback Functions
+    function showDEVSECOPSFeedbackResult(result) {
+        const resultDiv = document.getElementById('devsecops-feedback-result');
+        const submitBtn = document.getElementById('submit-devsecops-feedback-btn');
+        
+        // Reset button
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '🚀 Create Feedback In DEVSECOPS Hub';
+        }
+        
+        if (resultDiv) {
+            if (result.success) {
+                resultDiv.className = 'feedback-result success';
+                resultDiv.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-icon">✅</span>
+                        <span class="result-title">Success!</span>
+                    </div>
+                    <div class="result-details">
+                        <div class="result-item">
+                            <span class="result-label">Message:</span>
+                            <span class="result-value">${result.message}</span>
+                        </div>
+                        ${result.ticketId ? `
+                        <div class="result-item">
+                            <span class="result-label">Ticket ID:</span>
+                            <span class="result-value">${result.ticketId}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                resultDiv.className = 'feedback-result error';
+                resultDiv.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-icon">❌</span>
+                        <span class="result-title">Submission Failed</span>
+                    </div>
+                    <div class="result-details">
+                        <div class="result-item">
+                            <span class="result-label">Error:</span>
+                            <span class="result-value">${result.error || result.message}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultDiv.style.display = 'block';
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 10000);
+        }
+    }
+
+    // Dropdown population functions removed - using manual entry instead
+
 
 
     // Estimation Notification - DISABLED
@@ -628,6 +747,9 @@
                 break;
             case 'estimationDataResponse':
                 updateEstimationData(message.data);
+                break;
+            case 'devsecopssFeedbackResult':
+                showDEVSECOPSFeedbackResult(message.data);
                 break;
             case 'feedbackResult':
                 showFeedbackResult(message.data.message, message.data.type);

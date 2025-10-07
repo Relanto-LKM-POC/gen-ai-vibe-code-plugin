@@ -45,6 +45,12 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('vibeAssistant.submitFeedback', message.data);
                         break;
 
+                    case 'submitDEVSECOPSFeedback':
+                        vscode.commands.executeCommand('vibeAssistant.submitDEVSECOPSFeedback', message.data);
+                        break;
+
+                    // Dropdown loading commands removed - using manual entry instead
+
                     case 'getEstimationData':
                         this.handleGetEstimationData();
                         break;
@@ -312,79 +318,104 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                         <!-- Feedback Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
-                                <h3>Help & Support</h3>
+                                <h3>🎯 Submit Feedback to DEVSECOPS Hub</h3>
+                                <p class="info-text">Create a new feedback ticket in DEVSECOPS Hub (Salesforce) with the required fields.</p>
+                                
+                                <!-- Mandatory Fields -->
+                                <div class="input-group">
+                                    <label for="feedback-name">Feedback Name: *</label>
+                                    <input type="text" id="feedback-name" placeholder="Brief title for your feedback" required />
+                                </div>
                                 
                                 <div class="input-group">
-                                    <label for="issue-type">Issue Type:</label>
-                                    <select id="issue-type">
-                                        <option value="bug">Bug Report</option>
-                                        <option value="feature">Feature Request</option>
-                                        <option value="feedback">General Feedback</option>
-                                        <option value="support">Support Request</option>
+                                    <label for="feedback-description">Description: *</label>
+                                    <textarea id="feedback-description" rows="6" placeholder="Detailed description of your feedback..." required></textarea>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="estimated-effort-hours">Estimated Effort Hours: *</label>
+                                    <input type="number" id="estimated-effort-hours" placeholder="e.g., 10" min="0.5" step="0.5" required />
+                                    <small class="input-hint">How many hours will this take to complete?</small>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="feedback-type">Type: *</label>
+                                    <select id="feedback-type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="Story">Story</option>
+                                        <option value="Bug">Bug</option>
+                                        <option value="Enhancement">Enhancement</option>
+                                        <option value="Task">Task</option>
                                     </select>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="priority">Priority:</label>
-                                    <select id="priority">
-                                        <option value="low">Low</option>
-                                        <option value="medium" selected>Medium</option>
-                                        <option value="high">High</option>
-                                        <option value="critical">Critical</option>
-                                    </select>
+                                    <label for="acceptance-criteria">Acceptance Criteria: *</label>
+                                    <textarea id="acceptance-criteria" rows="4" placeholder="Define what constitutes completion..." required></textarea>
+                                    <small class="input-hint">What needs to be done for this to be considered complete?</small>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="component">Component:</label>
-                                    <select id="component">
-                                        <option value="aws-integration">AWS Integration</option>
-                                        <option value="jira-integration">JIRA Integration</option>
-                                        <option value="estimation-parser">Estimation Parser</option>
-                                        <option value="ui">User Interface</option>
-                                        <option value="other">Other</option>
-                                    </select>
+                                    <label for="epic-id">Epic ID: *</label>
+                                    <input type="text" id="epic-id" placeholder="e.g., a53DV000002fCveYAE" maxlength="18" pattern="[a-zA-Z0-9]{15,18}" required />
+                                    <small class="input-hint">Enter the 18-character Salesforce Epic ID (e.g., a53DV000002fCveYAE)</small>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="feedback-description">Description:</label>
-                                    <textarea id="feedback-description" rows="6" placeholder="Please describe the issue or feedback in detail..."></textarea>
+                                    <label for="initiative-id">Initiative ID: *</label>
+                                    <input type="text" id="initiative-id" placeholder="e.g., a2sDV000001VekkYAC" maxlength="18" pattern="[a-zA-Z0-9]{15,18}" required />
+                                    <small class="input-hint">Enter the 18-character Salesforce Initiative ID (e.g., a2sDV000001VekkYAC)</small>
                                 </div>
                                 
+                                <!-- Optional Fields -->
+                                <div class="input-group">
+                                    <label for="completion-date">Estimation Completion Date:</label>
+                                    <input type="date" id="completion-date" />
+                                    <small class="input-hint">Optional: When do you estimate this will be completed?</small>
+                                </div>
+                                
+                                <!-- Contact Information -->
+                                <div class="input-group">
+                                    <label for="contact-email">Contact Email:</label>
+                                    <input type="email" id="contact-email" placeholder="your.email@company.com" />
+                                </div>
+                                
+                                <!-- Diagnostic Options -->
                                 <div class="diagnostic-options">
-                                    <h4>Diagnostic Information:</h4>
+                                    <h4>📋 Additional Information:</h4>
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="include-system-info" checked />
                                         <span>Include system information</span>
                                     </label>
                                     <label class="checkbox-label">
-                                        <input type="checkbox" id="include-logs" checked />
-                                        <span>Include recent logs</span>
-                                    </label>
-                                    <label class="checkbox-label">
                                         <input type="checkbox" id="include-aws-details" />
                                         <span>Include AWS connection details</span>
                                     </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="submit-anonymously" />
-                                        <span>Submit anonymously</span>
-                                    </label>
-                                </div>
-                                
-                                <div class="input-group">
-                                    <label for="contact-email">Contact Information:</label>
-                                    <input type="email" id="contact-email" placeholder="your.email@company.com" />
                                 </div>
                                 
                                 <div class="button-group">
-                                    <button class="primary-button" id="submit-feedback-btn">
-                                        Submit Feedback
+                                    <button class="primary-button" id="submit-devsecops-feedback-btn">
+                                        🚀 Create Feedback In DEVSECOPS Hub
                                     </button>
-                                    <button class="secondary-button" id="save-draft-btn">
-                                        Save Draft
+                                    <button class="secondary-button" id="clear-feedback-form-btn">
+                                        🗑️ Clear Form
                                     </button>
                                 </div>
                                 
-                                <div class="feedback-result" id="feedback-result"></div>
+                                <div class="feedback-result" id="devsecops-feedback-result"></div>
+                                
+                                <!-- Help Section -->
+                                <div class="help-section" style="margin-top: 20px; padding: 15px; background: var(--vscode-textCodeBlock-background); border-radius: 6px;">
+                                    <h4>💡 Help</h4>
+                                    <ul style="font-size: 12px; color: var(--vscode-descriptionForeground);">
+                                        <li><strong>Name:</strong> Brief, descriptive title for your feedback</li>
+                                        <li><strong>Description:</strong> Detailed explanation of the issue or request</li>
+                                        <li><strong>Estimated Hours:</strong> Your best guess for implementation time</li>
+                                        <li><strong>Type:</strong> Story (feature), Bug (fix), Enhancement (improvement), Task (work item)</li>
+                                        <li><strong>Acceptance Criteria:</strong> Specific conditions that define "done"</li>
+                                        <li><strong>Epic/Initiative:</strong> Will be auto-populated from Salesforce</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                         
@@ -397,6 +428,18 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                 <script nonce="${nonce}" src="${scriptUri}"></script>
             </body>
             </html>`;
+    }
+
+    /**
+     * Send a message to the webview
+     */
+    public sendMessage(command: string, data?: any): void {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: command,
+                data: data
+            });
+        }
     }
 }
 

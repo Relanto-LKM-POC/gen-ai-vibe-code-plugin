@@ -51,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext) {
         awsService = new AWSService(context);
         estimationParser = new EstimationParser(context);
         jiraService = new JiraService(context, awsService);
-        feedbackService = new FeedbackService(context);
+        feedbackService = new FeedbackService(context, awsService); // Inject AWS service for DEVSECOPS Hub
         
         // Initialize notification manager
         notificationManager = NotificationManager.getInstance(context);
@@ -777,6 +777,29 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    // DEVSECOPS Hub Commands
+    const submitDEVSECOPSFeedbackCommand = vscode.commands.registerCommand('vibeAssistant.submitDEVSECOPSFeedback', async (data: any) => {
+        try {
+            const result = await feedbackService.submitToDEVSECOPSHub(data);
+            
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendMessage('devsecopssFeedbackResult', result);
+            }
+            
+            if (result.success) {
+                vscode.window.showInformationMessage(`✅ Feedback created in DEVSECOPS Hub! Ticket: ${result.ticketId}`);
+            } else {
+                vscode.window.showErrorMessage(`❌ Failed to create feedback: ${result.error}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to submit feedback: ${(error as Error).message}`);
+        }
+    });
+
+    // Dropdown option loading commands removed - using manual entry instead
+
+    // Old dropdown command removed - using form-based submission instead
+
     const configureGitHubTokenCommand = vscode.commands.registerCommand('vibeAssistant.configureGitHubToken', async () => {
         try {
             const currentToken = config.getGitHubToken();
@@ -1193,6 +1216,7 @@ Token will be stored securely in VS Code settings.`;
         retrySalesforceCredentialsCommand,
         updateJiraIssueCommand,
         submitFeedbackCommand,
+
         viewFeedbackHistoryCommand,
         exportFeedbackHistoryCommand,
         clearFeedbackHistoryCommand,
