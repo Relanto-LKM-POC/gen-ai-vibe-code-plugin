@@ -301,10 +301,52 @@ export class FeedbackService {
             console.log('Salesforce response:', { status: response.status, result });
 
             if (response.ok && result.success) {
+                let jiraTicketNumber = result.id; // Fallback to Salesforce ID
+
+                try {
+                    // Retry logic to wait for JIRA ticket creation (as it's asynchronous)
+                    const maxRetries = 3;
+                    const retryDelay = 2000; // 2 seconds
+                    
+                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                        const queryResponse = await fetch(`${baseUrl}/services/data/v56.0/query/?q=SELECT+Id%2CJira_Link__c+FROM+Feedback__c+ORDER+BY+CreatedDate+DESC+LIMIT+1`, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (queryResponse.ok) {
+                            const queryData = await queryResponse.json();
+                            
+                            if (queryData.records && queryData.records.length > 0) {
+                                const latestRecord = queryData.records[0];
+                                
+                                if (latestRecord.Jira_Link__c && latestRecord.Jira_Link__c !== 'TBD') {
+                                    // Extract JIRA ticket number from URL like "https://cisco-learning.atlassian.net/browse/DEVSECOPS-14936"
+                                    const jiraUrlMatch = latestRecord.Jira_Link__c.match(/\/browse\/([A-Z]+-\d+)$/);
+                                    if (jiraUrlMatch) {
+                                        jiraTicketNumber = jiraUrlMatch[1];
+                                        break; // Success! Exit retry loop
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Wait before next attempt (except for the last attempt)
+                        if (attempt < maxRetries) {
+                            await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        }
+                    }
+                } catch (error) {
+                    // Continue with Salesforce ID as fallback
+                }
+
                 return {
                     success: true,
                     message: 'Feedback submitted to Salesforce successfully!',
-                    ticketId: result.id,
+                    ticketId: jiraTicketNumber,
                     timestamp: new Date().toISOString()
                 };
             } else {
