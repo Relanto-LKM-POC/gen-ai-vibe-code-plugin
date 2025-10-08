@@ -42,12 +42,12 @@ export class AWSService {
     }
 
     private getConfiguredProfile(): string {
-        const configuredProfile = vscode.workspace.getConfiguration('vibeAssistant').get('awsProfile', '');
+        const configuredProfile = vscode.workspace.getConfiguration('specDrivenDevelopment').get('awsProfile', '');
         return configuredProfile || ''; // Empty string means use default AWS CLI profile
     }
 
     private getConfiguredRegion(): string {
-        const configuredRegion = vscode.workspace.getConfiguration('vibeAssistant').get('awsRegion', '');
+        const configuredRegion = vscode.workspace.getConfiguration('specDrivenDevelopment').get('awsRegion', '');
         return configuredRegion || ''; // Empty string means use default AWS CLI region
     }
 
@@ -83,7 +83,7 @@ export class AWSService {
         const envValue = this.readFromEnvFile('SALESFORCE_SECRET_NAME');
         if (envValue) return envValue;
         
-        const configuredSecret = vscode.workspace.getConfiguration('vibeAssistant').get('salesforceSecretName', '');
+        const configuredSecret = vscode.workspace.getConfiguration('specDrivenDevelopment').get('salesforceSecretName', '');
         return configuredSecret || 'salesforce';
     }
 
@@ -95,7 +95,7 @@ export class AWSService {
             return envValue.split(',').map(k => k.trim()).filter(k => k.length > 0);
         }
         
-        const configuredKeywords = vscode.workspace.getConfiguration('vibeAssistant').get('salesforceSecretKeywords', []);
+        const configuredKeywords = vscode.workspace.getConfiguration('specDrivenDevelopment').get('salesforceSecretKeywords', []);
         return configuredKeywords.length > 0 ? configuredKeywords : ['salesforce', 'sf', 'crm', 'sales', 'force'];
     }
 
@@ -141,7 +141,7 @@ export class AWSService {
                 error: salesforceCredentialsAvailable ? undefined : 'Salesforce credentials not found - JIRA features may be limited'
             };
 
-            await this.context.globalState.update('vibeAssistant.awsStatus', this.connectionStatus);
+            await this.context.globalState.update('specDrivenDevelopment.awsStatus', this.connectionStatus);
             return this.connectionStatus;
         } catch (error) {
             const errorStatus: AWSConnectionStatus = {
@@ -266,7 +266,7 @@ export class AWSService {
                 error: 'AWS credentials expired or invalid'
             };
             this.salesforceCredentials = undefined;
-            await this.context.globalState.update('vibeAssistant.awsStatus', this.connectionStatus);
+            await this.context.globalState.update('specDrivenDevelopment.awsStatus', this.connectionStatus);
             return this.connectionStatus;
         }
     }
@@ -333,7 +333,7 @@ export class AWSService {
                     `No secret found matching "${configuredSecretName}" or fallback keywords [${fallbackKeywords.join(', ')}]. ` +
                     `Available secrets (${availableSecrets.length}): ${availableSecrets.join(', ') || 'None'}. ` +
                     `Looking in${regionMsg},${profileMsg}. ` +
-                    `Please update the "vibeAssistant.salesforceSecretName" setting or create a secret with the configured name.`
+                    `Please update the "specDrivenDevelopment.salesforceSecretName" setting or create a secret with the configured name.`
                 );
             }
             
@@ -390,7 +390,7 @@ export class AWSService {
             // Update connection status to reflect successful credentials fetch
             if (this.connectionStatus.connected) {
                 this.connectionStatus.error = undefined;
-                await this.context.globalState.update('vibeAssistant.awsStatus', this.connectionStatus);
+                await this.context.globalState.update('specDrivenDevelopment.awsStatus', this.connectionStatus);
             }
             
             return { success: true };
@@ -428,7 +428,7 @@ export class AWSService {
 
     public async disconnect(): Promise<void> {
         this.connectionStatus = { connected: false, status: 'disconnected' };
-        await this.context.globalState.update('vibeAssistant.awsStatus', undefined);
+        await this.context.globalState.update('specDrivenDevelopment.awsStatus', undefined);
         this.salesforceCredentials = undefined;
     }
 

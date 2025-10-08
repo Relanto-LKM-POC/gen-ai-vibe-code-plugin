@@ -374,7 +374,7 @@ export class FeedbackService {
      */
     public async saveDraft(feedbackData: Partial<FeedbackData>): Promise<void> {
         try {
-            const drafts = this.context.globalState.get<any[]>('vibeAssistant.feedbackDrafts', []);
+            const drafts = this.context.globalState.get<any[]>('specDrivenDevelopment.feedbackDrafts', []);
             const newDraft = {
                 ...feedbackData,
                 id: this.generateSubmissionId(),
@@ -382,7 +382,7 @@ export class FeedbackService {
             };
 
             const updatedDrafts = [newDraft, ...drafts.slice(0, 4)]; // Keep last 5 drafts
-            await this.context.globalState.update('vibeAssistant.feedbackDrafts', updatedDrafts);
+            await this.context.globalState.update('specDrivenDevelopment.feedbackDrafts', updatedDrafts);
 
         } catch (error) {
             console.error('Failed to save feedback draft:', error);
@@ -393,7 +393,7 @@ export class FeedbackService {
      * Get saved drafts
      */
     public async getDrafts(): Promise<any[]> {
-        return this.context.globalState.get<any[]>('vibeAssistant.feedbackDrafts', []);
+        return this.context.globalState.get<any[]>('specDrivenDevelopment.feedbackDrafts', []);
     }
 
     /**
@@ -401,9 +401,9 @@ export class FeedbackService {
      */
     public async deleteDraft(draftId: string): Promise<void> {
         try {
-            const drafts = this.context.globalState.get<any[]>('vibeAssistant.feedbackDrafts', []);
+            const drafts = this.context.globalState.get<any[]>('specDrivenDevelopment.feedbackDrafts', []);
             const updatedDrafts = drafts.filter(draft => draft.id !== draftId);
-            await this.context.globalState.update('vibeAssistant.feedbackDrafts', updatedDrafts);
+            await this.context.globalState.update('specDrivenDevelopment.feedbackDrafts', updatedDrafts);
         } catch (error) {
             console.error('Failed to delete feedback draft:', error);
         }
@@ -492,12 +492,12 @@ export class FeedbackService {
             };
 
             // Store most recent submission
-            await this.context.globalState.update('vibeAssistant.lastFeedbackSubmission', submission);
+            await this.context.globalState.update('specDrivenDevelopment.lastFeedbackSubmission', submission);
 
             // Add to submission history
-            const history = this.context.globalState.get<any[]>('vibeAssistant.feedbackHistory', []);
+            const history = this.context.globalState.get<any[]>('specDrivenDevelopment.feedbackHistory', []);
             const updatedHistory = [submission, ...history.slice(0, 9)]; // Keep last 10 submissions
-            await this.context.globalState.update('vibeAssistant.feedbackHistory', updatedHistory);
+            await this.context.globalState.update('specDrivenDevelopment.feedbackHistory', updatedHistory);
 
         } catch (error) {
             console.error('Failed to cache feedback submission:', error);
@@ -505,16 +505,16 @@ export class FeedbackService {
     }
 
     public async getSubmissionHistory(): Promise<any[]> {
-        return this.context.globalState.get<any[]>('vibeAssistant.feedbackHistory', []);
+        return this.context.globalState.get<any[]>('specDrivenDevelopment.feedbackHistory', []);
     }
 
     public async getLastSubmission(): Promise<any> {
-        return this.context.globalState.get('vibeAssistant.lastFeedbackSubmission');
+        return this.context.globalState.get('specDrivenDevelopment.lastFeedbackSubmission');
     }
 
     public async clearSubmissionHistory(): Promise<void> {
-        await this.context.globalState.update('vibeAssistant.lastFeedbackSubmission', undefined);
-        await this.context.globalState.update('vibeAssistant.feedbackHistory', []);
+        await this.context.globalState.update('specDrivenDevelopment.lastFeedbackSubmission', undefined);
+        await this.context.globalState.update('specDrivenDevelopment.feedbackHistory', []);
     }
 
     /**

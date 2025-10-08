@@ -1,10 +1,10 @@
-# Vibe Code Assistant - Enterprise Salesforce Integration
+# Spec Driven Development - Enterprise Salesforce Integration
 
 **Transform your enterprise feedback workflow with secure AWS connectivity and intelligent Salesforce integration.**
 
-## 🚀 What is Vibe Code Assistant?
+## 🚀 What is Spec Driven Development?
 
-Vibe Code Assistant is a powerful VS Code extension that streamlines enterprise feedback submission through **secure AWS Secrets Manager integration**, **intelligent Salesforce API connectivity**, and **dynamic field discovery**. It provides a seamless interface for submitting feedback to Salesforce with real-time validation and smart relationship-based filtering.
+Spec Driven Development is a powerful VS Code extension that streamlines enterprise feedback submission through **secure AWS Secrets Manager integration**, **intelligent Salesforce API connectivity**, and **dynamic field discovery**. It provides a seamless interface for submitting feedback to Salesforce with real-time validation and smart relationship-based filtering.
 
 ## ✨ Key Features
 
@@ -114,10 +114,10 @@ your-project/
 
 ## ⚙️ Configuration Options
 
-- `vibeAssistant.autoApplyInstructions` - Automatically apply instructions (default: true)
-- `vibeAssistant.enableContextualPrompts` - Enable smart prompts (default: true)
-- `vibeAssistant.showNotifications` - Show instruction notifications (default: true)
-- `vibeAssistant.autoIgnoreAIFiles` - Auto-add to .gitignore (default: true)
+- `specDrivenDevelopment.autoApplyInstructions` - Automatically apply instructions (default: true)
+- `specDrivenDevelopment.enableContextualPrompts` - Enable smart prompts (default: true)
+- `specDrivenDevelopment.showNotifications` - Show instruction notifications (default: true)
+- `specDrivenDevelopment.autoIgnoreAIFiles` - Auto-add to .gitignore (default: true)
 
 ## 🔧 System Requirements
 
@@ -143,21 +143,21 @@ your-project/
 
 ## 📖 Documentation
 
-For detailed usage instructions, examples, and troubleshooting, visit our [GitHub repository](https://github.com/vibe-tech/vibe-code-assistant-extension).
+For detailed usage instructions, examples, and troubleshooting, visit our [GitHub repository](https://github.com/Relanto-LKM-POC/spec-driven-development).
 
 ## 🤝 Support & Feedback
 
-- **Issues & Bug Reports**: [GitHub Issues](https://github.com/vibe-tech/vibe-code-assistant-extension/issues)
+- **Issues & Bug Reports**: [GitHub Issues](https://github.com/Relanto-LKM-POC/spec-driven-development/issues)
 - **Feature Requests**: Submit via GitHub Issues
 - **Documentation**: Available in the repository README
 - **Community**: Join our discussions on GitHub
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/vibe-tech/vibe-code-assistant-extension/blob/main/LICENSE) file for details.
+MIT License - see [LICENSE](https://github.com/Relanto-LKM-POC/spec-driven-development/blob/main/LICENSE) file for details.
 
 ---
 
-**Enhance your development workflow today with Vibe Code Assistant - where intelligent automation meets coding excellence.**
+**Enhance your development workflow today with Spec Driven Development - where intelligent automation meets coding excellence.**
 
-*Ready to supercharge GitHub Copilot? Install Vibe Code Assistant now and experience the future of AI-assisted development!* 🚀
+*Ready to supercharge GitHub Copilot? Install Spec Driven Development now and experience the future of AI-assisted development!* 🚀

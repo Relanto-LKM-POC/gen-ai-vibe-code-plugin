@@ -14,7 +14,7 @@ export class CopilotIntegration {
     private isManualCommand: boolean = false;
 
     constructor() {
-        this.outputChannel = vscode.window.createOutputChannel('Vibe Code Assistant');
+        this.outputChannel = vscode.window.createOutputChannel('Spec Driven Development');
     }
 
     public async applyInstructionsToWorkspace(instructions: Instruction[], prompt?: Prompt): Promise<void> {
@@ -30,7 +30,7 @@ export class CopilotIntegration {
             })));
             
             // Show notification if enabled
-            const config = vscode.workspace.getConfiguration('vibeAssistant');
+            const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
             const showNotifications = config.get('showNotifications', true);
             
             // Only show notifications for manual commands, not automatic file switching
@@ -94,7 +94,7 @@ export class CopilotIntegration {
             })));
             
             // Show notification
-            const config = vscode.workspace.getConfiguration('vibeAssistant');
+            const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
             const showNotifications = config.get('showNotifications', true);
             
             if (showNotifications && this.shouldShowNotification()) {
@@ -154,7 +154,7 @@ export class CopilotIntegration {
         await this.copyAdditionalResourcesToWorkspace(workspaceRoot);
         
         // Check user preference for .gitignore handling
-        const config = vscode.workspace.getConfiguration('vibeAssistant');
+        const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
         const autoIgnore = config.get('autoIgnoreAIFiles', true);
         
         if (autoIgnore) {
@@ -460,7 +460,7 @@ export class CopilotIntegration {
             
             if (nonVibeFiles.length > 0) {
                 console.log(`📁 .github folder contains existing files: ${nonVibeFiles.map(([name]) => name).join(', ')}`);
-                console.log('📁 Vibe Assistant will coexist with existing .github content');
+                console.log('📁 Spec Driven Development will coexist with existing .github content');
             }
         } catch {
             // .github directory doesn't exist yet, that's fine
@@ -809,8 +809,8 @@ export class CopilotIntegration {
         let additions = '';
         
         // Add header if we're adding new entries
-        if (!gitignoreContent.includes('# Vibe Code Assistant')) {
-            additions += '\n# Vibe Code Assistant - AI Instructions & Prompts\n';
+        if (!gitignoreContent.includes('# Spec Driven Development')) {
+            additions += '\n# Spec Driven Development - AI Instructions & Prompts\n';
             additions += '# Auto-generated AI guidance files - excluded from version control\n';
         }
         

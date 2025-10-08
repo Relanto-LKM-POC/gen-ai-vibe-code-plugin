@@ -1,4 +1,4 @@
-# Vibe Code Assistant
+# Spec Driven Development
 
 > **🎯 Intelligent GitHub Copilot Enhancement with Context-Aware Development Resources**
 
@@ -7,7 +7,13 @@
 
 ## 🚀 What Does This Extension Do?
 
-**Vibe Code Assistant** is a powerful VS Code extension that enhances your development workflow by providing:
+### Spec Driven Development
+
+*Supercharge GitHub Copilot with intelligent, context-aware coding instructions and workspace enhancement*
+
+## 🎯 Overview
+
+**Spec Driven Development** is a powerful VS Code extension that enhances your development workflow by providing:
 
 - 🧠 **Intelligent Context Analysis** - Automatically detects your project's technologies and frameworks
 - 📚 **Comprehensive Development Resources** - Creates language-specific instructions and best practices
@@ -90,13 +96,13 @@ The extension creates comprehensive development resources in your workspace:
 ### 🔧 **VS Code Extension Settings**
 ```json
 {
-  "vibeAssistant.githubRepository": "owner/repo-name",
-  "vibeAssistant.githubToken": "your-github-token",
-  "vibeAssistant.enableAutoDocumentParsing": false,
-  "vibeAssistant.awsProfile": "",
-  "vibeAssistant.awsRegion": "",
-  "vibeAssistant.salesforceSecretName": "salesforce",
-  "vibeAssistant.salesforceSecretKeywords": ["salesforce", "sf", "crm"]
+  "specDrivenDevelopment.githubRepository": "owner/repo-name",
+  "specDrivenDevelopment.githubToken": "your-github-token",
+  "specDrivenDevelopment.enableAutoDocumentParsing": false,
+  "specDrivenDevelopment.awsProfile": "",
+  "specDrivenDevelopment.awsRegion": "",
+  "specDrivenDevelopment.salesforceSecretName": "salesforce",
+  "specDrivenDevelopment.salesforceSecretKeywords": ["salesforce", "sf", "crm"]
 }
 ```
 
@@ -265,7 +271,7 @@ Built with TypeScript and VS Code Extension API:
 ```bash
 # 1. Clone and setup
 git clone <repository-url>
-cd vibe-code-assistant-extension
+cd spec-driven-development
 
 # 2. Install dependencies
 npm install
@@ -288,7 +294,7 @@ npm run watch    # Auto-recompile on file changes
 
 # Method 2: Package and Install
 npm run package
-code --install-extension vibe-code-assistant-<version>.vsix
+code --install-extension spec-driven-development-<version>.vsix
 ```
 
 ### 📦 **Available Scripts**
@@ -332,13 +338,13 @@ npm run test            # Run tests (if available)
 **Enable Debug Mode:**
 ```json
 {
-  "vibeAssistant.enableAutoDocumentParsing": true
+  "specDrivenDevelopment.enableAutoDocumentParsing": true
 }
 ```
 
 **Check Logs:**
 1. Open VS Code Output panel (`View > Output`)
-2. Select "Vibe Code Assistant" from dropdown
+2. Select "Spec Driven Development" from dropdown
 3. Check for error messages and warnings
 
 **Common Log Messages:**
@@ -444,7 +450,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 <div align="center">
 
-**🎯 Vibe Code Assistant** • **Intelligent Development Enhancement**
+**🎯 Spec Driven Development** • **Intelligent Development Enhancement**
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.74.0+-007ACC.svg)](https://code.visualstudio.com/)

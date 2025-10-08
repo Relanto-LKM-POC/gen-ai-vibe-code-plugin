@@ -5,7 +5,7 @@ import { PromptManager } from './promptManager';
 import { ContextAnalyzer } from './contextAnalyzer';
 import { CopilotIntegration } from './copilotIntegration';
 import { ResourceManager } from './resourceManager';
-import { VibeAssistantPanel } from './ui/webviewPanel';
+import { SpecDrivenDevelopmentPanel } from './ui/webviewPanel';
 import { AWSService } from './services/awsService';
 import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
@@ -18,7 +18,7 @@ let promptManager: PromptManager;
 let contextAnalyzer: ContextAnalyzer;
 let copilotIntegration: CopilotIntegration;
 let resourceManager: ResourceManager;
-let vibeAssistantPanel: VibeAssistantPanel;
+let specDrivenDevelopmentPanel: SpecDrivenDevelopmentPanel;
 let awsService: AWSService;
 let estimationParser: EstimationParser;
 let jiraService: JiraService;
@@ -31,11 +31,11 @@ declare global {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('🎯 Vibe Code Assistant is now active!');
+    console.log('🎯 Spec Driven Development is now active!');
 
     try {
         // Clear any stale cached estimation data on activation to prevent unwanted notifications
-        await context.globalState.update('vibeAssistant.estimationData', undefined);
+        await context.globalState.update('specDrivenDevelopment.estimationData', undefined);
         
         // Initialize managers
         instructionManager = new InstructionManager(context.extensionPath);
@@ -57,10 +57,10 @@ export async function activate(context: vscode.ExtensionContext) {
         notificationManager = NotificationManager.getInstance(context);
 
         // Initialize UI providers
-        vibeAssistantPanel = new VibeAssistantPanel(context);
+        specDrivenDevelopmentPanel = new SpecDrivenDevelopmentPanel(context);
 
         // Register webview panel provider
-        vscode.window.registerWebviewViewProvider('vibeAssistantPanel', vibeAssistantPanel);
+        vscode.window.registerWebviewViewProvider('specDrivenDevelopmentPanel', specDrivenDevelopmentPanel);
 
         // Register commands
         registerCommands(context);
@@ -76,9 +76,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Show status bar - updated to open the new panel
         const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-        statusBarItem.text = "$(dashboard) Vibe Assistant";
-        statusBarItem.tooltip = "Vibe Code Assistant - Click to open panel (AWS, JIRA, Feedback)";
-        statusBarItem.command = 'vibeAssistant.openPanel';
+        statusBarItem.text = "$(dashboard) Spec Driven Development";
+        statusBarItem.tooltip = "Spec Driven Development - Click to open panel (AWS, JIRA, Feedback)";
+        statusBarItem.command = 'specDrivenDevelopment.openPanel';
         statusBarItem.show();
         context.subscriptions.push(statusBarItem);
 
@@ -86,14 +86,14 @@ export async function activate(context: vscode.ExtensionContext) {
         const hasShownWelcome = context.globalState.get('hasShownWelcome', false);
         if (!hasShownWelcome) {
             const action = await vscode.window.showInformationMessage(
-                '🎉 Welcome to Vibe Code Assistant! Click the status bar to open the management panel with AWS integration, JIRA connectivity, and feedback system.',
+                '🎉 Welcome to Spec Driven Development! Click the status bar to open the management panel with AWS integration, JIRA connectivity, and feedback system.',
                 'Open Panel',
                 'Learn More',
                 'Got it'
             );
             
             if (action === 'Open Panel') {
-                vscode.commands.executeCommand('vibeAssistant.openPanel');
+                vscode.commands.executeCommand('specDrivenDevelopment.openPanel');
             } else if (action === 'Learn More') {
                 vscode.env.openExternal(vscode.Uri.parse(config.getDocumentationUrls().readme));
             }
@@ -113,11 +113,11 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }, 2000);
 
-        console.log('✅ Vibe Code Assistant activated successfully');
+        console.log('✅ Spec Driven Development activated successfully');
 
     } catch (error) {
-        console.error('❌ Failed to activate Vibe Code Assistant:', error);
-        vscode.window.showErrorMessage(`Failed to activate Vibe Code Assistant: ${error}`);
+        console.error('❌ Failed to activate Spec Driven Development:', error);
+        vscode.window.showErrorMessage(`Failed to activate Spec Driven Development: ${error}`);
     }
 }
 
@@ -139,7 +139,7 @@ async function initializeWorkspace(): Promise<void> {
 
 function registerCommands(context: vscode.ExtensionContext) {
     // Analyze Code & Apply Instructions
-    const analyzeCodeCommand = vscode.commands.registerCommand('vibeAssistant.analyzeCode', async () => {
+    const analyzeCodeCommand = vscode.commands.registerCommand('specDrivenDevelopment.analyzeCode', async () => {
         try {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -245,7 +245,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Suggest Contextual Prompt
-    const suggestPromptCommand = vscode.commands.registerCommand('vibeAssistant.suggestPrompt', async () => {
+    const suggestPromptCommand = vscode.commands.registerCommand('specDrivenDevelopment.suggestPrompt', async () => {
         try {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -317,12 +317,12 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Open Instructions Panel
-    const openInstructionsCommand = vscode.commands.registerCommand('vibeAssistant.openInstructions', () => {
-        vscode.commands.executeCommand('vibeAssistantInstructions.focus');
+    const openInstructionsCommand = vscode.commands.registerCommand('specDrivenDevelopment.openInstructions', () => {
+        vscode.commands.executeCommand('specDrivenDevelopmentInstructions.focus');
     });
 
     // Apply Copilot Instructions
-    const applyCopilotInstructionsCommand = vscode.commands.registerCommand('vibeAssistant.applyCopilotInstructions', async () => {
+    const applyCopilotInstructionsCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyCopilotInstructions', async () => {
         try {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -348,24 +348,24 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Show Prompts Sidebar
-    const showPromptSidebarCommand = vscode.commands.registerCommand('vibeAssistant.showPromptSidebar', () => {
-        vscode.commands.executeCommand('vibeAssistantPrompts.focus');
+    const showPromptSidebarCommand = vscode.commands.registerCommand('specDrivenDevelopment.showPromptSidebar', () => {
+        vscode.commands.executeCommand('specDrivenDevelopmentPrompts.focus');
     });
 
     // Refresh Instructions
-    const refreshInstructionsCommand = vscode.commands.registerCommand('vibeAssistant.refreshInstructions', () => {
+    const refreshInstructionsCommand = vscode.commands.registerCommand('specDrivenDevelopment.refreshInstructions', () => {
         instructionManager.refreshInstructions();
         vscode.window.showInformationMessage('Instructions refreshed successfully');
     });
 
     // Refresh Prompts
-    const refreshPromptsCommand = vscode.commands.registerCommand('vibeAssistant.refreshPrompts', () => {
+    const refreshPromptsCommand = vscode.commands.registerCommand('specDrivenDevelopment.refreshPrompts', () => {
         promptManager.refreshPrompts();
         vscode.window.showInformationMessage('Prompts refreshed successfully');
     });
 
     // Search Instructions
-    const searchInstructionsCommand = vscode.commands.registerCommand('vibeAssistant.searchInstructions', async () => {
+    const searchInstructionsCommand = vscode.commands.registerCommand('specDrivenDevelopment.searchInstructions', async () => {
         const query = await vscode.window.showInputBox({
             placeHolder: 'Search instructions...',
             prompt: 'Enter search terms for instructions'
@@ -403,7 +403,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Search Prompts
-    const searchPromptsCommand = vscode.commands.registerCommand('vibeAssistant.searchPrompts', async () => {
+    const searchPromptsCommand = vscode.commands.registerCommand('specDrivenDevelopment.searchPrompts', async () => {
         const query = await vscode.window.showInputBox({
             placeHolder: 'Search prompts...',
             prompt: 'Enter search terms for prompts'
@@ -445,7 +445,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Apply Resource Files command
-    const applyResourceFilesCommand = vscode.commands.registerCommand('vibeAssistant.applyResourceFiles', async () => {
+    const applyResourceFilesCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyResourceFiles', async () => {
         try {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -528,15 +528,15 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    // New Vibe Assistant Panel Commands
-    const openPanelCommand = vscode.commands.registerCommand('vibeAssistant.openPanel', async () => {
-        // First, ensure the Vibe Assistant view container is visible
-        await vscode.commands.executeCommand('workbench.view.extension.vibeAssistant');
+    // New Spec Driven Development Panel Commands
+    const openPanelCommand = vscode.commands.registerCommand('specDrivenDevelopment.openPanel', async () => {
+        // First, ensure the Spec Driven Development view container is visible
+        await vscode.commands.executeCommand('workbench.view.extension.specDrivenDevelopment');
         // Then focus on the panel specifically
-        await vscode.commands.executeCommand('vibeAssistantPanel.focus');
+        await vscode.commands.executeCommand('specDrivenDevelopmentPanel.focus');
     });
 
-    const connectAWSCommand = vscode.commands.registerCommand('vibeAssistant.connectAWS', async () => {
+    const connectAWSCommand = vscode.commands.registerCommand('specDrivenDevelopment.connectAWS', async () => {
         try {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -546,8 +546,8 @@ function registerCommands(context: vscode.ExtensionContext) {
                 progress.report({ increment: 0, message: 'Testing AWS CLI credentials...' });
                 const status = await awsService.connectToAWS();
                 
-                if (vibeAssistantPanel) {
-                    vibeAssistantPanel.updateAWSStatus(status);
+                if (specDrivenDevelopmentPanel) {
+                    specDrivenDevelopmentPanel.updateAWSStatus(status);
                 }
                 
                 if (status.connected) {
@@ -561,11 +561,11 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const refreshAWSConnectionCommand = vscode.commands.registerCommand('vibeAssistant.refreshAWSConnection', async () => {
+    const refreshAWSConnectionCommand = vscode.commands.registerCommand('specDrivenDevelopment.refreshAWSConnection', async () => {
         try {
             const status = await awsService.refreshConnection();
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.updateAWSStatus(status);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateAWSStatus(status);
             }
             vscode.window.showInformationMessage('AWS connection refreshed');
         } catch (error) {
@@ -573,23 +573,23 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const getRealTimeAWSStatusCommand = vscode.commands.registerCommand('vibeAssistant.getRealTimeAWSStatus', async () => {
+    const getRealTimeAWSStatusCommand = vscode.commands.registerCommand('specDrivenDevelopment.getRealTimeAWSStatus', async () => {
         try {
             const status = await awsService.getRealTimeConnectionStatus();
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.updateAWSStatus(status);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateAWSStatus(status);
             }
             return status;
         } catch (error) {
             const errorStatus = { connected: false, status: 'error' as const, error: (error as Error).message };
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.updateAWSStatus(errorStatus);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateAWSStatus(errorStatus);
             }
             return errorStatus;
         }
     });
 
-    const getEnhancedAWSStatusCommand = vscode.commands.registerCommand('vibeAssistant.getEnhancedAWSStatus', async () => {
+    const getEnhancedAWSStatusCommand = vscode.commands.registerCommand('specDrivenDevelopment.getEnhancedAWSStatus', async () => {
         try {
             const enhancedStatus = await awsService.checkEnhancedConnectionStatus();
             
@@ -622,8 +622,8 @@ function registerCommands(context: vscode.ExtensionContext) {
                 availableFields: enhancedStatus.availableFields
             };
             
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.updateEnhancedAWSStatus();
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateEnhancedAWSStatus();
             }
             return transformedStatus;
         } catch (error) {
@@ -636,7 +636,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const listAWSSecretsCommand = vscode.commands.registerCommand('vibeAssistant.listAWSSecrets', async () => {
+    const listAWSSecretsCommand = vscode.commands.registerCommand('specDrivenDevelopment.listAWSSecrets', async () => {
         try {
             const result = await awsService.listAvailableSecrets();
             const secretsList = result.secrets.length > 0 ? result.secrets.join(', ') : 'No secrets found';
@@ -651,7 +651,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const retrySalesforceCredentialsCommand = vscode.commands.registerCommand('vibeAssistant.retrySalesforceCredentials', async () => {
+    const retrySalesforceCredentialsCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrySalesforceCredentials', async () => {
         try {
             const credentials = await awsService.retryFetchSalesforceCredentials();
             if (credentials) {
@@ -669,11 +669,11 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const updateJiraIssueCommand = vscode.commands.registerCommand('vibeAssistant.updateJiraIssue', async (data: any) => {
+    const updateJiraIssueCommand = vscode.commands.registerCommand('specDrivenDevelopment.updateJiraIssue', async (data: any) => {
         try {
             const result = await jiraService.updateJiraIssue(data);
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.updateJiraStatus(result);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateJiraStatus(result);
             }
             
             if (result.success) {
@@ -686,41 +686,41 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const loadInitiativesCommand = vscode.commands.registerCommand('vibeAssistant.loadInitiatives', async () => {
+    const loadInitiativesCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadInitiatives', async () => {
         try {
             const initiatives = await feedbackService.getInitiatives();
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendInitiatives(initiatives);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendInitiatives(initiatives);
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to load initiatives: ${(error as Error).message}`);
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendInitiatives([]);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendInitiatives([]);
             }
         }
     });
 
-    const loadEpicsCommand = vscode.commands.registerCommand('vibeAssistant.loadEpics', async () => {
+    const loadEpicsCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadEpics', async () => {
         try {
             const epics = await feedbackService.getEpics();
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendEpics(epics);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendEpics(epics);
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to load epics: ${(error as Error).message}`);
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendEpics([]);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendEpics([]);
             }
         }
     });
 
-    const submitFeedbackCommand = vscode.commands.registerCommand('vibeAssistant.submitFeedback', async (data: any) => {
+    const submitFeedbackCommand = vscode.commands.registerCommand('specDrivenDevelopment.submitFeedback', async (data: any) => {
         try {
             const result = await feedbackService.submitFeedback(data);
             
             // Send result back to webview
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendFeedbackResult(
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendFeedbackResult(
                     result.message + (result.ticketId ? ` (${result.ticketId})` : ''),
                     result.success ? 'success' : 'error'
                 );
@@ -736,8 +736,8 @@ function registerCommands(context: vscode.ExtensionContext) {
             const errorMessage = `Failed to submit feedback: ${(error as Error).message}`;
             
             // Send error back to webview
-            if (vibeAssistantPanel) {
-                vibeAssistantPanel.sendFeedbackResult(errorMessage, 'error');
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendFeedbackResult(errorMessage, 'error');
             }
             
             vscode.window.showErrorMessage(errorMessage);
@@ -745,7 +745,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Add feedback management commands
-    const viewFeedbackHistoryCommand = vscode.commands.registerCommand('vibeAssistant.viewFeedbackHistory', async () => {
+    const viewFeedbackHistoryCommand = vscode.commands.registerCommand('specDrivenDevelopment.viewFeedbackHistory', async () => {
         try {
             const history = await feedbackService.getSubmissionHistory();
             
@@ -777,7 +777,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const exportFeedbackHistoryCommand = vscode.commands.registerCommand('vibeAssistant.exportFeedbackHistory', async () => {
+    const exportFeedbackHistoryCommand = vscode.commands.registerCommand('specDrivenDevelopment.exportFeedbackHistory', async () => {
         try {
             const history = await feedbackService.getSubmissionHistory();
             
@@ -787,7 +787,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
 
             const uri = await vscode.window.showSaveDialog({
-                defaultUri: vscode.Uri.file('vibe-assistant-feedback.json'),
+                defaultUri: vscode.Uri.file('spec-driven-development-feedback.json'),
                 filters: {
                     'JSON': ['json'],
                     'Text': ['txt']
@@ -804,7 +804,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const clearFeedbackHistoryCommand = vscode.commands.registerCommand('vibeAssistant.clearFeedbackHistory', async () => {
+    const clearFeedbackHistoryCommand = vscode.commands.registerCommand('specDrivenDevelopment.clearFeedbackHistory', async () => {
         try {
             const confirm = await vscode.window.showWarningMessage(
                 'Are you sure you want to clear all feedback history?',
@@ -821,7 +821,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const configureGitHubTokenCommand = vscode.commands.registerCommand('vibeAssistant.configureGitHubToken', async () => {
+    const configureGitHubTokenCommand = vscode.commands.registerCommand('specDrivenDevelopment.configureGitHubToken', async () => {
         try {
             const currentToken = config.getGitHubToken();
             const hasToken = currentToken && currentToken.length > 0;
@@ -862,7 +862,7 @@ function registerCommands(context: vscode.ExtensionContext) {
 
 1. Go to GitHub Settings → Developer settings → Personal access tokens
 2. Click "Generate new token (classic)"
-3. Give it a name like "Vibe Assistant Extension"
+3. Give it a name like "Spec Driven Development Extension"
 4. Select scopes: 'repo' (for private repos) or 'public_repo' (for public repos only)
 5. Click "Generate token"
 6. Copy the token (you won't see it again!)
@@ -925,7 +925,7 @@ Token will be stored securely in VS Code settings.`;
     });
 
     // Analyze Folder Code & Apply Instructions
-    const analyzeFolderCodeCommand = vscode.commands.registerCommand('vibeAssistant.analyzeFolderCode', async (folderUri: vscode.Uri) => {
+    const analyzeFolderCodeCommand = vscode.commands.registerCommand('specDrivenDevelopment.analyzeFolderCode', async (folderUri: vscode.Uri) => {
         try {
             if (!folderUri) {
                 vscode.window.showWarningMessage('No folder selected');
@@ -1010,7 +1010,7 @@ Token will be stored securely in VS Code settings.`;
     });
 
     // Analyze Workspace Code & Apply Instructions
-    const analyzeWorkspaceCodeCommand = vscode.commands.registerCommand('vibeAssistant.analyzeWorkspaceCode', async () => {
+    const analyzeWorkspaceCodeCommand = vscode.commands.registerCommand('specDrivenDevelopment.analyzeWorkspaceCode', async () => {
         try {
             // Mark as manual command to show notifications
             copilotIntegration.setManualCommand();
@@ -1093,7 +1093,7 @@ Token will be stored securely in VS Code settings.`;
     });
 
     // Apply Folder Prompts
-    const applyFolderPromptsCommand = vscode.commands.registerCommand('vibeAssistant.applyFolderPrompts', async (folderUri: vscode.Uri) => {
+    const applyFolderPromptsCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyFolderPrompts', async (folderUri: vscode.Uri) => {
         try {
             if (!folderUri) {
                 vscode.window.showWarningMessage('No folder selected');
@@ -1157,7 +1157,7 @@ Token will be stored securely in VS Code settings.`;
     });
 
     // Apply Workspace Prompts
-    const applyWorkspacePromptsCommand = vscode.commands.registerCommand('vibeAssistant.applyWorkspacePrompts', async () => {
+    const applyWorkspacePromptsCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyWorkspacePrompts', async () => {
         try {
             // Analyze workspace context
             const workspaceContext = await contextAnalyzer.analyzeWorkspaceContext();
@@ -1227,7 +1227,7 @@ Token will be stored securely in VS Code settings.`;
         refreshPromptsCommand,
         searchInstructionsCommand,
         searchPromptsCommand,
-        // New Vibe Assistant Panel Commands
+        // New Spec Driven Development Panel Commands
         openPanelCommand,
         connectAWSCommand,
         refreshAWSConnectionCommand,
@@ -1270,8 +1270,8 @@ function setupEventListeners(context: vscode.ExtensionContext) {
 
     // Listen for configuration changes
     const configChange = vscode.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
-        if (event.affectsConfiguration('vibeAssistant')) {
-            console.log('Vibe Assistant configuration changed');
+        if (event.affectsConfiguration('specDrivenDevelopment')) {
+            console.log('Spec Driven Development configuration changed');
         }
     });
 
@@ -1318,7 +1318,7 @@ function setupAutoApplyInstructions(context: vscode.ExtensionContext) {
 }
 
 function isAutoApplyEnabled(): boolean {
-    const config = vscode.workspace.getConfiguration('vibeAssistant');
+    const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
     return config.get('autoApplyInstructions', true);
 }
 
@@ -1370,5 +1370,5 @@ export function deactivate() {
     if (feedbackService) {
         feedbackService.dispose();
     }
-    console.log('Vibe Code Assistant deactivated');
+    console.log('Spec Driven Development deactivated');
 }

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the "Vibe Code Assistant" extension will be documented in this file.
+All notable changes to the "Spec Driven Development" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en//),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -79,11 +79,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Configuration & Settings
 
 #### Extension Settings
-- `vibeAssistant.autoApplyInstructions` - Automatic instruction application (default: true)
-- `vibeAssistant.enableContextualPrompts` - Smart prompt suggestions (default: true)  
-- `vibeAssistant.showNotifications` - User notifications (default: true)
-- `vibeAssistant.autoIgnoreAIFiles` - Automatic .gitignore management (default: true)
-- `vibeAssistant.supportedLanguages` - Configurable language support
+- `specDrivenDevelopment.autoApplyInstructions` - Automatic instruction application (default: true)
+- `specDrivenDevelopment.enableContextualPrompts` - Smart prompt suggestions (default: true)  
+- `specDrivenDevelopment.showNotifications` - User notifications (default: true)
+- `specDrivenDevelopment.autoIgnoreAIFiles` - Automatic .gitignore management (default: true)
+- `specDrivenDevelopment.supportedLanguages` - Configurable language support
 
 #### Keyboard Shortcuts
 - `Ctrl+Shift+V A` / `Cmd+Shift+V A` - Analyze Code & Apply Instructions
@@ -181,7 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Notes
 
-- This is the initial release of Vibe Code Assistant
+- This is the initial release of Spec Driven Development
 - All features have been thoroughly tested across multiple project types
 - The extension is designed to work seamlessly with existing development workflows
 - Future updates will maintain backward compatibility with existing configurations

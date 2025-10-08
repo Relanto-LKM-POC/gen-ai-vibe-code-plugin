@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-export class VibeAssistantPanel implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'vibeAssistantPanel';
+export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
+    public static readonly viewType = 'specDrivenDevelopmentPanel';
 
     private _view?: vscode.WebviewView;
     private _context: vscode.ExtensionContext;
@@ -33,24 +33,24 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
             message => {
                 switch (message.command) {
                     case 'connectAWS':
-                        vscode.commands.executeCommand('vibeAssistant.connectAWS');
+                        vscode.commands.executeCommand('specDrivenDevelopment.connectAWS');
                         break;
                     case 'refreshAWSConnection':
-                        vscode.commands.executeCommand('vibeAssistant.refreshAWSConnection');
+                        vscode.commands.executeCommand('specDrivenDevelopment.refreshAWSConnection');
                         break;
                     case 'updateJiraIssue':
-                        vscode.commands.executeCommand('vibeAssistant.updateJiraIssue', message.data);
+                        vscode.commands.executeCommand('specDrivenDevelopment.updateJiraIssue', message.data);
                         break;
                     case 'submitFeedback':
-                        vscode.commands.executeCommand('vibeAssistant.submitFeedback', message.data);
+                        vscode.commands.executeCommand('specDrivenDevelopment.submitFeedback', message.data);
                         break;
 
                     case 'loadInitiatives':
-                        vscode.commands.executeCommand('vibeAssistant.loadInitiatives');
+                        vscode.commands.executeCommand('specDrivenDevelopment.loadInitiatives');
                         break;
 
                     case 'loadEpics':
-                        vscode.commands.executeCommand('vibeAssistant.loadEpics', message.initiativeId);
+                        vscode.commands.executeCommand('specDrivenDevelopment.loadEpics', message.initiativeId);
                         break;
 
                     case 'getEstimationData':
@@ -138,7 +138,7 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
 
     private handleGetEstimationData() {
         // Get cached estimation data
-        const estimationData = this._context.globalState.get('vibeAssistant.estimationData');
+        const estimationData = this._context.globalState.get('specDrivenDevelopment.estimationData');
         if (this._view) {
             this._view.webview.postMessage({
                 command: 'estimationDataResponse',
@@ -152,10 +152,10 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
         // Get real-time AWS connection status
         try {
             // Use the new command to get real-time status
-            await vscode.commands.executeCommand('vibeAssistant.getRealTimeAWSStatus');
+            await vscode.commands.executeCommand('specDrivenDevelopment.getRealTimeAWSStatus');
         } catch (error) {
             // Fallback to cached status if real-time check fails
-            const awsStatus = this._context.globalState.get('vibeAssistant.awsStatus');
+            const awsStatus = this._context.globalState.get('specDrivenDevelopment.awsStatus');
             if (this._view) {
                 this._view.webview.postMessage({
                     command: 'awsStatusResponse',
@@ -171,7 +171,7 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
     public async updateEnhancedAWSStatus() {
         try {
             // Get enhanced status from AWS service
-            const enhancedStatus = await vscode.commands.executeCommand('vibeAssistant.getEnhancedAWSStatus') as any;
+            const enhancedStatus = await vscode.commands.executeCommand('specDrivenDevelopment.getEnhancedAWSStatus') as any;
             
             if (this._view) {
                 this._view.webview.postMessage({
@@ -216,12 +216,12 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                 <link href="${styleResetUri}" rel="stylesheet">
                 <link href="${styleVSCodeUri}" rel="stylesheet">
                 <link href="${styleMainUri}" rel="stylesheet">
-                <title>Vibe Code Assistant</title>
+                <title>Spec Driven Development</title>
             </head>
             <body>
                 <div class="container">
                     <header class="header">
-                        <h1>🎯 Vibe Code Assistant</h1>
+                        <h1>🎯 Spec Driven Development</h1>
                     </header>
                     
                     <div class="tab-container">
