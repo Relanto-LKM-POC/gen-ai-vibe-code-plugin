@@ -226,12 +226,12 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                     
                     <div class="tab-container">
                         <div class="tabs">
-                            <button class="tab-button active" data-tab="aws-config">AWS Config</button>
-                            <button class="tab-button" data-tab="devsecops-hub">DEVSECOPS Hub</button>
-                            <button class="tab-button" data-tab="feedback">Feedback</button>
+                            <button class="tab-button active" data-tab="aws-config">AWS Setup</button>
+                            <button class="tab-button" data-tab="devsecops-hub">My Task List</button>
+                            <button class="tab-button" data-tab="feedback">Manage Feedback</button>
                         </div>
                         
-                        <!-- AWS Configuration Tab -->
+                        <!-- AWS Setup Tab -->
                         <div class="tab-content active" id="aws-config">
                             <div class="status-section">
                                 <div class="status-indicator" id="aws-status-indicator">
@@ -294,7 +294,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             </div>
                         </div>
                         
-                        <!-- DEVSECOPS Hub Tab -->
+                        <!-- My Task List Tab -->
                         <div class="tab-content" id="devsecops-hub">
                             <div class="prerequisites" id="hub-prerequisites">
                                 <div class="prerequisite-item">
@@ -344,7 +344,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             </div>
                         </div>
                         
-                        <!-- Feedback Tab -->
+                        <!-- Manage Feedback Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
                                 <h3>Help & Support</h3>
