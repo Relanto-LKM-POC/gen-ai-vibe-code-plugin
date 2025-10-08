@@ -700,9 +700,9 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const loadEpicsCommand = vscode.commands.registerCommand('vibeAssistant.loadEpics', async (initiativeId?: string) => {
+    const loadEpicsCommand = vscode.commands.registerCommand('vibeAssistant.loadEpics', async () => {
         try {
-            const epics = await feedbackService.getEpics(initiativeId);
+            const epics = await feedbackService.getEpics();
             if (vibeAssistantPanel) {
                 vibeAssistantPanel.sendEpics(epics);
             }

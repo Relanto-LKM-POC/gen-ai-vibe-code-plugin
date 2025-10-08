@@ -174,10 +174,11 @@
             }
         });
 
-        // Handle initiative change to filter epics
+        // Handle initiative change - just reset epic selection since all epics are already loaded
         const initiativeSelect = document.getElementById('initiative');
         initiativeSelect.addEventListener('change', () => {
-            filterEpicsByInitiative(initiativeSelect.value);
+            const epicSelect = document.getElementById('epic');
+            epicSelect.value = ''; // Reset epic selection when initiative changes
         });
 
         // Handle form submission
@@ -231,11 +232,9 @@
             return;
         }
 
-        // Only load initiatives initially - epics will be loaded when an initiative is selected
+        // Load both initiatives and epics
         vscode.postMessage({ command: 'loadInitiatives' });
-        
-        // Clear epics dropdown until an initiative is selected
-        populateEpicsDropdown([]);
+        vscode.postMessage({ command: 'loadEpics' });
     }
 
     function canSubmitFeedback() {
@@ -717,17 +716,9 @@
         currentState.allEpics = epics || [];
         
         const epicSelect = document.getElementById('epic');
-        const initiativeSelect = document.getElementById('initiative');
-        const selectedInitiativeId = initiativeSelect.value;
         
         if (!canSubmitFeedback()) {
             epicSelect.innerHTML = '<option value="">Connect to AWS to load epics</option>';
-            epicSelect.disabled = true;
-            return;
-        }
-        
-        if (!selectedInitiativeId) {
-            epicSelect.innerHTML = '<option value="">Select an initiative first</option>';
             epicSelect.disabled = true;
             return;
         }
@@ -736,7 +727,7 @@
         epicSelect.innerHTML = '<option value="">Select Epic...</option>';
         
         if (epics && epics.length > 0) {
-            // Epics are already filtered by initiative on the backend
+            // Show all epics - no filtering needed
             epics.forEach(epic => {
                 const option = document.createElement('option');
                 option.value = epic.id;
@@ -744,35 +735,10 @@
                 epicSelect.appendChild(option);
             });
         } else {
-            epicSelect.innerHTML = '<option value="">No epics available for this initiative</option>';
+            epicSelect.innerHTML = '<option value="">No epics available</option>';
         }
     }
 
-    // Filter epics by selected initiative
-    function filterEpicsByInitiative(selectedInitiativeId) {
-        const epicSelect = document.getElementById('epic');
-        
-        if (!canSubmitFeedback()) {
-            return;
-        }
-        
-        // Reset epic selection
-        epicSelect.value = '';
-        epicSelect.innerHTML = '<option value="">Select Epic...</option>';
-        
-        if (!selectedInitiativeId) {
-            // If no initiative selected, clear epics
-            epicSelect.innerHTML = '<option value="">Select an initiative first</option>';
-            epicSelect.disabled = true;
-        } else {
-            // Show loading state
-            epicSelect.innerHTML = '<option value="">Loading epics...</option>';
-            epicSelect.disabled = true;
-            
-            // Load epics for the selected initiative
-            vscode.postMessage({ command: 'loadEpics', initiativeId: selectedInitiativeId });
-        }
-    }
 
     // Message handling from extension
     window.addEventListener('message', event => {

@@ -145,9 +145,9 @@ export class FeedbackService {
     }
 
     /**
-     * Get list of epics from Salesforce, optionally filtered by initiative ID
+     * Get list of all epics from Salesforce
      */
-    public async getEpics(initiativeId?: string): Promise<SalesforceEpic[]> {
+    public async getEpics(): Promise<SalesforceEpic[]> {
         try {
             // Check AWS connection status first
             const awsStatus = await this.awsService.getRealTimeConnectionStatus();
@@ -186,12 +186,7 @@ export class FeedbackService {
             if (hasInitiativeField) {
                 query += `%2CInitiative__c`;
             }
-            query += `+FROM+Epic__c`;
-            
-            if (initiativeId && hasInitiativeField) {
-                query += `+WHERE+Initiative__c%3D%27${initiativeId}%27`;
-            }
-            query += `+ORDER+BY+CreatedDate+DESC`;
+            query += `+FROM+Epic__c+ORDER+BY+CreatedDate+DESC`;
             
             console.log(`Epic query: ${query}`);
             const response = await fetch(`${baseUrl}/services/data/v56.0/query/?q=${query}`, {
