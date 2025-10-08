@@ -125,11 +125,11 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
         }
     }
 
-    public sendFeedbackResult(message: string, type: 'success' | 'error') {
+    public sendFeedbackResult(result: any) {
         if (this._view) {
             this._view.webview.postMessage({
                 command: 'feedbackResult',
-                data: { message, type }
+                data: result
             });
         }
     }

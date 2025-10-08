@@ -185,7 +185,11 @@
         submitFeedbackBtn.addEventListener('click', () => {
             // Check AWS connection first
             if (!canSubmitFeedback()) {
-                showFeedbackResult('AWS connection is required to submit feedback. Please connect to AWS first.', 'error');
+                showFeedbackResult({
+                    success: false,
+                    message: 'AWS connection is required to submit feedback. Please connect to AWS first.',
+                    error: 'AWS connection required'
+                });
                 return;
             }
 
@@ -202,12 +206,20 @@
             // Basic validation
             if (!feedbackData.name || !feedbackData.feedbackType || !feedbackData.estimatedHours || 
                 !feedbackData.initiativeId || !feedbackData.epicId || !feedbackData.description) {
-                showFeedbackResult('Please fill in all required fields', 'error');
+                showFeedbackResult({
+                    success: false,
+                    message: 'Please fill in all required fields',
+                    error: 'Validation failed'
+                });
                 return;
             }
 
             if (feedbackData.feedbackType === 'Story' && !feedbackData.acceptanceCriteria) {
-                showFeedbackResult('Acceptance criteria is required for Story type', 'error');
+                showFeedbackResult({
+                    success: false,
+                    message: 'Acceptance criteria is required for Story type',
+                    error: 'Validation failed'
+                });
                 return;
             }
 
@@ -656,15 +668,55 @@
     }
 
     // Feedback Results
-    function showFeedbackResult(message, type) {
+    function showFeedbackResult(result) {
         const feedbackResult = document.getElementById('feedback-result');
-        feedbackResult.className = `feedback-result ${type}`;
-        feedbackResult.textContent = message;
-        feedbackResult.style.display = 'block';
         
-        setTimeout(() => {
-            feedbackResult.style.display = 'none';
-        }, 5000);
+        if (result.success) {
+            feedbackResult.className = 'feedback-result success';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">✅</span>
+                    <span class="result-title">Feedback Submitted Successfully</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Ticket ID:</span>
+                        <span class="result-value">${result.ticketId || 'N/A'}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Status:</span>
+                        <span class="result-value">${result.message}</span>
+                    </div>
+                    ${result.jiraUrl ? `
+                    <div class="result-item">
+                        <span class="result-label">JIRA Link:</span>
+                        <span class="result-value"><a href="${result.jiraUrl}" target="_blank">View in JIRA</a></span>
+                    </div>` : ''}
+                </div>
+            `;
+        } else {
+            feedbackResult.className = 'feedback-result error';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">❌</span>
+                    <span class="result-title">Failed to Submit Feedback</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Message:</span>
+                        <span class="result-value">${result.message}</span>
+                    </div>
+                    ${result.error ? `
+                    <div class="result-item">
+                        <span class="result-label">Error:</span>
+                        <span class="result-value error-text">${result.error}</span>
+                    </div>` : ''}
+                </div>
+            `;
+        }
+        
+        feedbackResult.style.display = 'block';
+        // Remove the timeout - let the message stay persistent like JIRA updates
     }
 
 
@@ -771,7 +823,7 @@
                 updateEstimationData(message.data);
                 break;
             case 'feedbackResult':
-                showFeedbackResult(message.data.message, message.data.type);
+                showFeedbackResult(message.data);
                 break;
             case 'initiativesLoaded':
                 populateInitiativesDropdown(message.data);

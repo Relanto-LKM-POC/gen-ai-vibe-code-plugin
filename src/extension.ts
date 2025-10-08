@@ -720,10 +720,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             
             // Send result back to webview
             if (specDrivenDevelopmentPanel) {
-                specDrivenDevelopmentPanel.sendFeedbackResult(
-                    result.message + (result.ticketId ? ` (${result.ticketId})` : ''),
-                    result.success ? 'success' : 'error'
-                );
+                specDrivenDevelopmentPanel.sendFeedbackResult(result);
             }
 
             // Also show VS Code notification
@@ -737,7 +734,12 @@ function registerCommands(context: vscode.ExtensionContext) {
             
             // Send error back to webview
             if (specDrivenDevelopmentPanel) {
-                specDrivenDevelopmentPanel.sendFeedbackResult(errorMessage, 'error');
+                specDrivenDevelopmentPanel.sendFeedbackResult({
+                    success: false,
+                    message: errorMessage,
+                    error: (error as Error).message,
+                    timestamp: new Date().toISOString()
+                });
             }
             
             vscode.window.showErrorMessage(errorMessage);

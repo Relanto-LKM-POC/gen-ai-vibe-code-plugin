@@ -434,7 +434,7 @@
 }
 
 /* Enhanced Result Display Styles */
-.result-display {
+.result-display, .feedback-result {
     margin-top: 15px;
     border-radius: 6px;
     overflow: hidden;

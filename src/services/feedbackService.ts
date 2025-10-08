@@ -42,6 +42,7 @@ export interface FeedbackSubmissionResult {
     success: boolean;
     message: string;
     ticketId?: string;
+    jiraUrl?: string;
     timestamp: string;
     error?: string;
 }
@@ -298,6 +299,8 @@ export class FeedbackService {
             if (response.ok && result.success) {
                 let jiraTicketNumber = result.id; // Fallback to Salesforce ID
 
+                let jiraUrl = undefined;
+                
                 try {
                     // Retry logic to wait for JIRA ticket creation (as it's asynchronous)
                     const maxRetries = 3;
@@ -319,6 +322,7 @@ export class FeedbackService {
                                 const latestRecord = queryData.records[0];
                                 
                                 if (latestRecord.Jira_Link__c && latestRecord.Jira_Link__c !== 'TBD') {
+                                    jiraUrl = latestRecord.Jira_Link__c;
                                     // Extract JIRA ticket number from URL like "https://cisco-learning.atlassian.net/browse/DEVSECOPS-14936"
                                     const jiraUrlMatch = latestRecord.Jira_Link__c.match(/\/browse\/([A-Z]+-\d+)$/);
                                     if (jiraUrlMatch) {
@@ -342,6 +346,7 @@ export class FeedbackService {
                     success: true,
                     message: 'Feedback submitted to Salesforce successfully!',
                     ticketId: jiraTicketNumber,
+                    jiraUrl: jiraUrl,
                     timestamp: new Date().toISOString()
                 };
             } else {
