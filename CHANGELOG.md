@@ -7,58 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [] - 2024-01-25
+## [2.0.0] - 2025-10-07
 
-### Added
+### Major Release - Enterprise Salesforce Integration
 
 #### Core Extension Features
-- **Intelligent Context Analysis** - Automatic detection of programming languages, frameworks, and patterns
-- **GitHub Copilot Integration** - Enhanced AI code suggestions through workspace context
-- **Comprehensive Resource Management** - Automated creation and management of development resources
-- **Clean Repository Integration** - Smart .gitignore management to keep repositories focused on code
+- **Salesforce API Integration** - Direct REST API connectivity with Salesforce Feedback__c objects
+- **AWS Secrets Manager Integration** - Secure credential management for enterprise authentication
+- **Dynamic Field Discovery** - Automatic Salesforce object structure analysis using describe APIs
+- **Real-time Connection Management** - Live status monitoring with comprehensive error handling
 
-#### New Resource System
-- **VS Code Workspace Settings** - Automated creation of `.github/.vscode/` with MCP server configurations
-- **Development How-to Guides** - Comprehensive guides in `.github/how-to-guides/` including:
-  - `vibe-workflow.md` - Complete development workflow guide
-  - `vs-copilot-how-to-instructions.md` - Instructions integration guide
-  - `vs-copilot-how-to-mcp-server.md` - MCP server setup and usage
-  - `vs-copilot-how-to-prompts.md` - Prompt system usage guide
+#### Enterprise Integration System
+- **AWS Secrets Manager** - Secure credential storage and retrieval with IAM-based access control
+- **Salesforce Authentication** - OAuth 2.0 flow with automatic token refresh and error recovery
+- **Connection Status Management** - Real-time monitoring of AWS and Salesforce connections
+- **Comprehensive Error Handling** - Detailed error reporting with actionable user guidance
 
-#### Languages & Framework Support
-- **Go** - Complete ecosystem support with 5 comprehensive instruction sets:
-  - Best practices and coding standards
-  - OTEL observability and metrics
-  - Design and architecture patterns
-  - Development workflows
-  - Power user optimization techniques
-- **Python** - Full stack development support for Django, Flask, FastAPI with PEP compliance
-- **Terraform** - Infrastructure as Code best practices for AWS, Azure, GCP
-- **JavaScript/TypeScript** - Modern development practices for React, Node.js, Express
-- **Bash** - Security-focused shell scripting guidelines
+#### Salesforce Integration Features
+- **Feedback Submission** - Direct integration with Salesforce Feedback__c objects using REST API v56.0
+- **Initiative Management** - Dynamic loading and filtering of initiatives using relationship discovery
+- **Epic Filtering** - Smart epic dropdown filtering based on selected initiative relationships
+- **Field Validation** - Real-time form validation against Salesforce field requirements and data types
+- **Dynamic Object Discovery** - Uses Salesforce describe APIs to understand object relationships and field types
 
-#### Smart Prompt System
-- **Contextual Prompts** - Intelligent suggestions based on current development context
-- **Code Review Automation** - Automated quality checks and improvement suggestions  
-- **Security Analysis** - Built-in secret detection and vulnerability scanning
-- **Effort Estimation** - Project planning and time estimation templates
-- **Jenkins Pipeline** - CI/CD pipeline optimization and estimation
-- **Code Quality** - Linting and formatting standards across all languages
+#### Smart Data Management System
+- **Progressive Loading** - Load initiatives first, then filter epics based on selection
+- **Relationship Discovery** - Automatically discover Initiative__c field references using describe APIs
+- **Intelligent Query Building** - Dynamic SOQL query construction based on discovered object relationships
+- **Error Recovery** - Graceful fallback mechanisms when fields or objects don't exist
+- **Connection Validation** - Pre-flight checks before data operations to prevent errors
 
 #### User Interface & Experience
-- **Tree Data Providers** - Integrated VS Code sidebar for browsing instructions and prompts
-- **Context Menu Integration** - Right-click access to all major features
-- **Command Palette** - Full command integration with keyboard shortcuts
-- **Smart Notifications** - User-friendly feedback and progress indicators
-- **Configuration Management** - Comprehensive settings for customization
+- **Modern Webview Interface** - Clean, responsive UI with real-time status updates
+- **Progressive Form Loading** - Smart forms that show relevant options based on current state
+- **Connection Status Indicators** - Clear visual feedback for AWS and Salesforce connection states
+- **Comprehensive Error Display** - Helpful error messages with actionable guidance for resolution
+- **Real-time Validation** - Live form validation with immediate feedback on field requirements
 
 #### Technical Architecture
-- **Modular Design** - Separate managers for instructions, prompts, context, and resources
-- **YAML Frontmatter** - Structured metadata parsing for instruction files
-- **Glob Pattern Matching** - Intelligent file type detection and association
-- **Event-Driven Processing** - Efficient context analysis with debouncing
-- **Error Handling** - Comprehensive error management with user feedback
-- **Performance Optimization** - Zero-impact activation and efficient resource usage
+- **Service-Oriented Design** - Separate services for AWS, Salesforce, and feedback management
+- **Dynamic API Discovery** - Uses Salesforce describe APIs to understand object schemas
+- **Intelligent Query Building** - Dynamic SOQL construction based on discovered relationships
+- **Secure Credential Management** - AWS Secrets Manager integration with OAuth 2.0 flow
+- **Comprehensive Logging** - Detailed operation logs for debugging and audit trails
+- **Enterprise Security** - Follows AWS and Salesforce security best practices
 
 ### Initial Instruction Set
 
@@ -113,30 +105,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resource Copying System** - Efficient file management and workspace integration
 - **Pattern Matching Engine** - Intelligent file type and framework detection
 
-### Performance & Security
-- **100% Local Processing** - No external network requests or data transmission
-- **Zero Telemetry** - Complete user privacy with no data collection
-- **Lightweight Package** - Optimized 159KB bundle with webpack optimization
-- **Instant Activation** - Zero-impact VS Code startup with efficient resource loading
-- **Secure by Design** - No credential handling or sensitive data processing
+### Breaking Changes & Migration
 
-### Marketplace Ready
-- **Complete Documentation** - Comprehensive README, overview, and publishing guides
-- **Professional Packaging** - Optimized .vsix with proper file exclusions
-- **Icon and Branding** - Professional visual identity for marketplace presence
-- **Licensing** - MIT license for maximum compatibility and adoption
+#### Major Architecture Change
+- **Removed GitHub Copilot Integration** - Extension no longer focuses on code context analysis
+- **Removed Resource File Generation** - No longer creates instruction files or prompts in workspace
+- **New Focus on Enterprise Integration** - Complete shift to Salesforce feedback workflow management
+
+#### Required Migration Steps
+- **AWS Setup Required** - Must configure AWS CLI and Secrets Manager access
+- **Salesforce Credentials** - Store Salesforce OAuth credentials in AWS Secrets Manager
+- **Environment Configuration** - Optional `.env` file for endpoint and configuration overrides
+
+### Security & Enterprise Features
+- **AWS IAM Integration** - Secure credential management through AWS Secrets Manager
+- **OAuth 2.0 Authentication** - Industry-standard Salesforce authentication
+- **Enterprise Logging** - Comprehensive audit trails for all operations
+- **Network Security** - All communications use HTTPS/TLS encryption
+- **Credential Isolation** - No local storage of sensitive authentication data
+
+### Current Implementation Details
+
+#### Core Services
+- **FeedbackService** - Handles Salesforce API integration with dynamic field discovery
+- **AWSService** - Manages AWS Secrets Manager integration and credential retrieval  
+- **JiraService** - Provides Salesforce authentication using OAuth 2.0 flow
+- **WebviewPanel** - Modern UI interface with real-time status updates
+
+#### Smart Features Implemented
+- **Initiative-Epic Filtering** - Dynamic filtering of epics based on selected initiative
+- **Field Relationship Discovery** - Uses `sobjects/{object}/describe` API to understand field relationships
+- **Progressive Data Loading** - Loads initiatives first, then epics based on selection
+- **Connection Status Management** - Real-time AWS and Salesforce connection monitoring
+- **Comprehensive Error Handling** - User-friendly error messages with actionable guidance
+
+#### Enterprise Ready
+- **Production Deployment** - Ready for enterprise environments with proper security
+- **Multi-Environment Support** - Configurable for dev, staging, and production Salesforce orgs
+- **Audit Trail** - Complete logging of all operations for compliance and debugging
+- **Scalable Architecture** - Designed to handle enterprise-scale Salesforce integrations
 
 ---
 
 ## [Unreleased]
 
-### Planned Features
-- **Additional Language Support** - Rust, C++, Java, C# instruction sets
-- **IDE Integrations** - Support for other editors beyond VS Code
-- **Team Sharing** - Cloud-based instruction and prompt sharing
-- **Custom Instruction Builder** - UI for creating project-specific instructions
-- **Advanced Analytics** - Code quality metrics and improvement tracking
-- **Plugin Ecosystem** - Support for community-contributed instructions and prompts
+### Technical Improvements
+
+#### Dynamic Field Discovery Implementation
+- **Describe API Usage** - `GET /services/data/v56.0/sobjects/Feedback__c/describe` for field discovery
+- **Relationship Resolution** - Automatically resolves `Initiative__c` field references to correct objects
+- **Smart Query Building** - Constructs SOQL queries: `SELECT Id,Name FROM {discovered_object}`
+- **Fallback Mechanisms** - Graceful degradation when fields or objects don't exist
+
+#### Connection Management Enhancements  
+- **Real-time Status** - Live monitoring of AWS and Salesforce connection states
+- **Automatic Retry Logic** - Intelligent retry mechanisms for network failures
+- **Connection Validation** - Pre-flight checks before data operations
+- **Status Indicators** - Clear visual feedback: Connected, Connecting, Disconnected, Error
+
+#### Form Intelligence Features
+- **Progressive Loading** - Show "Select an initiative first" until initiative is selected
+- **Smart Validation** - Real-time validation against Salesforce field requirements
+- **Dynamic Options** - Epic dropdown filtered by selected initiative relationship
+- **Error Recovery** - Comprehensive error handling with user-friendly messages
+
+### Future Enhancements
+- **Multi-Org Support** - Support for multiple Salesforce orgs with org switching
+- **Bulk Operations** - Batch feedback submission capabilities  
+- **Advanced Filtering** - Additional filtering options beyond Initiative-Epic relationships
+- **Custom Field Mapping** - Configurable field mappings for different Salesforce orgs
+- **Integration Templates** - Pre-built templates for common enterprise integrations
+- **Audit Dashboard** - Visual dashboard for tracking feedback submission metrics
 
 ---
 

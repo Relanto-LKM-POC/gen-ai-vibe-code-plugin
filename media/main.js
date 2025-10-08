@@ -8,7 +8,8 @@
         estimationData: null,
         jiraValidation: null,
         settings: {},
-        parsedEstimation: null
+        parsedEstimation: null,
+        allEpics: [] // Store all epics for filtering
     };
 
     // Unit conversion function
@@ -41,6 +42,8 @@
     function initializeUIState() {
         // Initialize secret validation to disconnected state
         updateSecretValidationForDisconnected();
+        // Initialize feedback form state
+        updateFeedbackFormState();
     }
 
     // Tab functionality
@@ -155,20 +158,57 @@
 
     function setupFeedbackEventListeners() {
         const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
-        const saveDraftBtn = document.getElementById('save-draft-btn');
+        const loadDataBtn = document.getElementById('load-data-btn');
+        const feedbackTypeSelect = document.getElementById('feedback-type');
+        const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
 
+        // Handle feedback type change to show/hide acceptance criteria
+        feedbackTypeSelect.addEventListener('change', () => {
+            if (feedbackTypeSelect.value === 'Story') {
+                acceptanceCriteriaGroup.style.display = 'block';
+                document.getElementById('acceptance-criteria').required = true;
+            } else {
+                acceptanceCriteriaGroup.style.display = 'none';
+                document.getElementById('acceptance-criteria').required = false;
+                document.getElementById('acceptance-criteria').value = '';
+            }
+        });
+
+        // Handle initiative change to filter epics
+        const initiativeSelect = document.getElementById('initiative');
+        initiativeSelect.addEventListener('change', () => {
+            filterEpicsByInitiative(initiativeSelect.value);
+        });
+
+        // Handle form submission
         submitFeedbackBtn.addEventListener('click', () => {
+            // Check AWS connection first
+            if (!canSubmitFeedback()) {
+                showFeedbackResult('AWS connection is required to submit feedback. Please connect to AWS first.', 'error');
+                return;
+            }
+
             const feedbackData = {
-                issueType: document.getElementById('issue-type').value,
-                priority: document.getElementById('priority').value,
-                component: document.getElementById('component').value,
+                name: document.getElementById('feedback-name').value,
+                feedbackType: document.getElementById('feedback-type').value,
+                estimatedHours: parseFloat(document.getElementById('estimated-hours').value),
+                initiativeId: document.getElementById('initiative').value,
+                epicId: document.getElementById('epic').value,
                 description: document.getElementById('feedback-description').value,
-                includeSystemInfo: document.getElementById('include-system-info').checked,
-                includeLogs: document.getElementById('include-logs').checked,
-                includeAWSDetails: document.getElementById('include-aws-details').checked,
-                submitAnonymously: document.getElementById('submit-anonymously').checked,
-                contactEmail: document.getElementById('contact-email').value
+                acceptanceCriteria: document.getElementById('acceptance-criteria').value
             };
+
+            // Basic validation
+            if (!feedbackData.name || !feedbackData.feedbackType || !feedbackData.estimatedHours || 
+                !feedbackData.initiativeId || !feedbackData.epicId || !feedbackData.description) {
+                showFeedbackResult('Please fill in all required fields', 'error');
+                return;
+            }
+
+            if (feedbackData.feedbackType === 'Story' && !feedbackData.acceptanceCriteria) {
+                showFeedbackResult('Acceptance criteria is required for Story type', 'error');
+                return;
+            }
 
             vscode.postMessage({ 
                 command: 'submitFeedback', 
@@ -176,10 +216,52 @@
             });
         });
 
-        saveDraftBtn.addEventListener('click', () => {
-            // Save draft functionality (could be implemented later)
-            showFeedbackResult('Draft saved locally', 'success');
+        // Handle refresh dropdowns
+        loadDataBtn.addEventListener('click', () => {
+            loadFeedbackDropdowns();
         });
+    }
+
+    function loadFeedbackDropdowns() {
+        // Check if AWS is connected before loading dropdowns
+        if (!currentState.awsStatus || currentState.awsStatus.status !== 'connected') {
+            console.log('AWS not connected, skipping feedback dropdown loading');
+            populateInitiativesDropdown([]);
+            populateEpicsDropdown([]);
+            return;
+        }
+
+        // Only load initiatives initially - epics will be loaded when an initiative is selected
+        vscode.postMessage({ command: 'loadInitiatives' });
+        
+        // Clear epics dropdown until an initiative is selected
+        populateEpicsDropdown([]);
+    }
+
+    function canSubmitFeedback() {
+        return currentState.awsStatus && currentState.awsStatus.status === 'connected';
+    }
+
+    function updateFeedbackFormState() {
+        const submitBtn = document.getElementById('submit-feedback-btn');
+        const loadDataBtn = document.getElementById('load-data-btn');
+        const epicSelect = document.getElementById('epic');
+        
+        if (canSubmitFeedback()) {
+            submitBtn.disabled = false;
+            loadDataBtn.disabled = false;
+            submitBtn.textContent = 'Submit Feedback';
+        } else {
+            submitBtn.disabled = true;
+            loadDataBtn.disabled = true;
+            submitBtn.textContent = 'Connect to AWS First';
+            
+            // Ensure epic dropdown is disabled when AWS is not connected
+            if (epicSelect) {
+                epicSelect.disabled = true;
+                epicSelect.innerHTML = '<option value="">Connect to AWS first</option>';
+            }
+        }
     }
 
 
@@ -225,6 +307,8 @@
                 updateSecretValidationForValidating();
                 // Load enhanced status after showing validating state
                 vscode.postMessage({ command: 'getEnhancedAWSStatus' });
+                // Load feedback dropdowns when AWS is connected
+                loadFeedbackDropdowns();
                 break;
             case 'connecting':
                 statusDot.classList.add('status-connecting');
@@ -256,6 +340,9 @@
                 // Update secret validation to show disconnected state
                 updateSecretValidationForDisconnected();
         }
+        
+        // Update feedback form state based on AWS connection
+        updateFeedbackFormState();
     }
 
     function updateEnhancedAWSStatus(enhancedStatus) {
@@ -599,6 +686,94 @@
 
 
 
+    // Populate initiatives dropdown
+    function populateInitiativesDropdown(initiatives) {
+        const initiativeSelect = document.getElementById('initiative');
+        
+        if (!canSubmitFeedback()) {
+            initiativeSelect.innerHTML = '<option value="">Connect to AWS to load initiatives</option>';
+            initiativeSelect.disabled = true;
+            return;
+        }
+        
+        initiativeSelect.disabled = false;
+        initiativeSelect.innerHTML = '<option value="">Select Initiative...</option>';
+        
+        if (initiatives && initiatives.length > 0) {
+            initiatives.forEach(initiative => {
+                const option = document.createElement('option');
+                option.value = initiative.id;
+                option.textContent = initiative.name;
+                initiativeSelect.appendChild(option);
+            });
+        } else {
+            initiativeSelect.innerHTML = '<option value="">No initiatives available</option>';
+        }
+    }
+
+    // Populate epics dropdown
+    function populateEpicsDropdown(epics) {
+        // Store epics for reference
+        currentState.allEpics = epics || [];
+        
+        const epicSelect = document.getElementById('epic');
+        const initiativeSelect = document.getElementById('initiative');
+        const selectedInitiativeId = initiativeSelect.value;
+        
+        if (!canSubmitFeedback()) {
+            epicSelect.innerHTML = '<option value="">Connect to AWS to load epics</option>';
+            epicSelect.disabled = true;
+            return;
+        }
+        
+        if (!selectedInitiativeId) {
+            epicSelect.innerHTML = '<option value="">Select an initiative first</option>';
+            epicSelect.disabled = true;
+            return;
+        }
+        
+        epicSelect.disabled = false;
+        epicSelect.innerHTML = '<option value="">Select Epic...</option>';
+        
+        if (epics && epics.length > 0) {
+            // Epics are already filtered by initiative on the backend
+            epics.forEach(epic => {
+                const option = document.createElement('option');
+                option.value = epic.id;
+                option.textContent = `${epic.name}${epic.teamName ? ' (' + epic.teamName + ')' : ''}`;
+                epicSelect.appendChild(option);
+            });
+        } else {
+            epicSelect.innerHTML = '<option value="">No epics available for this initiative</option>';
+        }
+    }
+
+    // Filter epics by selected initiative
+    function filterEpicsByInitiative(selectedInitiativeId) {
+        const epicSelect = document.getElementById('epic');
+        
+        if (!canSubmitFeedback()) {
+            return;
+        }
+        
+        // Reset epic selection
+        epicSelect.value = '';
+        epicSelect.innerHTML = '<option value="">Select Epic...</option>';
+        
+        if (!selectedInitiativeId) {
+            // If no initiative selected, clear epics
+            epicSelect.innerHTML = '<option value="">Select an initiative first</option>';
+            epicSelect.disabled = true;
+        } else {
+            // Show loading state
+            epicSelect.innerHTML = '<option value="">Loading epics...</option>';
+            epicSelect.disabled = true;
+            
+            // Load epics for the selected initiative
+            vscode.postMessage({ command: 'loadEpics', initiativeId: selectedInitiativeId });
+        }
+    }
+
     // Message handling from extension
     window.addEventListener('message', event => {
         const message = event.data;
@@ -631,6 +806,12 @@
                 break;
             case 'feedbackResult':
                 showFeedbackResult(message.data.message, message.data.type);
+                break;
+            case 'initiativesLoaded':
+                populateInitiativesDropdown(message.data);
+                break;
+            case 'epicsLoaded':
+                populateEpicsDropdown(message.data);
                 break;
         }
     });

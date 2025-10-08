@@ -12,7 +12,6 @@
 - 🧠 **Intelligent Context Analysis** - Automatically detects your project's technologies and frameworks
 - 📚 **Comprehensive Development Resources** - Creates language-specific instructions and best practices
 - 🎯 **Smart Prompts** - Contextual development prompts for code review, estimation, and security
-- ⚙️ **Environment Configuration** - Flexible configuration through `.env` files
 - � **AWS & Salesforce Integration** - Seamless integration with enterprise services
 - 🤖 **Enhanced GitHub Copilot** - Better AI suggestions through improved context
 
@@ -21,17 +20,17 @@
 ## 🎯 Quick Start Guide
 
 1. **Install** the extension in VS Code
-2. **Open any project** - Extension automatically analyzes your codebase
-3. **Access features** through the Vibe Assistant panel in the Activity Bar
-4. **Use command palette** (`Ctrl+Shift+P`) → Search "Vibe" commands
+2. **Configure AWS credentials** - Ensure AWS CLI is set up with Secrets Manager access
+3. **Connect to AWS** - Use the extension panel to establish AWS connection
+4. **Submit feedback** - Use the streamlined feedback form with intelligent field validation
 
 ### 🔧 **Core Features Available:**
-- **Context Analysis** - Automatic detection of languages and frameworks
-- **Resource Management** - Creates comprehensive development resources
-- **Feedback System** - Integrated feedback submission to GitHub Issues
-- **Estimation Tools** - Intelligent effort estimation and parsing
-- **AWS Integration** - Secure credential management through AWS Secrets Manager
-- **JIRA Integration** - Salesforce-based ticket management and updates
+- **AWS Connection Management** - Secure authentication with real-time status monitoring
+- **Salesforce Feedback Submission** - Direct integration with Salesforce Feedback__c objects
+- **Initiative & Epic Management** - Smart dropdowns with relationship-based filtering
+- **Dynamic Field Validation** - Real-time form validation with Salesforce field requirements
+- **Connection Status Monitoring** - Live AWS and Salesforce connection status
+- **Error Handling & Logging** - Comprehensive error reporting with detailed diagnostics
 
 ---
 
@@ -76,7 +75,6 @@ The extension creates comprehensive development resources in your workspace:
 
 ### � **Development Tools**
 - **Estimation Parser** - Intelligent parsing of time estimates from text (hours, days, weeks, months)
-- **Configurable Work Hours** - Customizable time calculations via environment variables
 - **Resource Management** - Automated creation and management of development resources
 - **Context-Aware Suggestions** - Enhanced GitHub Copilot integration through better context
 
@@ -84,7 +82,6 @@ The extension creates comprehensive development resources in your workspace:
 - **AWS Secrets Manager** - Secure credential management for enterprise services
 - **Salesforce Integration** - JIRA ticket management through Salesforce APIs
 - **Feedback System** - Integrated issue tracking and feedback submission
-- **Multi-Environment Support** - Configurable endpoints for dev, staging, and production
 
 ---
 
@@ -101,32 +98,6 @@ The extension creates comprehensive development resources in your workspace:
   "vibeAssistant.salesforceSecretName": "salesforce",
   "vibeAssistant.salesforceSecretKeywords": ["salesforce", "sf", "crm"]
 }
-```
-
-### 🌍 **Environment Variables Configuration**
-
-Create a `.env` file in your workspace root for flexible configuration:
-
-```env
-# GitHub Configuration
-GITHUB_REPOSITORY=owner/repo-name
-
-# Feedback Endpoints (optional - currently dormant)
-# FEEDBACK_INTERNAL_ENDPOINT=https://api.internal-tracker.example.com/feedback
-# FEEDBACK_ANALYTICS_ENDPOINT=https://analytics.vibe-tech.com/feedback
-
-# Salesforce Configuration
-SALESFORCE_BASE_URL=https://your-org.sandbox.my.salesforce-setup.com
-SALESFORCE_BROWSER_ID=your-browser-id
-
-# AWS Secrets Manager
-SALESFORCE_SECRET_NAME=salesforce
-SALESFORCE_SECRET_KEYWORDS=salesforce,sf,crm
-
-# Work Hour Calculations (customizable per organization)
-HOURS_PER_DAY=8
-HOURS_PER_WEEK=40
-HOURS_PER_MONTH=160
 ```
 
 ### 🔐 **AWS Integration Setup**
@@ -149,9 +120,8 @@ The extension integrates with AWS Secrets Manager for secure credential manageme
 ```
 
 **Configuration Priority:**
-1. Environment variables (`.env` file)
-2. VS Code settings
-3. Fallback defaults
+1. VS Code settings
+2. Fallback defaults
 
 ### � **Generated Project Structure**
 
@@ -159,7 +129,6 @@ When you use the extension, it creates a comprehensive resource structure:
 
 ```
 your-project/
-├── .env                      # 🌍 Environment configuration
 ├── resources/
 │   ├── instructions/         # 📚 Language-specific best practices
 │   │   ├── go.best-practices.instructions.md
@@ -355,7 +324,6 @@ npm run test            # Run tests (if available)
 | Extension not loading | Check VS Code version (requires 1.74.0+) |
 | AWS authentication failed | Verify AWS CLI configuration and credentials |
 | Salesforce integration errors | Check AWS Secrets Manager permissions and secret format |
-| Environment variables not working | Ensure `.env` file is in workspace root |
 | Estimation parsing not working | Check text format against supported patterns |
 | Webview not displaying | Restart VS Code, check for extension conflicts |
 
@@ -374,7 +342,6 @@ npm run test            # Run tests (if available)
 3. Check for error messages and warnings
 
 **Common Log Messages:**
-- `Failed to read .env file` - Check file path and permissions
 - `AWS authentication failed` - Verify AWS CLI setup
 - `Salesforce credentials not available` - Check AWS Secrets Manager configuration
 
@@ -398,8 +365,6 @@ aws secretsmanager get-secret-value --secret-id "your-secret-name"
 ### 🔒 **Security Features**
 - **Local Processing** - Most operations happen locally in VS Code
 - **Secure Credential Management** - Uses AWS Secrets Manager for sensitive data
-- **Environment Variable Support** - Secure configuration through `.env` files
-- **No Hardcoded Secrets** - All sensitive values configurable via environment
 - **Fallback Defaults** - Safe fallback values for all configurations
 
 ### � **Data Handling**
@@ -409,14 +374,12 @@ aws secretsmanager get-secret-value --secret-id "your-secret-name"
 - **Local File Operations** - All resource creation happens in your workspace
 
 ### ⚠️ **Security Considerations**
-- Ensure your `.env` file is added to `.gitignore`
 - Use appropriate AWS IAM permissions for Secrets Manager
 - Regularly rotate Salesforce and GitHub tokens
 - Review generated resources before committing to version control
 
 ### 🔍 **Audit Trail**
 - All operations logged to VS Code Output panel
-- Environment variable reading attempts logged with warnings
 - AWS authentication attempts logged for debugging
 - File creation and modification operations tracked
 
@@ -440,7 +403,6 @@ aws secretsmanager get-secret-value --secret-id "your-secret-name"
 - ✅ **Salesforce/JIRA** - Enterprise ticket management integration
 - ✅ **Estimation Tools** - Intelligent effort parsing and calculation
 - ✅ **GitHub Integration** - Feedback submission and issue tracking
-- ✅ **Environment Config** - Flexible `.env` file configuration
 - ✅ **Multi-Platform** - Windows, macOS, and Linux support
 
 ### 📈 **Capabilities**
@@ -448,7 +410,6 @@ aws secretsmanager get-secret-value --secret-id "your-secret-name"
 - **Work Hour Configs**: Fully customizable time calculations
 - **Enterprise Ready**: AWS and Salesforce integration
 - **Developer Friendly**: Comprehensive debugging and logging
-- **Secure by Design**: Environment-based configuration management
 
 ---
 

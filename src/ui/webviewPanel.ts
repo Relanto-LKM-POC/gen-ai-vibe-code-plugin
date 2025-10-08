@@ -45,6 +45,14 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('vibeAssistant.submitFeedback', message.data);
                         break;
 
+                    case 'loadInitiatives':
+                        vscode.commands.executeCommand('vibeAssistant.loadInitiatives');
+                        break;
+
+                    case 'loadEpics':
+                        vscode.commands.executeCommand('vibeAssistant.loadEpics', message.initiativeId);
+                        break;
+
                     case 'getEstimationData':
                         this.handleGetEstimationData();
                         break;
@@ -95,6 +103,33 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'updateJiraStatus',
                 data: status
+            });
+        }
+    }
+
+    public sendInitiatives(initiatives: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'initiativesLoaded',
+                data: initiatives
+            });
+        }
+    }
+
+    public sendEpics(epics: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'epicsLoaded',
+                data: epics
+            });
+        }
+    }
+
+    public sendFeedbackResult(message: string, type: 'success' | 'error') {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'feedbackResult',
+                data: { message, type }
             });
         }
     }
@@ -315,72 +350,57 @@ export class VibeAssistantPanel implements vscode.WebviewViewProvider {
                                 <h3>Help & Support</h3>
                                 
                                 <div class="input-group">
-                                    <label for="issue-type">Issue Type:</label>
-                                    <select id="issue-type">
-                                        <option value="bug">Bug Report</option>
-                                        <option value="feature">Feature Request</option>
-                                        <option value="feedback">General Feedback</option>
-                                        <option value="support">Support Request</option>
+                                    <label for="feedback-name">Name: <span class="required">*</span></label>
+                                    <input type="text" id="feedback-name" placeholder="e.g. AWS Integration Bug" required />
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="feedback-type">Type: <span class="required">*</span></label>
+                                    <select id="feedback-type" required>
+                                        <option value="">Select Type...</option>
+                                        <option value="Story">Story</option>
+                                        <option value="Bug">Bug</option>
+                                        <option value="Defect">Defect</option>
                                     </select>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="priority">Priority:</label>
-                                    <select id="priority">
-                                        <option value="low">Low</option>
-                                        <option value="medium" selected>Medium</option>
-                                        <option value="high">High</option>
-                                        <option value="critical">Critical</option>
+                                    <label for="estimated-hours">Estimated Hours: <span class="required">*</span></label>
+                                    <input type="number" id="estimated-hours" min="0.5" step="0.5" placeholder="e.g. 8" required />
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="initiative">Initiative: <span class="required">*</span></label>
+                                    <select id="initiative" required>
+                                        <option value="">Loading initiatives...</option>
                                     </select>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="component">Component:</label>
-                                    <select id="component">
-                                        <option value="aws-integration">AWS Integration</option>
-                                        <option value="jira-integration">JIRA Integration</option>
-                                        <option value="estimation-parser">Estimation Parser</option>
-                                        <option value="ui">User Interface</option>
-                                        <option value="other">Other</option>
+                                    <label for="epic">Epic: <span class="required">*</span></label>
+                                    <select id="epic" required>
+                                        <option value="">Loading epics...</option>
                                     </select>
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="feedback-description">Description:</label>
-                                    <textarea id="feedback-description" rows="6" placeholder="Please describe the issue or feedback in detail..."></textarea>
+                                    <label for="feedback-description">Description: <span class="required">*</span></label>
+                                    <textarea id="feedback-description" rows="6" placeholder="Please describe the feedback in detail..." required></textarea>
                                 </div>
                                 
-                                <div class="diagnostic-options">
-                                    <h4>Diagnostic Information:</h4>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="include-system-info" checked />
-                                        <span>Include system information</span>
-                                    </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="include-logs" checked />
-                                        <span>Include recent logs</span>
-                                    </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="include-aws-details" />
-                                        <span>Include AWS connection details</span>
-                                    </label>
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="submit-anonymously" />
-                                        <span>Submit anonymously</span>
-                                    </label>
+                                <div class="input-group" id="acceptance-criteria-group" style="display: none;">
+                                    <label for="acceptance-criteria">Acceptance Criteria: <span class="required">*</span></label>
+                                    <textarea id="acceptance-criteria" rows="4" placeholder="Define acceptance criteria for this story..."></textarea>
                                 </div>
                                 
-                                <div class="input-group">
-                                    <label for="contact-email">Contact Information:</label>
-                                    <input type="email" id="contact-email" placeholder="your.email@company.com" />
-                                </div>
+
                                 
                                 <div class="button-group">
                                     <button class="primary-button" id="submit-feedback-btn">
                                         Submit Feedback
                                     </button>
-                                    <button class="secondary-button" id="save-draft-btn">
-                                        Save Draft
+                                    <button class="secondary-button" id="load-data-btn">
+                                        Refresh Dropdowns
                                     </button>
                                 </div>
                                 

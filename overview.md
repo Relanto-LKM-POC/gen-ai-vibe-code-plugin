@@ -1,33 +1,35 @@
-# Vibe Code Assistant - Intelligent GitHub Copilot Enhancement
+# Vibe Code Assistant - Enterprise Salesforce Integration
 
-**Transform your coding experience with context-aware instructions that supercharge GitHub Copilot's capabilities.**
+**Transform your enterprise feedback workflow with secure AWS connectivity and intelligent Salesforce integration.**
 
 ## 🚀 What is Vibe Code Assistant?
 
-Vibe Code Assistant is a powerful VS Code extension that automatically enhances GitHub Copilot with **intelligent context-aware instructions**, **smart development prompts**, and **comprehensive project resources**. It analyzes your code, detects technologies and frameworks, and provides GitHub Copilot with the right context to generate better, more relevant suggestions.
+Vibe Code Assistant is a powerful VS Code extension that streamlines enterprise feedback submission through **secure AWS Secrets Manager integration**, **intelligent Salesforce API connectivity**, and **dynamic field discovery**. It provides a seamless interface for submitting feedback to Salesforce with real-time validation and smart relationship-based filtering.
 
 ## ✨ Key Features
 
-### 🧠 **Intelligent Context Analysis**
-- **Automatic Detection** - Recognizes Go, Python, Terraform, JavaScript, TypeScript, and Bash
-- **Framework Awareness** - Detects Django, Flask, FastAPI, OTEL, AWS, Azure, GCP, and more
-- **Smart Pattern Recognition** - Identifies coding patterns and architectural decisions
+### 🔐 **Secure AWS Integration**
+- **Secrets Manager** - Secure credential storage and retrieval using AWS Secrets Manager
+- **Real-time Authentication** - Live connection status with automatic retry mechanisms
+- **IAM Security** - Follows AWS security best practices with minimal required permissions
 
-### 📚 **Comprehensive Resource Creation**
-- **Instructions** - Language-specific best practices and coding standards
-- **Prompts** - Contextual development prompts for code review, security, and estimation
-- **VS Code Settings** - Workspace configurations and MCP server setups
-- **How-to Guides** - Step-by-step development workflow documentation
+### � **Salesforce API Integration**
+- **Direct API Access** - Native Salesforce REST API v56.0 integration
+- **Dynamic Discovery** - Uses describe APIs to understand Salesforce object structures
+- **Smart Field Mapping** - Automatic mapping between form fields and Salesforce objects
+- **Real-time Validation** - Live validation against Salesforce field requirements
 
-### 🤖 **GitHub Copilot Integration**
-- **Enhanced Suggestions** - Better AI code generation through improved context
-- **Workspace Integration** - Seamless integration with Copilot Chat
-- **Project-Specific Guidance** - Tailored suggestions based on your project's technologies
+### 🎯 **Intelligent Data Management**
+- **Relationship Discovery** - Automatically discovers Initiative-Epic relationships
+- **Progressive Loading** - Load data on-demand for better performance
+- **Smart Filtering** - Show only relevant epics based on selected initiative
+- **Error Recovery** - Comprehensive error handling with graceful degradation
 
-### 🛡️ **Clean Repository Management**
-- **Smart .gitignore** - Automatically excludes AI files from version control
-- **User Preference Support** - Option to commit AI files for team sharing
-- **Clean Project Structure** - Keeps repositories focused on actual code
+### � **Enterprise User Experience**
+- **Modern Interface** - Clean, responsive webview with real-time feedback
+- **Progressive Forms** - Smart forms that adapt based on current selections
+- **Status Monitoring** - Clear visual indicators for all connection states
+- **Comprehensive Logging** - Detailed logs for debugging and audit trails
 
 ## 🎯 Use Cases
 

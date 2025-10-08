@@ -51,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext) {
         awsService = new AWSService(context);
         estimationParser = new EstimationParser(context);
         jiraService = new JiraService(context, awsService);
-        feedbackService = new FeedbackService(context);
+        feedbackService = new FeedbackService(context, awsService);
         
         // Initialize notification manager
         notificationManager = NotificationManager.getInstance(context);
@@ -686,17 +686,61 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    const loadInitiativesCommand = vscode.commands.registerCommand('vibeAssistant.loadInitiatives', async () => {
+        try {
+            const initiatives = await feedbackService.getInitiatives();
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendInitiatives(initiatives);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load initiatives: ${(error as Error).message}`);
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendInitiatives([]);
+            }
+        }
+    });
+
+    const loadEpicsCommand = vscode.commands.registerCommand('vibeAssistant.loadEpics', async (initiativeId?: string) => {
+        try {
+            const epics = await feedbackService.getEpics(initiativeId);
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendEpics(epics);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load epics: ${(error as Error).message}`);
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendEpics([]);
+            }
+        }
+    });
+
     const submitFeedbackCommand = vscode.commands.registerCommand('vibeAssistant.submitFeedback', async (data: any) => {
         try {
             const result = await feedbackService.submitFeedback(data);
             
+            // Send result back to webview
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendFeedbackResult(
+                    result.message + (result.ticketId ? ` (${result.ticketId})` : ''),
+                    result.success ? 'success' : 'error'
+                );
+            }
+
+            // Also show VS Code notification
             if (result.success) {
                 vscode.window.showInformationMessage(`✅ Feedback submitted successfully! Ticket: ${result.ticketId}`);
             } else {
                 vscode.window.showErrorMessage(`❌ Failed to submit feedback: ${result.error}`);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to submit feedback: ${(error as Error).message}`);
+            const errorMessage = `Failed to submit feedback: ${(error as Error).message}`;
+            
+            // Send error back to webview
+            if (vibeAssistantPanel) {
+                vibeAssistantPanel.sendFeedbackResult(errorMessage, 'error');
+            }
+            
+            vscode.window.showErrorMessage(errorMessage);
         }
     });
 
@@ -1192,6 +1236,8 @@ Token will be stored securely in VS Code settings.`;
         listAWSSecretsCommand,
         retrySalesforceCredentialsCommand,
         updateJiraIssueCommand,
+        loadInitiativesCommand,
+        loadEpicsCommand,
         submitFeedbackCommand,
         viewFeedbackHistoryCommand,
         exportFeedbackHistoryCommand,
