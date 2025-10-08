@@ -227,8 +227,8 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                     <div class="tab-container">
                         <div class="tabs">
                             <button class="tab-button active" data-tab="aws-config">AWS Setup</button>
-                            <button class="tab-button" data-tab="devsecops-hub">My Task List</button>
                             <button class="tab-button" data-tab="feedback">Manage Feedback</button>
+                            <button class="tab-button" data-tab="devsecops-hub">My Task List</button>
                         </div>
                         
                         <!-- AWS Setup Tab -->
@@ -294,56 +294,6 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             </div>
                         </div>
                         
-                        <!-- My Task List Tab -->
-                        <div class="tab-content" id="devsecops-hub">
-                            <div class="prerequisites" id="hub-prerequisites">
-                                <div class="prerequisite-item">
-                                    <span class="prereq-status" id="prereq-aws-status">❌</span>
-                                    <span>AWS Connected</span>
-                                </div>
-                            </div>
-                            
-                            <div class="section" id="jira-config-section">
-                                <h3>Ticket Configuration</h3>
-                                
-                                <div class="input-group">
-                                    <label for="jira-issue-id">DEVSECOPS Ticket ID:</label>
-                                    <div class="input-with-button">
-                                        <input type="text" id="jira-issue-id" placeholder="DEVSECOPS-1234" />
-                                    </div>
-                                    <div class="validation-result" id="jira-validation-result"></div>
-                                </div>
-
-                                <!-- Manual Estimation Input -->
-                                <div class="input-group">
-                                    <label for="estimation-value">Estimation:</label>
-                                    <div class="estimation-input-group">
-                                        <input type="number" id="estimation-value" placeholder="e.g., 15" min="0" step="0.5" />
-                                        <select id="estimation-unit">
-                                            <option value="hours">Hours</option>
-                                            <option value="days">Days</option>
-                                            <option value="weeks">Weeks</option>
-                                            <option value="months">Months</option>
-                                        </select>
-                                    </div>
-                                    <small class="input-hint">Enter the estimation value from Copilot and select the appropriate unit</small>
-                                </div>
-                                
-                                <div class="estimation-details" id="estimation-details" style="display: none;">
-                                    <h4>Estimation Details:</h4>
-                                    <div id="estimation-content"></div>
-                                </div>
-                                
-
-                                
-                                <button class="primary-button" id="update-jira-btn" disabled>
-                                    📊 Update DEVSECOPS Ticket
-                                </button>
-                                
-                                <div class="result-display" id="jira-update-result"></div>
-                            </div>
-                        </div>
-                        
                         <!-- Manage Feedback Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
@@ -405,6 +355,56 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 </div>
                                 
                                 <div class="feedback-result" id="feedback-result"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- My Task List Tab -->
+                        <div class="tab-content" id="devsecops-hub">
+                            <div class="prerequisites" id="hub-prerequisites">
+                                <div class="prerequisite-item">
+                                    <span class="prereq-status" id="prereq-aws-status">❌</span>
+                                    <span>AWS Connected</span>
+                                </div>
+                            </div>
+                            
+                            <div class="section" id="jira-config-section">
+                                <h3>Ticket Configuration</h3>
+                                
+                                <div class="input-group">
+                                    <label for="jira-issue-id">DEVSECOPS Ticket ID:</label>
+                                    <div class="input-with-button">
+                                        <input type="text" id="jira-issue-id" placeholder="DEVSECOPS-1234" />
+                                    </div>
+                                    <div class="validation-result" id="jira-validation-result"></div>
+                                </div>
+
+                                <!-- Manual Estimation Input -->
+                                <div class="input-group">
+                                    <label for="estimation-value">Estimation:</label>
+                                    <div class="estimation-input-group">
+                                        <input type="number" id="estimation-value" placeholder="e.g., 15" min="0" step="0.5" />
+                                        <select id="estimation-unit">
+                                            <option value="hours">Hours</option>
+                                            <option value="days">Days</option>
+                                            <option value="weeks">Weeks</option>
+                                            <option value="months">Months</option>
+                                        </select>
+                                    </div>
+                                    <small class="input-hint">Enter the estimation value from Copilot and select the appropriate unit</small>
+                                </div>
+                                
+                                <div class="estimation-details" id="estimation-details" style="display: none;">
+                                    <h4>Estimation Details:</h4>
+                                    <div id="estimation-content"></div>
+                                </div>
+                                
+
+                                
+                                <button class="primary-button" id="update-jira-btn" disabled>
+                                    📊 Update DEVSECOPS Ticket
+                                </button>
+                                
+                                <div class="result-display" id="jira-update-result"></div>
                             </div>
                         </div>
                         

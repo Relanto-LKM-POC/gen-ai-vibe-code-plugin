@@ -445,12 +445,27 @@ function registerCommands(context: vscode.ExtensionContext) {
     });
 
     // Apply Resource Files command
-    const applyResourceFilesCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyResourceFiles', async () => {
+    const applyResourceFilesCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyResourceFiles', async (folderUri?: vscode.Uri) => {
         try {
-            const activeEditor = vscode.window.activeTextEditor;
-            if (!activeEditor) {
-                vscode.window.showWarningMessage('No active editor found. Please open a file to get contextual resource suggestions.');
-                return;
+            let fileExtension = '';
+            let fileName = '';
+            let suggestedResources: any[] = [];
+
+            if (folderUri) {
+                // Called from folder context menu - use folder context
+                fileExtension = '';
+                fileName = path.basename(folderUri.fsPath);
+                suggestedResources = resourceManager.suggestResourceFilesForContext('', fileName);
+            } else {
+                // Called from command palette or other means - try to use active editor
+                const activeEditor = vscode.window.activeTextEditor;
+                if (!activeEditor) {
+                    vscode.window.showWarningMessage('No active editor found. Please open a file or use the context menu on a folder.');
+                    return;
+                }
+                fileExtension = path.extname(activeEditor.document.fileName);
+                fileName = path.basename(activeEditor.document.fileName);
+                suggestedResources = resourceManager.suggestResourceFilesForContext(fileExtension, fileName);
             }
 
             // Get all resource files
@@ -460,11 +475,6 @@ function registerCommands(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('No resource files available');
                 return;
             }
-
-            // Get contextual suggestions
-            const fileExtension = path.extname(activeEditor.document.fileName);
-            const fileName = path.basename(activeEditor.document.fileName);
-            const suggestedResources = resourceManager.suggestResourceFilesForContext(fileExtension, fileName);
 
             // Create multi-select quick pick items
             const quickPickItems: (vscode.QuickPickItem & { resourceFile: any })[] = allResourceFiles.map(resourceFile => {
@@ -485,7 +495,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 matchOnDescription: true,
                 matchOnDetail: true,
                 ignoreFocusOut: true,
-                title: `📋 Choose Resource Files for ${path.basename(activeEditor.document.fileName)}`
+                title: `📋 Choose Resource Files for ${fileName}`
             }) as (vscode.QuickPickItem & { resourceFile: any })[] | undefined;
 
             if (!selectedItems || selectedItems.length === 0) {
