@@ -227,7 +227,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                     <div class="tab-container">
                         <div class="tabs">
                             <button class="tab-button active" data-tab="aws-config">AWS Setup</button>
-                            <button class="tab-button" data-tab="feedback">Manage Feedback</button>
+                            <button class="tab-button" data-tab="feedback">Manage Features</button>
                             <button class="tab-button" data-tab="devsecops-hub">My Task List</button>
                         </div>
                         
@@ -294,14 +294,14 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             </div>
                         </div>
                         
-                        <!-- Manage Feedback Tab -->
+                        <!-- Manage Features Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
                                 <h3>Help & Support</h3>
                                 
                                 <div class="input-group">
                                     <label for="feedback-name">Name: <span class="required">*</span></label>
-                                    <input type="text" id="feedback-name" placeholder="e.g. AWS Integration Bug" required />
+                                    <input type="text" id="feedback-name" placeholder="e.g. AWS Integration Enhancement" required />
                                 </div>
                                 
                                 <div class="input-group">
@@ -335,7 +335,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 
                                 <div class="input-group">
                                     <label for="feedback-description">Description: <span class="required">*</span></label>
-                                    <textarea id="feedback-description" rows="6" placeholder="Please describe the feedback in detail..." required></textarea>
+                                    <textarea id="feedback-description" rows="6" placeholder="Please describe the feature in detail..." required></textarea>
                                 </div>
                                 
                                 <div class="input-group" id="acceptance-criteria-group" style="display: none;">
@@ -347,7 +347,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 
                                 <div class="button-group">
                                     <button class="primary-button" id="submit-feedback-btn">
-                                        Submit Feedback
+                                        Submit Feature
                                     </button>
                                     <button class="secondary-button" id="load-data-btn">
                                         Refresh Dropdowns

@@ -4,7 +4,7 @@
 
 ## 🚀 What is Spec Driven Development?
 
-Spec Driven Development is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade project management capabilities. It provides **language-specific best practices**, **smart development prompts**, **AWS Secrets Manager integration**, and **Salesforce feedback management** in a unified development experience.
+Spec Driven Development is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade project management capabilities. It provides **language-specific best practices**, **smart development prompts**, **AWS Secrets Manager integration**, and **Salesforce feature management** in a unified development experience.
 
 ## ✨ Core Capabilities
 
@@ -22,12 +22,12 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 
 ### 🎯 **Project Management**
 - **Effort Estimation Parser** - Intelligent parsing of time estimates from multiple formats
-- **Feedback Workflow** - Complete feedback lifecycle from submission to tracking
+- **Feature Workflow** - Complete feature lifecycle from submission to tracking
 - **Real-time Status Monitoring** - Live connection status for AWS and Salesforce
 - **Comprehensive Logging** - Detailed audit trails for all operations
 
 ### 🛠️ **Developer Experience**
-- **Three-Tab Interface** - AWS Setup, Manage Feedback, and My Task List in one panel
+- **Three-Tab Interface** - AWS Setup, Manage Features, and My Task List in one panel
 - **Context-Aware Commands** - Smart commands that work at file and folder levels
 - **Progressive Loading** - Efficient data loading with relationship-based filtering
 - **Error Recovery** - Graceful error handling with actionable user guidance
@@ -38,7 +38,7 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 - **Smart Development Resources** - Access comprehensive language-specific best practices and guidelines
 - **Contextual Prompts** - Get targeted prompts for code review, security analysis, and quality improvements
 - **Effort Estimation** - Parse and structure time estimates from various formats
-- **Enterprise Feedback** - Submit feedback directly to Salesforce with JIRA integration
+- **Enterprise Feature** - Submit feature directly to Salesforce with JIRA integration
 
 ### **For Development Teams**
 - **Standardized Practices** - Share consistent coding standards and best practices across team members
@@ -48,8 +48,8 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 
 ### **For Enterprise Organizations**
 - **Secure Credential Management** - Use AWS Secrets Manager for centralized credential storage
-- **Audit Trails** - Complete logging and tracking of all feedback and task updates
-- **Initiative Tracking** - Manage feedback and tasks within enterprise initiative and epic structures
+- **Audit Trails** - Complete logging and tracking of all feature and task updates
+- **Initiative Tracking** - Manage features and tasks within enterprise initiative and epic structures
 - **Compliance** - Ensure development practices align with organizational standards
 
 ## 🚀 Getting Started
@@ -64,7 +64,7 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 1. **Configure AWS CLI** with `aws configure` 
 2. **Store Salesforce credentials** in AWS Secrets Manager
 3. **Open the panel** and use the AWS Setup tab to establish connections
-4. **Submit feedback** using the Manage Feedback tab with full Salesforce integration
+4. **Submit feature** using the Manage Features tab with full Salesforce integration
 
 ## 🛠️ Available Commands
 
@@ -81,7 +81,7 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 |---------|-------------|
 | **Open Panel** | Access the three-tab management interface |
 | **Connect to AWS** | Establish AWS Secrets Manager connection |
-| **Submit Feedback** | Submit feedback to Salesforce with JIRA integration |
+| **Submit Feature** | Submit feature to Salesforce with JIRA integration |
 | **Update JIRA Issue** | Update tasks with effort estimation |
 | **Parse Copilot Estimation** | Extract effort estimates from GitHub Copilot Chat |
 
@@ -160,7 +160,7 @@ your-project/
 
 ### **Enterprise Features** (Optional)
 - AWS CLI configured for Secrets Manager integration
-- Salesforce org access for feedback submission
+- Salesforce org access for feature submission
 
 ## 🛡️ Security & Privacy
 
@@ -190,7 +190,7 @@ your-project/
 
 For detailed usage instructions, examples, and troubleshooting, visit our [GitHub repository](https://github.com/Relanto-LKM-POC/spec-driven-development).
 
-## 🤝 Support & Feedback
+## 🤝 Support & Feature
 
 - **Issues & Bug Reports**: [GitHub Issues](https://github.com/Relanto-LKM-POC/spec-driven-development/issues)
 - **Feature Requests**: Submit via GitHub Issues

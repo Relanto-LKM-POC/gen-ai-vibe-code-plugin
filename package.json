@@ -113,23 +113,23 @@
         "category": "Spec Driven Development"
       },
       {
-        "command": "specDrivenDevelopment.submitFeedback",
-        "title": "Submit Feedback",
+        "command": "specDrivenDevelopment.submitFeature",
+        "title": "Submit Feature",
         "category": "Spec Driven Development"
       },
       {
-        "command": "specDrivenDevelopment.viewFeedbackHistory",
-        "title": "View Feedback History",
+        "command": "specDrivenDevelopment.viewFeatureHistory",
+        "title": "View Feature History",
         "category": "Spec Driven Development"
       },
       {
-        "command": "specDrivenDevelopment.exportFeedbackHistory",
-        "title": "Export Feedback History",
+        "command": "specDrivenDevelopment.exportFeatureHistory",
+        "title": "Export Feature History",
         "category": "Spec Driven Development"
       },
       {
-        "command": "specDrivenDevelopment.clearFeedbackHistory",
-        "title": "Clear Feedback History",
+        "command": "specDrivenDevelopment.clearFeatureHistory",
+        "title": "Clear Feature History",
         "category": "Spec Driven Development"
       },
       {

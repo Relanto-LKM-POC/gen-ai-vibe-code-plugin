@@ -735,12 +735,12 @@ function registerCommands(context: vscode.ExtensionContext) {
 
             // Also show VS Code notification
             if (result.success) {
-                vscode.window.showInformationMessage(`✅ Feedback submitted successfully! Ticket: ${result.ticketId}`);
+                vscode.window.showInformationMessage(`✅ Feature submitted successfully! Ticket: ${result.ticketId}`);
             } else {
-                vscode.window.showErrorMessage(`❌ Failed to submit feedback: ${result.error}`);
+                vscode.window.showErrorMessage(`❌ Failed to submit feature: ${result.error}`);
             }
         } catch (error) {
-            const errorMessage = `Failed to submit feedback: ${(error as Error).message}`;
+            const errorMessage = `Failed to submit feature: ${(error as Error).message}`;
             
             // Send error back to webview
             if (specDrivenDevelopmentPanel) {

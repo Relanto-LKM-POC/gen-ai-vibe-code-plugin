@@ -7,7 +7,7 @@
 
 ## 🚀 What Does This Extension Do?
 
-**Spec Driven Development** is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade feedback and project management capabilities.
+**Spec Driven Development** is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade Feature and project management capabilities.
 
 ## 🎯 Core Features
 
@@ -21,13 +21,13 @@ The extension provides three main capabilities:
 
 ### � **Enterprise Integration**
 - **AWS Secrets Manager Integration** - Secure credential management using your AWS CLI configuration
-- **Salesforce Feedback System** - Direct integration with Salesforce for feedback submission
+- **Salesforce Feature System** - Direct integration with Salesforce for feature submission
 - **JIRA Task Management** - Update and track JIRA tasks with effort estimation
 - **Initiative & Epic Management** - Smart filtering and relationship-based dropdowns
 
 ### 🎯 **Project Management**
 - **Effort Estimation Parser** - Intelligent parsing of time estimates from various formats
-- **Feedback History Tracking** - Complete audit trail of submitted feedback
+- **Feature History Tracking** - Complete audit trail of submitted feature
 - **Real-time Status Monitoring** - Live connection status for AWS and Salesforce
 - **Enterprise-grade Logging** - Comprehensive error reporting and diagnostics
 
@@ -70,7 +70,7 @@ Install from the VS Code Marketplace or use the Command Palette (`Ctrl+Shift+P` 
 |---------|-------------|
 | **Open Panel** | Access the main management interface |
 | **Connect to AWS** | Establish AWS Secrets Manager connection |
-| **Submit Feedback** | Submit feedback to Salesforce with JIRA integration |
+| **Submit Feature** | Submit Feature to Salesforce with JIRA integration |
 | **Update JIRA Issue** | Update JIRA tasks with effort estimation |
 | **Parse Copilot Estimation** | Extract effort estimates from GitHub Copilot Chat |
 
@@ -123,7 +123,7 @@ When you use "Add Workspace Guidelines", the extension creates:
 - **AWS Secrets Manager** - Secure credential management using your AWS CLI configuration
 - **Salesforce API Integration** - Direct REST API connectivity with dynamic field discovery
 - **JIRA Task Management** - Update tasks with effort estimation and status tracking
-- **Feedback Workflow** - Complete feedback lifecycle from submission to tracking
+- **Feature Workflow** - Complete feature lifecycle from submission to tracking
 
 ---
 
@@ -255,7 +255,7 @@ Output: Structured time estimates with configurable work hours
 3. Code with enhanced context and instructions
 4. Use "Parse Copilot Estimation" → Extract time estimate from AI chat
 5. "Update JIRA Issue" → Automatically update Salesforce with 40-hour estimate
-6. "Submit Feedback" → Complete feedback loop with initiative/epic tracking
+6. "Submit Feature" → Complete feature loop with initiative/epic tracking
 ```
 
 ### **🔍 Smart Context Detection**
@@ -333,7 +333,7 @@ Built with TypeScript and VS Code Extension API:
 ### 🔧 **Service Layer**
 - **`src/services/awsService.ts`** - AWS Secrets Manager integration
 - **`src/services/jiraService.ts`** - Salesforce/JIRA ticket management  
-- **`src/services/feedbackService.ts`** - GitHub Issues feedback system
+- **`src/services/FeatureService.ts`** - Salesforce/JIRA Feature system
 - **`src/services/estimationParser.ts`** - Intelligent effort estimation parsing
 
 ### 🎨 **User Interface**
@@ -439,7 +439,7 @@ npm run watch
 - ✅ **9 Language-Specific Instruction Sets** - Comprehensive best practices
 - ✅ **5 Smart Development Prompts** - Context-aware development guidance
 - ✅ **AWS Secrets Manager Integration** - Enterprise credential management
-- ✅ **Salesforce API Integration** - Direct feedback and task management
+- ✅ **Salesforce API Integration** - Direct feature and task management
 - ✅ **Intelligent Effort Estimation** - Multiple format parsing support
 - ✅ **Multi-Platform Support** - Windows, macOS, and Linux compatible
 

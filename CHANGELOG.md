@@ -20,29 +20,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### 🏢 Enterprise Integration System
 - **AWS Secrets Manager Integration** - Secure credential management using AWS CLI configuration
-- **Salesforce API Integration** - Direct REST API connectivity with Feedback__c objects
+- **Salesforce API Integration** - Direct REST API connectivity with Feature__c objects
 - **Dynamic Field Discovery** - Automatic Salesforce object structure analysis using describe APIs
 - **Initiative & Epic Management** - Smart filtering with relationship-based data loading
 - **JIRA Task Management** - Update tasks with structured effort estimation
 
 #### 🎯 Project Management Capabilities
 - **Effort Estimation Parser** - Intelligent parsing of time estimates from multiple formats (hours, days, weeks, story points, sprints)
-- **Feedback Submission Workflow** - Complete feedback lifecycle with Salesforce integration
+- **Feature Submission Workflow** - Complete feature lifecycle with Salesforce integration
 - **Real-time Status Monitoring** - Live connection status for AWS and Salesforce
-- **Audit Trail Management** - Comprehensive logging and feedback history tracking
+- **Audit Trail Management** - Comprehensive logging and feature history tracking
 
 #### 🎨 User Interface & Experience
-- **Three-Tab Management Panel** - AWS Setup, Manage Feedback, and My Task List
+- **Three-Tab Management Panel** - AWS Setup, Manage Features, and My Task List
 - **Progressive Data Loading** - Load initiatives first, then filter epics based on selection
-- **Connection Status Indicators** - Real-time visual feedback for all connection states
+- **Connection Status Indicators** - Real-time visual feature for all connection states
 - **Modern Webview Interface** - Clean, responsive UI with comprehensive error handling
 - **Context Menu Integration** - Right-click commands for folders and files
 
 #### 🛠️ Available Commands
 - **Development Commands**: Analyze Code & Apply Instructions (`Ctrl+Shift+V A`), Apply Contextual Prompts (`Ctrl+Shift+V P`)
 - **Workspace Commands**: Add Workspace Guidelines, Analyze Folder & Apply Instructions, Apply Folder Prompts
-- **Enterprise Commands**: Connect to AWS, Submit Feedback, Update JIRA Issue, Parse Copilot Estimation
-- **Management Commands**: Open Panel, Refresh AWS Connection, View/Export/Clear Feedback History
+- **Enterprise Commands**: Connect to AWS, Submit Feature, Update JIRA Issue, Parse Copilot Estimation
+- **Management Commands**: Open Panel, Refresh AWS Connection, View/Export/Clear Feature History
 
 #### 📁 Resource Structure Created
 - **Instructions** (9 files): Language-specific best practices including Go (5 comprehensive guides), Python, Terraform, Bash, and software requirements
@@ -64,14 +64,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### 🏗️ Technical Architecture
 - **TypeScript-based** - Full VS Code Extension API integration with modern development practices
-- **Service-Oriented Design** - Separate services for AWS, Salesforce, feedback, estimation, and notifications
+- **Service-Oriented Design** - Separate services for AWS, Salesforce, feature, estimation, and notifications
 - **Context Analysis Engine** - Intelligent project analysis and technology detection
 - **Resource Management System** - Efficient file operations and workspace integration
 - **Enterprise Security Model** - AWS Secrets Manager integration with secure credential handling
 
 #### 🔧 Core Services Implementation
 - **AWSService** - AWS CLI integration with Secrets Manager access and connection management
-- **FeedbackService** - Salesforce API integration with dynamic field discovery and form validation
+- **FeatureService** - Salesforce API integration with dynamic field discovery and form validation
 - **JiraService** - Salesforce authentication using OAuth 2.0 with task management capabilities
 - **EstimationParser** - Multi-format parsing engine for effort estimation (hours, days, weeks, story points)
 - **NotificationManager** - Comprehensive user notification and status management system
@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Local Processing** - Core development features process data locally without external dependencies
 - **Secure Credential Management** - AWS Secrets Manager integration, no local credential storage
 - **Enterprise Security** - Follows AWS and Salesforce security best practices
-- **Audit Trails** - Comprehensive logging for all operations and feedback submissions
+- **Audit Trails** - Comprehensive logging for all operations and feature submissions
 - **Privacy by Design** - No telemetry collection, open-source transparency
 
 ---
@@ -96,7 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned Enhancements
 - **Multi-Org Support** - Support for multiple Salesforce orgs with organization switching
-- **Advanced Analytics** - Dashboard for tracking development metrics and feedback trends
+- **Advanced Analytics** - Dashboard for tracking development metrics and feature trends
 - **Custom Templates** - User-defined instruction and prompt templates
 - **Integration Expansion** - Additional enterprise system integrations (Azure DevOps, Jira Cloud)
 - **Collaboration Features** - Team-based instruction sharing and management
@@ -107,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Issue Tracking** - GitHub Issues for bug reports and feature requests
 - **Documentation** - Comprehensive guides and API documentation
 - **Extension Ecosystem** - Planned integration with other VS Code extensions
-- **Feedback Loop** - Direct feedback channel through the extension's Salesforce integration
+- **Feature Loop** - Direct feature channel through the extension's Salesforce integration
 
 ---
 
@@ -117,4 +117,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All features have been tested across multiple project types and enterprise environments
 - The extension is designed for seamless integration with existing development workflows
 - Backward compatibility will be maintained in future updates
-- Community feedback and contributions are actively encouraged for continuous improvement
+- Community feature and contributions are actively encouraged for continuous improvement

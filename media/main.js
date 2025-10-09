@@ -74,7 +74,7 @@
         // DEVSECOPS Hub Tab
         setupHubEventListeners();
         
-        // Feedback Tab
+        // Features Tab
         setupFeedbackEventListeners();
         
         // Estimation Notification
@@ -187,7 +187,7 @@
             if (!canSubmitFeedback()) {
                 showFeedbackResult({
                     success: false,
-                    message: 'AWS connection is required to submit feedback. Please connect to AWS first.',
+                    message: 'AWS connection is required to submit features. Please connect to AWS first.',
                     error: 'AWS connection required'
                 });
                 return;
@@ -261,7 +261,7 @@
         if (canSubmitFeedback()) {
             submitBtn.disabled = false;
             loadDataBtn.disabled = false;
-            submitBtn.textContent = 'Submit Feedback';
+            submitBtn.textContent = 'Submit Feature';
         } else {
             submitBtn.disabled = true;
             loadDataBtn.disabled = true;
@@ -676,7 +676,7 @@
             feedbackResult.innerHTML = `
                 <div class="result-header">
                     <span class="result-icon">✅</span>
-                    <span class="result-title">Feedback Submitted Successfully</span>
+                    <span class="result-title">Feature Submitted Successfully</span>
                 </div>
                 <div class="result-details">
                     <div class="result-item">
@@ -699,7 +699,7 @@
             feedbackResult.innerHTML = `
                 <div class="result-header">
                     <span class="result-icon">❌</span>
-                    <span class="result-title">Failed to Submit Feedback</span>
+                    <span class="result-title">Failed to Submit Feature</span>
                 </div>
                 <div class="result-details">
                     <div class="result-item">

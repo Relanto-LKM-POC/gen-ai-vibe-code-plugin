@@ -237,7 +237,7 @@ export class FeedbackService {
         } catch (error) {
             const errorResult: FeedbackSubmissionResult = {
                 success: false,
-                message: 'Failed to submit feedback',
+                message: 'Failed to submit feature',
                 error: (error as Error).message,
                 timestamp: new Date().toISOString()
             };
@@ -344,7 +344,7 @@ export class FeedbackService {
 
                 return {
                     success: true,
-                    message: 'Feedback submitted to Salesforce successfully!',
+                    message: 'Feature submitted to Salesforce successfully!',
                     ticketId: jiraTicketNumber,
                     jiraUrl: jiraUrl,
                     timestamp: new Date().toISOString()
