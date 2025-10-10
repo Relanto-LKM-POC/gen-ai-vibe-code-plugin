@@ -10,6 +10,7 @@ import { AWSService } from './services/awsService';
 import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
 import { FeedbackService } from './services/feedbackService';
+import { TaskService } from './services/taskService';
 import { config } from './utils/configurationManager';
 import { NotificationManager } from './services/notificationManager';
 
@@ -23,6 +24,7 @@ let awsService: AWSService;
 let estimationParser: EstimationParser;
 let jiraService: JiraService;
 let feedbackService: FeedbackService;
+let taskService: TaskService;
 let notificationManager: NotificationManager;
 
 // Global timeout variable
@@ -52,6 +54,7 @@ export async function activate(context: vscode.ExtensionContext) {
         estimationParser = new EstimationParser(context);
         jiraService = new JiraService(context, awsService);
         feedbackService = new FeedbackService(context, awsService);
+        taskService = new TaskService(context, awsService);
         
         // Initialize notification manager
         notificationManager = NotificationManager.getInstance(context);
@@ -1227,6 +1230,189 @@ Token will be stored securely in VS Code settings.`;
         }
     });
 
+    // Task Management Commands
+    const retrieveWipTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveWipTasks', async (options: any = {}) => {
+        try {
+            console.log('Retrieve WIP tasks command triggered with options:', options);
+            
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Retrieving WIP tasks...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 20, message: 'Checking AWS connection...' });
+                console.log('Checking AWS connection status...');
+                
+                progress.report({ increment: 30, message: 'Fetching WIP tasks from Salesforce...' });
+                console.log('Calling taskService.retrieveWipTasks()...');
+                
+                const result = await taskService.retrieveWipTasks(options);
+                console.log(`Retrieved ${result.tasks.length} WIP tasks (${result.totalCount} total):`, result);
+                
+                progress.report({ increment: 50, message: `Found ${result.tasks.length} WIP tasks` });
+                
+                if (specDrivenDevelopmentPanel) {
+                    console.log('Sending WIP task list to webview...');
+                    specDrivenDevelopmentPanel.sendTaskList(result.tasks, 'wip', {
+                        totalCount: result.totalCount,
+                        hasMore: result.hasMore,
+                        currentOffset: options.offset || 0,
+                        currentLimit: options.limit || 20,
+                        searchTerm: options.searchTerm
+                    });
+                } else {
+                    console.error('specDrivenDevelopmentPanel is null');
+                }
+                
+                const searchText = options.searchTerm ? ` (search: "${options.searchTerm}")` : '';
+                vscode.window.showInformationMessage(`✅ Retrieved ${result.tasks.length} of ${result.totalCount} WIP tasks${searchText}`);
+            });
+        } catch (error) {
+            console.error('Error in retrieveWipTasksCommand:', error);
+            vscode.window.showErrorMessage(`Failed to retrieve WIP tasks: ${(error as Error).message}`);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskList([], 'wip', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
+            }
+        }
+    });
+
+    const retrieveRunningTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveRunningTasks', async (options: any = {}) => {
+        try {
+            console.log('Retrieve running tasks command triggered with options:', options);
+            
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Retrieving running tasks...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 20, message: 'Checking AWS connection...' });
+                console.log('Checking AWS connection status...');
+                
+                progress.report({ increment: 30, message: 'Fetching tasks from Salesforce...' });
+                console.log('Calling taskService.retrieveRunningTasks()...');
+                
+                const result = await taskService.retrieveRunningTasks(options);
+                console.log(`Retrieved ${result.tasks.length} running tasks (${result.totalCount} total):`, result);
+                
+                progress.report({ increment: 50, message: `Found ${result.tasks.length} running tasks` });
+                
+                if (specDrivenDevelopmentPanel) {
+                    console.log('Sending task list to webview...');
+                    specDrivenDevelopmentPanel.sendTaskList(result.tasks, 'running', {
+                        totalCount: result.totalCount,
+                        hasMore: result.hasMore,
+                        currentOffset: options.offset || 0,
+                        currentLimit: options.limit || 20,
+                        searchTerm: options.searchTerm
+                    });
+                } else {
+                    console.error('specDrivenDevelopmentPanel is null');
+                }
+                
+                const searchText = options.searchTerm ? ` (search: "${options.searchTerm}")` : '';
+                vscode.window.showInformationMessage(`✅ Retrieved ${result.tasks.length} of ${result.totalCount} running tasks${searchText}`);
+            });
+        } catch (error) {
+            console.error('Error in retrieveRunningTasksCommand:', error);
+            vscode.window.showErrorMessage(`Failed to retrieve running tasks: ${(error as Error).message}`);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskList([], 'running', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
+            }
+        }
+    });
+
+    const editTaskCommand = vscode.commands.registerCommand('specDrivenDevelopment.editTask', async (taskData: any) => {
+        try {
+            const { taskId } = taskData;
+            console.log('Edit task command triggered for:', taskId, taskData);
+            
+            // Send task data to webview for comprehensive editing
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.showTaskEditForm(taskData);
+            }
+        } catch (error) {
+            console.error('Error in editTaskCommand:', error);
+            vscode.window.showErrorMessage(`Failed to open edit form: ${(error as Error).message}`);
+        }
+    });
+
+    const saveTaskUpdatesCommand = vscode.commands.registerCommand('specDrivenDevelopment.saveTaskUpdates', async (updateData: any) => {
+        try {
+            const { taskId, updates } = updateData;
+            console.log('Save task updates command triggered:', taskId, updates);
+            
+            const result = await taskService.updateTask(taskId, updates);
+            
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskActionResult(result, 'edit');
+            }
+            
+            if (result.success) {
+                vscode.window.showInformationMessage('✅ Task updated successfully!');
+                // Refresh the task list
+                vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks');
+            } else {
+                vscode.window.showErrorMessage(`❌ Failed to update task: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Error in saveTaskUpdatesCommand:', error);
+            vscode.window.showErrorMessage(`Failed to save task updates: ${(error as Error).message}`);
+        }
+    });
+
+    const deleteTaskCommand = vscode.commands.registerCommand('specDrivenDevelopment.deleteTask', async (taskData: any) => {
+        try {
+            const { taskId, taskName } = taskData;
+            
+            const confirmation = await vscode.window.showWarningMessage(
+                `Are you sure you want to delete task "${taskName}"? This action cannot be undone.`,
+                { modal: true },
+                'Yes, Delete'
+            );
+            
+            if (confirmation !== 'Yes, Delete') {
+                return;
+            }
+            
+            const result = await taskService.deleteTask(taskId);
+            
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskActionResult(result, 'delete');
+            }
+            
+            if (result.success) {
+                vscode.window.showInformationMessage('✅ Task deleted successfully!');
+            } else {
+                vscode.window.showErrorMessage(`❌ Failed to delete task: ${result.message}`);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to delete task: ${(error as Error).message}`);
+        }
+    });
+
+    const cleanupTaskCommand = vscode.commands.registerCommand('specDrivenDevelopment.cleanupTask', async (taskData: any) => {
+        try {
+            const { taskId, taskName } = taskData;
+            console.log('Cleanup task command triggered for:', taskId, taskName);
+            
+            const result = await taskService.cleanupTask(taskId);
+            
+            if (specDrivenDevelopmentPanel) {
+                // Send result with task ID for UI removal
+                specDrivenDevelopmentPanel.sendTaskActionResult({ ...result, taskId }, 'cleanup');
+            }
+            
+            if (result.success) {
+                vscode.window.showInformationMessage(`✅ Task "${taskName}" removed from list`);
+            } else {
+                vscode.window.showErrorMessage(`❌ Failed to cleanup task: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Error in cleanupTaskCommand:', error);
+            vscode.window.showErrorMessage(`Failed to cleanup task: ${(error as Error).message}`);
+        }
+    });
+
     // Register all commands
     context.subscriptions.push(
         analyzeCodeCommand,
@@ -1258,7 +1444,14 @@ Token will be stored securely in VS Code settings.`;
         analyzeFolderCodeCommand,
         analyzeWorkspaceCodeCommand,
         applyFolderPromptsCommand,
-        applyWorkspacePromptsCommand
+        applyWorkspacePromptsCommand,
+        // Task Management Commands
+        retrieveWipTasksCommand,
+        retrieveRunningTasksCommand,
+        editTaskCommand,
+        saveTaskUpdatesCommand,
+        deleteTaskCommand,
+        cleanupTaskCommand
 
     );
 }
@@ -1382,5 +1575,6 @@ export function deactivate() {
     if (feedbackService) {
         feedbackService.dispose();
     }
+    // taskService doesn't have a dispose method, so no cleanup needed
     console.log('Spec Driven Development deactivated');
 }

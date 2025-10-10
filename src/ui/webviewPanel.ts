@@ -64,6 +64,38 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                     case 'getEnhancedAWSStatus':
                         this.updateEnhancedAWSStatus();
                         break;
+                    
+                    case 'retrieveWipTasks':
+                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks');
+                        break;
+                    
+                    case 'retrieveRunningTasks':
+                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks');
+                        break;
+                    
+                    case 'editTask':
+                        vscode.commands.executeCommand('specDrivenDevelopment.editTask', message.data);
+                        break;
+                    
+                    case 'deleteTask':
+                        vscode.commands.executeCommand('specDrivenDevelopment.deleteTask', message.data);
+                        break;
+                    
+                    case 'cleanupTask':
+                        vscode.commands.executeCommand('specDrivenDevelopment.cleanupTask', message.data);
+                        break;
+                    
+                    case 'saveTaskUpdates':
+                        vscode.commands.executeCommand('specDrivenDevelopment.saveTaskUpdates', message.data);
+                        break;
+                    
+                    case 'searchTasks':
+                        if (message.data.taskType === 'wip') {
+                            vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks', message.data);
+                        } else {
+                            vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks', message.data);
+                        }
+                        break;
                 }
             },
             undefined,
@@ -130,6 +162,40 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'feedbackResult',
                 data: result
+            });
+        }
+    }
+
+    public sendTaskList(tasks: any[], taskType: 'wip' | 'running', pagination?: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'taskListLoaded',
+                data: {
+                    tasks,
+                    taskType,
+                    pagination
+                }
+            });
+        }
+    }
+
+    public sendTaskActionResult(result: any, action: string) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'taskActionResult',
+                data: {
+                    result,
+                    action
+                }
+            });
+        }
+    }
+
+    public showTaskEditForm(taskData: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'showTaskEditForm',
+                data: taskData
             });
         }
     }
@@ -364,6 +430,140 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 <div class="prerequisite-item">
                                     <span class="prereq-status" id="prereq-aws-status">❌</span>
                                     <span>AWS Connected</span>
+                                </div>
+                            </div>
+                            
+                            <div class="section">
+                                <h3>DevSecOps Task Management</h3>
+                                
+                                <!-- Task List Navigation -->
+                                <div class="task-nav-buttons">
+                                    <button class="secondary-button" id="retrieve-wip-btn">
+                                        Retrieve My WIP List
+                                    </button>
+                                    <button class="secondary-button active" id="running-tasks-btn">
+                                        Running Task List
+                                    </button>
+                                </div>
+                                
+                                <!-- Search Bar -->
+                                <div class="search-container" id="search-container" style="display: none;">
+                                    <div class="input-group">
+                                        <input type="text" id="task-search-input" placeholder="Search by ticket ID, name, or description..." />
+                                        <button class="secondary-button" id="task-search-btn">Search</button>
+                                        <button class="secondary-button" id="task-clear-search-btn" style="display: none;">Clear</button>
+                                    </div>
+                                </div>
+
+                                <!-- Task List Container -->
+                                <div class="task-list-container" id="task-list-container">
+                                    <div class="task-list-header">
+                                        <h4 id="task-list-title">Running Task List</h4>
+                                        <div class="task-count" id="task-count">0 tasks</div>
+                                    </div>
+                                    
+                                    <div class="task-list-content" id="task-list-content">
+                                        <div class="loading-indicator" id="task-loading" style="display: none;">
+                                            <div class="loading-spinner"></div>
+                                            <span>Loading tasks...</span>
+                                        </div>
+                                        
+                                        <div class="empty-state" id="task-empty-state">
+                                            <p>No tasks found. Click "Retrieve My WIP List" or "Running Task List" to load tasks.</p>
+                                        </div>
+                                        
+                                        <div class="task-list" id="task-list" style="display: none;">
+                                            <!-- Tasks will be populated here -->
+                                        </div>
+                                        
+                                        <!-- Pagination Controls -->
+                                        <div class="pagination-controls" id="pagination-controls" style="display: none;">
+                                            <button class="secondary-button" id="prev-page-btn" disabled>← Previous</button>
+                                            <span class="pagination-info" id="pagination-info">Page 1 of 1</span>
+                                            <button class="secondary-button" id="next-page-btn" disabled>Next →</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Task Edit Modal -->
+                                <div class="task-edit-modal" id="task-edit-modal" style="display: none;">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h3>Edit Task</h3>
+                                            <button class="close-btn" id="close-edit-modal">×</button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <form id="task-edit-form">
+                                                <div class="input-group">
+                                                    <label for="edit-task-name">Name:</label>
+                                                    <input type="text" id="edit-task-name" required />
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-task-description">Description:</label>
+                                                    <textarea id="edit-task-description" rows="4"></textarea>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-estimated-hours">Estimated Hours:</label>
+                                                    <input type="number" id="edit-estimated-hours" step="0.5" min="0" />
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-task-type">Type:</label>
+                                                    <select id="edit-task-type">
+                                                        <option value="Story">Story</option>
+                                                        <option value="Bug">Bug</option>
+                                                        <option value="Defect">Defect</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-task-priority">Priority:</label>
+                                                    <select id="edit-task-priority">
+                                                        <option value="High-P1">High-P1</option>
+                                                        <option value="High-P2">High-P2</option>
+                                                        <option value="Major-P3">Major-P3</option>
+                                                        <option value="Medium-P3">Medium-P3</option>
+                                                        <option value="Low-P4">Low-P4</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-task-status">Status:</label>
+                                                    <select id="edit-task-status">
+                                                        <option value="Backlog">Backlog</option>
+                                                        <option value="In Progress">In Progress</option>
+                                                        <option value="Code Review">Code Review</option>
+                                                        <option value="Testing">Testing</option>
+                                                        <option value="Done">Done</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-acceptance-criteria">Acceptance Criteria:</label>
+                                                    <textarea id="edit-acceptance-criteria" rows="3"></textarea>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-actual-hours">Actual Hours:</label>
+                                                    <input type="number" id="edit-actual-hours" step="0.5" min="0" />
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-resolution">Resolution:</label>
+                                                    <textarea id="edit-resolution" rows="2"></textarea>
+                                                </div>
+                                                
+                                                <input type="hidden" id="edit-task-id" />
+                                                <input type="hidden" id="edit-epic-id" />
+                                            </form>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button class="secondary-button" id="cancel-edit-btn">Cancel</button>
+                                            <button class="primary-button" id="save-task-btn">Save Changes</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             

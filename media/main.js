@@ -9,7 +9,10 @@
         jiraValidation: null,
         settings: {},
         parsedEstimation: null,
-        allEpics: [] // Store all epics for filtering
+        allEpics: [], // Store all epics for filtering
+        pagination: null, // Store pagination state
+        currentTaskList: [], // Store current task list
+        editingTask: null // Store currently editing task data
     };
 
     // Unit conversion function
@@ -73,6 +76,9 @@
         
         // DEVSECOPS Hub Tab
         setupHubEventListeners();
+        
+        // Task List functionality
+        setupTaskListEventListeners();
         
         // Features Tab
         setupFeedbackEventListeners();
@@ -152,8 +158,102 @@
                 }
             });
         });
+    }
 
+    function setupTaskListEventListeners() {
+        // Task navigation buttons
+        const retrieveWipBtn = document.getElementById('retrieve-wip-btn');
+        const runningTasksBtn = document.getElementById('running-tasks-btn');
 
+        retrieveWipBtn?.addEventListener('click', () => {
+            console.log('WIP tasks button clicked');
+            setActiveTaskTab('wip');
+            showSearchContainer(); // Enable search for WIP tasks too
+            loadWipTasks();
+        });
+
+        runningTasksBtn?.addEventListener('click', () => {
+            console.log('Running tasks button clicked');
+            setActiveTaskTab('running');
+            showSearchContainer();
+            loadRunningTasks();
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('task-search-input');
+        const searchBtn = document.getElementById('task-search-btn');
+        const clearSearchBtn = document.getElementById('task-clear-search-btn');
+
+        searchBtn?.addEventListener('click', () => {
+            const searchTerm = searchInput?.value.trim();
+            if (searchTerm) {
+                performSearch(searchTerm);
+            } else {
+                const activeTab = getActiveTaskTab();
+                if (activeTab === 'wip') {
+                    loadWipTasks();
+                } else {
+                    loadRunningTasks();
+                }
+            }
+        });
+
+        clearSearchBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            const activeTab = getActiveTaskTab();
+            if (activeTab === 'wip') {
+                loadWipTasks();
+            } else {
+                loadRunningTasks();
+            }
+        });
+
+        searchInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchBtn?.click();
+            }
+        });
+
+        searchInput?.addEventListener('input', () => {
+            const hasValue = searchInput.value.trim().length > 0;
+            if (clearSearchBtn) {
+                clearSearchBtn.style.display = hasValue ? 'inline-block' : 'none';
+            }
+        });
+
+        // Pagination controls
+        const prevBtn = document.getElementById('prev-page-btn');
+        const nextBtn = document.getElementById('next-page-btn');
+
+        prevBtn?.addEventListener('click', () => {
+            if (currentState.pagination && currentState.pagination.currentOffset > 0) {
+                const newOffset = Math.max(0, currentState.pagination.currentOffset - currentState.pagination.currentLimit);
+                const activeTab = getActiveTaskTab();
+                if (activeTab === 'wip') {
+                    loadWipTasks(newOffset, currentState.pagination.searchTerm);
+                } else {
+                    loadRunningTasks(newOffset, currentState.pagination.searchTerm);
+                }
+            }
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            if (currentState.pagination && currentState.pagination.hasMore) {
+                const newOffset = currentState.pagination.currentOffset + currentState.pagination.currentLimit;
+                const activeTab = getActiveTaskTab();
+                if (activeTab === 'wip') {
+                    loadWipTasks(newOffset, currentState.pagination.searchTerm);
+                } else {
+                    loadRunningTasks(newOffset, currentState.pagination.searchTerm);
+                }
+            }
+        });
+
+        // Task edit modal
+        setupTaskEditModal();
+
+        // Don't auto-load tasks - let user click when ready
     }
 
     function setupFeedbackEventListeners() {
@@ -792,6 +892,302 @@
     }
 
 
+    // Task List Management Functions
+    function setActiveTaskTab(tabType) {
+        const retrieveWipBtn = document.getElementById('retrieve-wip-btn');
+        const runningTasksBtn = document.getElementById('running-tasks-btn');
+        const taskListTitle = document.getElementById('task-list-title');
+
+        // Update button states
+        if (tabType === 'wip') {
+            retrieveWipBtn?.classList.add('active');
+            runningTasksBtn?.classList.remove('active');
+            if (taskListTitle) taskListTitle.textContent = 'My WIP List';
+        } else {
+            retrieveWipBtn?.classList.remove('active');
+            runningTasksBtn?.classList.add('active');
+            if (taskListTitle) taskListTitle.textContent = 'Running Task List';
+        }
+    }
+
+    function showTaskLoading() {
+        const taskLoading = document.getElementById('task-loading');
+        const taskEmptyState = document.getElementById('task-empty-state');
+        const taskList = document.getElementById('task-list');
+
+        if (taskLoading) taskLoading.style.display = 'flex';
+        if (taskEmptyState) taskEmptyState.style.display = 'none';
+        if (taskList) taskList.style.display = 'none';
+    }
+
+    function hideTaskLoading() {
+        const taskLoading = document.getElementById('task-loading');
+        if (taskLoading) taskLoading.style.display = 'none';
+    }
+
+    // Helper functions for task management
+    function showSearchContainer() {
+        const searchContainer = document.getElementById('search-container');
+        if (searchContainer) searchContainer.style.display = 'block';
+    }
+
+    function hideSearchContainer() {
+        const searchContainer = document.getElementById('search-container');
+        if (searchContainer) searchContainer.style.display = 'none';
+    }
+
+    function loadRunningTasks(offset = 0, searchTerm = '') {
+        showTaskLoading();
+        const options = { 
+            limit: 20, 
+            offset: offset,
+            ...(searchTerm && { searchTerm })
+        };
+        vscode.postMessage({ 
+            command: 'retrieveRunningTasks',
+            data: options
+        });
+    }
+
+    function loadWipTasks(offset = 0, searchTerm = '') {
+        showTaskLoading();
+        const options = { 
+            limit: 20, 
+            offset: offset,
+            ...(searchTerm && { searchTerm })
+        };
+        vscode.postMessage({ 
+            command: 'retrieveWipTasks',
+            data: options
+        });
+    }
+
+    function performSearch(searchTerm) {
+        console.log('Performing search for:', searchTerm);
+        const activeTab = getActiveTaskTab();
+        if (activeTab === 'wip') {
+            loadWipTasks(0, searchTerm);
+        } else {
+            loadRunningTasks(0, searchTerm);
+        }
+    }
+
+    function getActiveTaskTab() {
+        const wipBtn = document.getElementById('retrieve-wip-btn');
+        const runningBtn = document.getElementById('running-tasks-btn');
+        
+        if (wipBtn?.classList.contains('active')) {
+            return 'wip';
+        } else if (runningBtn?.classList.contains('active')) {
+            return 'running';
+        }
+        return 'running'; // default
+    }
+
+    function displayTaskList(tasks, taskType, pagination = null) {
+        console.log(`Displaying ${tasks.length} ${taskType} tasks:`, tasks);
+        hideTaskLoading();
+        
+        // Store current state
+        currentState.currentTaskList = tasks;
+        currentState.pagination = pagination;
+        
+        const taskCount = document.getElementById('task-count');
+        const taskEmptyState = document.getElementById('task-empty-state');
+        const taskList = document.getElementById('task-list');
+        const paginationControls = document.getElementById('pagination-controls');
+
+        // Update task count
+        if (taskCount) {
+            const totalText = pagination ? ` of ${pagination.totalCount}` : '';
+            taskCount.textContent = `${tasks.length}${totalText} task${tasks.length !== 1 ? 's' : ''}`;
+        }
+
+        if (tasks.length === 0) {
+            // Show empty state
+            if (taskEmptyState) {
+                const searchText = pagination?.searchTerm ? ` matching "${pagination.searchTerm}"` : '';
+                taskEmptyState.innerHTML = `<p>No ${taskType === 'wip' ? 'WIP' : 'running'} tasks found${searchText}.</p>`;
+                taskEmptyState.style.display = 'block';
+            }
+            if (taskList) taskList.style.display = 'none';
+            if (paginationControls) paginationControls.style.display = 'none';
+            return;
+        }
+
+        // Hide empty state and show task list
+        if (taskEmptyState) taskEmptyState.style.display = 'none';
+        if (taskList) {
+            taskList.style.display = 'block';
+            taskList.innerHTML = tasks.map(task => createTaskItemHTML(task)).join('');
+            
+            // Add event listeners to task action buttons
+            addTaskActionListeners();
+        }
+
+        // Update pagination controls
+        if (pagination && paginationControls) {
+            updatePaginationControls(pagination);
+            paginationControls.style.display = 'flex';
+        } else if (paginationControls) {
+            paginationControls.style.display = 'none';
+        }
+    }
+
+    function updatePaginationControls(pagination) {
+        const prevBtn = document.getElementById('prev-page-btn');
+        const nextBtn = document.getElementById('next-page-btn');
+        const paginationInfo = document.getElementById('pagination-info');
+
+        if (prevBtn) {
+            prevBtn.disabled = pagination.currentOffset === 0;
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled = !pagination.hasMore;
+        }
+
+        if (paginationInfo) {
+            const currentPage = Math.floor(pagination.currentOffset / pagination.currentLimit) + 1;
+            const totalPages = Math.ceil(pagination.totalCount / pagination.currentLimit);
+            const searchText = pagination.searchTerm ? ` (filtered)` : '';
+            paginationInfo.textContent = `Page ${currentPage} of ${totalPages}${searchText}`;
+        }
+    }
+
+    function createTaskItemHTML(task) {
+        const ticketNumber = extractTicketNumber(task.Jira_Link__c);
+        const description = task.Description__c || 'No description available';
+        const truncatedDescription = description.length > 100 ? description.substring(0, 100) + '...' : description;
+        
+        return `
+            <div class="task-item" data-task-id="${task.Id}">
+                <div class="task-main-content">
+                    <div class="task-header">
+                        <h4 class="task-name">${task.Name}</h4>
+                        <span class="task-ticket">${ticketNumber}</span>
+                    </div>
+                    <p class="task-description">${truncatedDescription}</p>
+                    <div class="task-meta">
+                        <span class="task-status ${getStatusClass(task.Status__c)}">${task.Status__c || 'Unknown'}</span>
+                        <span class="task-type ${getTypeClass(task.Type__c)}">${task.Type__c || 'Unknown'}</span>
+                        ${task.Estimated_Effort_Hours__c ? `<span class="task-effort">${task.Estimated_Effort_Hours__c}h</span>` : ''}
+                    </div>
+                </div>
+                <div class="task-actions">
+                    <button class="task-action-btn edit" data-action="edit" data-task-id="${task.Id}" data-task-name="${task.Name}" data-description="${description}">
+                        Edit
+                    </button>
+                    <button class="task-action-btn delete" data-action="delete" data-task-id="${task.Id}" data-task-name="${task.Name}">
+                        Delete
+                    </button>
+                    <button class="task-action-btn cleanup" data-action="cleanup" data-task-id="${task.Id}" data-task-name="${task.Name}">
+                        Cleanup
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function extractTicketNumber(jiraLink) {
+        if (!jiraLink) return 'N/A';
+        const match = jiraLink.match(/DEVSECOPS-(\d+)/);
+        return match ? `DEVSECOPS-${match[1]}` : 'N/A';
+    }
+
+    function getStatusClass(status) {
+        if (!status) return '';
+        const statusLower = status.toLowerCase().replace(/\s+/g, '-');
+        return statusLower;
+    }
+
+    function getTypeClass(type) {
+        if (!type) return '';
+        return type.toLowerCase();
+    }
+
+    function addTaskActionListeners() {
+        const actionButtons = document.querySelectorAll('.task-action-btn');
+        
+        actionButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const action = button.getAttribute('data-action');
+                const taskId = button.getAttribute('data-task-id');
+                const taskName = button.getAttribute('data-task-name');
+                const description = button.getAttribute('data-description');
+                
+                const taskData = {
+                    taskId,
+                    taskName,
+                    description
+                };
+                
+                switch (action) {
+                    case 'edit':
+                        vscode.postMessage({ 
+                            command: 'editTask', 
+                            data: taskData 
+                        });
+                        break;
+                    case 'delete':
+                        vscode.postMessage({ 
+                            command: 'deleteTask', 
+                            data: taskData 
+                        });
+                        break;
+                    case 'cleanup':
+                        vscode.postMessage({ 
+                            command: 'cleanupTask', 
+                            data: taskData 
+                        });
+                        break;
+                }
+            });
+        });
+    }
+
+    function handleTaskActionResult(result, action) {
+        if (result.success) {
+            // For cleanup action, remove the task from the UI immediately
+            if (action === 'cleanup') {
+                // Find and remove the task item from the UI
+                const currentTaskItems = document.querySelectorAll('.task-item');
+                currentTaskItems.forEach(item => {
+                    const taskId = item.getAttribute('data-task-id');
+                    if (taskId === result.taskId) {
+                        item.remove();
+                        // Update task count
+                        const taskCount = document.getElementById('task-count');
+                        const remainingTasks = document.querySelectorAll('.task-item').length;
+                        if (taskCount) {
+                            taskCount.textContent = `${remainingTasks} task${remainingTasks !== 1 ? 's' : ''}`;
+                        }
+                        
+                        // Show empty state if no tasks remain
+                        if (remainingTasks === 0) {
+                            const taskEmptyState = document.getElementById('task-empty-state');
+                            const taskList = document.getElementById('task-list');
+                            if (taskEmptyState) {
+                                taskEmptyState.innerHTML = '<p>No tasks remaining in the list.</p>';
+                                taskEmptyState.style.display = 'block';
+                            }
+                            if (taskList) taskList.style.display = 'none';
+                        }
+                    }
+                });
+            } else if (action === 'delete') {
+                // For delete action, reload the current task list
+                const activeTab = document.querySelector('.task-nav-buttons .secondary-button.active');
+                if (activeTab) {
+                    activeTab.click();
+                }
+            }
+        }
+    }
+
     // Message handling from extension
     window.addEventListener('message', event => {
         const message = event.data;
@@ -831,8 +1227,119 @@
             case 'epicsLoaded':
                 populateEpicsDropdown(message.data);
                 break;
+            
+            // Task List Messages
+            case 'taskListLoaded':
+                console.log('Task list loaded message received:', message.data);
+                displayTaskList(message.data.tasks, message.data.taskType, message.data.pagination);
+                break;
+            case 'taskActionResult':
+                console.log('Task action result received:', message.data);
+                handleTaskActionResult(message.data.result, message.data.action);
+                break;
+            case 'showTaskEditForm':
+                console.log('Show task edit form message received:', message.data);
+                showTaskEditModal(message.data);
+                break;
         }
     });
+
+    // Task Edit Modal Functions
+    function setupTaskEditModal() {
+        const modal = document.getElementById('task-edit-modal');
+        const closeBtn = document.getElementById('close-edit-modal');
+        const cancelBtn = document.getElementById('cancel-edit-btn');
+        const saveBtn = document.getElementById('save-task-btn');
+
+        closeBtn?.addEventListener('click', hideTaskEditModal);
+        cancelBtn?.addEventListener('click', hideTaskEditModal);
+        
+        // Close modal when clicking outside
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideTaskEditModal();
+            }
+        });
+
+        saveBtn?.addEventListener('click', saveTaskUpdates);
+    }
+
+    function showTaskEditModal(taskData) {
+        console.log('Showing edit modal for task:', taskData);
+        currentState.editingTask = taskData;
+        
+        // Populate form fields
+        const fields = {
+            'edit-task-id': taskData.taskId || taskData.Id,
+            'edit-task-name': taskData.taskName || taskData.Name || '',
+            'edit-task-description': taskData.description || taskData.Description__c || '',
+            'edit-estimated-hours': taskData.Estimated_Effort_Hours__c || '',
+            'edit-task-type': taskData.Type__c || 'Story',
+            'edit-task-priority': taskData.Jira_Priority__c || 'Major-P3',
+            'edit-task-status': taskData.Status__c || 'Backlog',
+            'edit-acceptance-criteria': taskData.Jira_Acceptance_Criteria__c || '',
+            'edit-actual-hours': taskData.Actual_Effort_Hours__c || '',
+            'edit-resolution': taskData.Resolution__c || '',
+            'edit-epic-id': taskData.Epic__c || ''
+        };
+
+        Object.entries(fields).forEach(([fieldId, value]) => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.value = value || '';
+            }
+        });
+
+        const modal = document.getElementById('task-edit-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function hideTaskEditModal() {
+        const modal = document.getElementById('task-edit-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        currentState.editingTask = null;
+    }
+
+    function saveTaskUpdates() {
+        const taskId = document.getElementById('edit-task-id')?.value;
+        if (!taskId) {
+            console.error('No task ID found');
+            return;
+        }
+
+        const updates = {
+            name: document.getElementById('edit-task-name')?.value,
+            description: document.getElementById('edit-task-description')?.value,
+            estimatedHours: parseFloat(document.getElementById('edit-estimated-hours')?.value) || undefined,
+            type: document.getElementById('edit-task-type')?.value,
+            priority: document.getElementById('edit-task-priority')?.value,
+            status: document.getElementById('edit-task-status')?.value,
+            acceptanceCriteria: document.getElementById('edit-acceptance-criteria')?.value,
+            actualHours: parseFloat(document.getElementById('edit-actual-hours')?.value) || undefined,
+            resolution: document.getElementById('edit-resolution')?.value,
+            epicId: document.getElementById('edit-epic-id')?.value
+        };
+
+        // Remove undefined values
+        Object.keys(updates).forEach(key => {
+            if (updates[key] === undefined || updates[key] === '') {
+                delete updates[key];
+            }
+        });
+
+        console.log('Saving task updates:', taskId, updates);
+
+        vscode.postMessage({
+            command: 'saveTaskUpdates',
+            data: { taskId, updates }
+        });
+
+        hideTaskEditModal();
+    }
 
     // Initialize when DOM is loaded
     if (document.readyState === 'loading') {
