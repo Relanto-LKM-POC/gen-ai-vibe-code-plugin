@@ -57,11 +57,28 @@ export class TaskService {
             const offset = options.offset || 0;
 
             // Build the WHERE clause with WIP conditions and optional search
-            let whereClause = 'WHERE Jira_Link__c != null AND Status__c != \'Done\'';
+            let baseWipConditions = 'Jira_Link__c != null AND Status__c != \'Done\'';
+            let whereClause = '';
             
-            if (options.searchTerm) {
-                const searchTerm = options.searchTerm.replace(/'/g, "\\'");
-                whereClause += ` AND (Name LIKE '%${searchTerm}%' OR Description__c LIKE '%${searchTerm}%' OR Jira_Link__c LIKE '%${searchTerm}%')`;
+            if (options.searchTerm && options.searchTerm.trim()) {
+                const searchTerm = options.searchTerm.trim().replace(/'/g, "\\'");
+                console.log('WIP Search term received:', searchTerm);
+                // Only search by DEVSECOPS ticket ID in Jira_Link__c field
+                const devsecopsPattern = /^DEVSECOPS-\d+$/i;
+                console.log('WIP Search: Testing pattern match for:', searchTerm, 'Pattern:', devsecopsPattern.toString());
+                if (devsecopsPattern.test(searchTerm)) {
+                    // Search for specific DEVSECOPS ID - ignore WIP conditions when searching
+                    whereClause = `WHERE Jira_Link__c LIKE '%${searchTerm}%'`;
+                    console.log('WIP Search: ✓ DEVSECOPS pattern matched, using search for:', searchTerm);
+                } else {
+                    // If not a valid DEVSECOPS ID format, return no results
+                    whereClause = `WHERE 1=0`;
+                    console.log('WIP Search: ✗ Invalid DEVSECOPS format, expected DEVSECOPS-NUMBER, got:', searchTerm);
+                }
+            } else {
+                // Default WIP query when no search term
+                whereClause = `WHERE ${baseWipConditions}`;
+                console.log('WIP Search: Using default WIP conditions');
             }
 
             // Use the provided WIP query structure with pagination
@@ -69,7 +86,9 @@ export class TaskService {
                 `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Status__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
-            console.log('WIP Tasks Query:', query);
+            console.log('WIP Tasks - Final whereClause:', whereClause);
+            console.log('WIP Tasks - Query with limit/offset:', limit, offset);
+            console.log('WIP Tasks - Encoded Query:', query);
 
             const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
                 method: 'GET',
@@ -79,11 +98,15 @@ export class TaskService {
                 }
             });
 
+            console.log('WIP Tasks - Response status:', response.status);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('WIP Tasks - API Error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
+            console.log('WIP Tasks - Data received:', data.records?.length, 'records');
             
             // Get total count for pagination
             const countQuery = encodeURIComponent(
@@ -108,12 +131,15 @@ export class TaskService {
                 console.warn('Failed to get WIP total count, using records length');
             }
 
-            console.log(`Retrieved ${data.records?.length || 0} WIP tasks (${totalCount} total)`);
+            const recordsLength = data.records?.length || 0;
+            const hasMore = (offset + limit) < totalCount;
+            console.log(`WIP Tasks - Retrieved: ${recordsLength}, Total: ${totalCount}, Offset: ${offset}, Limit: ${limit}`);
+            console.log(`WIP Tasks - HasMore calculation: (${offset} + ${limit}) < ${totalCount} = ${hasMore}`);
 
             return {
                 tasks: data.records || [],
                 totalCount,
-                hasMore: (offset + limit) < totalCount
+                hasMore
             };
         } catch (error) {
             console.error('Error retrieving WIP tasks:', error);
@@ -132,15 +158,34 @@ export class TaskService {
 
             // Build the WHERE clause for search
             let whereClause = '';
-            if (options.searchTerm) {
-                const searchTerm = options.searchTerm.replace(/'/g, "\\'");
-                whereClause = ` WHERE (Name LIKE '%${searchTerm}%' OR Description__c LIKE '%${searchTerm}%' OR Jira_Link__c LIKE '%${searchTerm}%')`;
+            if (options.searchTerm && options.searchTerm.trim()) {
+                const searchTerm = options.searchTerm.trim().replace(/'/g, "\\'");
+                console.log('Running Search term received:', searchTerm);
+                // Only search by DEVSECOPS ticket ID in Jira_Link__c field
+                const devsecopsPattern = /^DEVSECOPS-\d+$/i;
+                console.log('Running Search: Testing pattern match for:', searchTerm, 'Pattern:', devsecopsPattern.toString());
+                if (devsecopsPattern.test(searchTerm)) {
+                    whereClause = `WHERE Jira_Link__c LIKE '%${searchTerm}%'`;
+                    console.log('Running Search: ✓ DEVSECOPS pattern matched, using search for:', searchTerm);
+                } else {
+                    // If not a valid DEVSECOPS ID format, return no results
+                    whereClause = `WHERE 1=0`;
+                    console.log('Running Search: ✗ Invalid DEVSECOPS format, expected DEVSECOPS-NUMBER, got:', searchTerm);
+                }
+            } else {
+                // No WHERE clause for running tasks when no search - show all
+                whereClause = '';
+                console.log('Running Search: No search term, showing all running tasks');
             }
 
             // Use the existing query structure with pagination
             const query = encodeURIComponent(
-                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c FROM Feedback__c${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
+                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
+
+            console.log('Running Tasks - Final whereClause:', whereClause);
+            console.log('Running Tasks - Query with limit/offset:', limit, offset);
+            console.log('Running Tasks - Encoded Query:', query);
 
             const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
                 method: 'GET',
@@ -150,15 +195,19 @@ export class TaskService {
                 }
             });
 
+            console.log('Running Tasks - Response status:', response.status);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('Running Tasks - API Error:', response.status, errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
+            console.log('Running Tasks - Data received:', data.records?.length, 'records');
             
             // Get total count for pagination
             const countQuery = encodeURIComponent(
-                `SELECT COUNT() FROM Feedback__c${whereClause}`
+                `SELECT COUNT() FROM Feedback__c ${whereClause}`
             );
             
             let totalCount = data.records?.length || 0;
@@ -179,10 +228,15 @@ export class TaskService {
                 console.warn('Failed to get total count, using records length');
             }
 
+            const recordsLength = data.records?.length || 0;
+            const hasMore = (offset + limit) < totalCount;
+            console.log(`Running Tasks - Retrieved: ${recordsLength}, Total: ${totalCount}, Offset: ${offset}, Limit: ${limit}`);
+            console.log(`Running Tasks - HasMore calculation: (${offset} + ${limit}) < ${totalCount} = ${hasMore}`);
+
             return {
                 tasks: data.records || [],
                 totalCount,
-                hasMore: (offset + limit) < totalCount
+                hasMore
             };
         } catch (error) {
             console.error('Error retrieving running tasks:', error);

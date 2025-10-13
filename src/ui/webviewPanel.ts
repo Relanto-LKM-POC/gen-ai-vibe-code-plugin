@@ -66,11 +66,11 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         break;
                     
                     case 'retrieveWipTasks':
-                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks');
+                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks', message.data);
                         break;
                     
                     case 'retrieveRunningTasks':
-                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks');
+                        vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks', message.data);
                         break;
                     
                     case 'editTask':
@@ -449,7 +449,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 <!-- Search Bar -->
                                 <div class="search-container" id="search-container" style="display: none;">
                                     <div class="input-group">
-                                        <input type="text" id="task-search-input" placeholder="Search by ticket ID, name, or description..." />
+                                        <input type="text" id="task-search-input" placeholder="Enter DEVSECOPS-ID (e.g., DEVSECOPS-1234)..." />
                                         <button class="secondary-button" id="task-search-btn">Search</button>
                                         <button class="secondary-button" id="task-clear-search-btn" style="display: none;">Clear</button>
                                     </div>

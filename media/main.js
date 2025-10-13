@@ -186,9 +186,13 @@
 
         searchBtn?.addEventListener('click', () => {
             const searchTerm = searchInput?.value.trim();
-            if (searchTerm) {
+            console.log('Search button clicked - Search term:', searchTerm);
+            console.log('Search term length:', searchTerm?.length);
+            if (searchTerm && searchTerm.length > 0) {
+                console.log('Performing search for:', searchTerm);
                 performSearch(searchTerm);
             } else {
+                console.log('No search term, loading default tasks');
                 const activeTab = getActiveTaskTab();
                 if (activeTab === 'wip') {
                     loadWipTasks();
@@ -239,14 +243,18 @@
         });
 
         nextBtn?.addEventListener('click', () => {
+            console.log('Next button clicked. Current pagination state:', currentState.pagination);
             if (currentState.pagination && currentState.pagination.hasMore) {
                 const newOffset = currentState.pagination.currentOffset + currentState.pagination.currentLimit;
+                console.log('Loading next page with offset:', newOffset);
                 const activeTab = getActiveTaskTab();
                 if (activeTab === 'wip') {
                     loadWipTasks(newOffset, currentState.pagination.searchTerm);
                 } else {
                     loadRunningTasks(newOffset, currentState.pagination.searchTerm);
                 }
+            } else {
+                console.log('Cannot go to next page. Has more:', currentState.pagination?.hasMore);
             }
         });
 
@@ -937,12 +945,14 @@
     }
 
     function loadRunningTasks(offset = 0, searchTerm = '') {
+        console.log('loadRunningTasks called with offset:', offset, 'searchTerm:', searchTerm);
         showTaskLoading();
         const options = { 
             limit: 20, 
             offset: offset,
             ...(searchTerm && { searchTerm })
         };
+        console.log('Sending retrieveRunningTasks message with options:', options);
         vscode.postMessage({ 
             command: 'retrieveRunningTasks',
             data: options
@@ -950,12 +960,14 @@
     }
 
     function loadWipTasks(offset = 0, searchTerm = '') {
+        console.log('loadWipTasks called with offset:', offset, 'searchTerm:', searchTerm);
         showTaskLoading();
         const options = { 
             limit: 20, 
             offset: offset,
             ...(searchTerm && { searchTerm })
         };
+        console.log('Sending retrieveWipTasks message with options:', options);
         vscode.postMessage({ 
             command: 'retrieveWipTasks',
             data: options
@@ -964,10 +976,15 @@
 
     function performSearch(searchTerm) {
         console.log('Performing search for:', searchTerm);
+        console.log('Search term type:', typeof searchTerm);
+        console.log('Search term length:', searchTerm.length);
         const activeTab = getActiveTaskTab();
+        console.log('Active tab for search:', activeTab);
         if (activeTab === 'wip') {
+            console.log('Loading WIP tasks with search term:', searchTerm);
             loadWipTasks(0, searchTerm);
         } else {
+            console.log('Loading running tasks with search term:', searchTerm);
             loadRunningTasks(0, searchTerm);
         }
     }
@@ -986,6 +1003,7 @@
 
     function displayTaskList(tasks, taskType, pagination = null) {
         console.log(`Displaying ${tasks.length} ${taskType} tasks:`, tasks);
+        console.log('Pagination data received:', pagination);
         hideTaskLoading();
         
         // Store current state
@@ -1035,16 +1053,19 @@
     }
 
     function updatePaginationControls(pagination) {
+        console.log('Updating pagination controls with:', pagination);
         const prevBtn = document.getElementById('prev-page-btn');
         const nextBtn = document.getElementById('next-page-btn');
         const paginationInfo = document.getElementById('pagination-info');
 
         if (prevBtn) {
             prevBtn.disabled = pagination.currentOffset === 0;
+            console.log('Previous button disabled:', prevBtn.disabled);
         }
 
         if (nextBtn) {
             nextBtn.disabled = !pagination.hasMore;
+            console.log('Next button disabled:', nextBtn.disabled, 'Has more:', pagination.hasMore);
         }
 
         if (paginationInfo) {
@@ -1052,6 +1073,7 @@
             const totalPages = Math.ceil(pagination.totalCount / pagination.currentLimit);
             const searchText = pagination.searchTerm ? ` (filtered)` : '';
             paginationInfo.textContent = `Page ${currentPage} of ${totalPages}${searchText}`;
+            console.log('Pagination info updated:', paginationInfo.textContent);
         }
     }
 
