@@ -11,7 +11,7 @@ module.exports = {
   },
   externals: {
     vscode: 'commonjs vscode'
-  },
+  },        
   resolve: {
     extensions: ['.ts', '.js']
   },

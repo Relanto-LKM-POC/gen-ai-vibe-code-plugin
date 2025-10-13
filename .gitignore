@@ -12,3 +12,9 @@ Thumbs.db
 # Environment files
 .env*
 next_actions.jpg
+
+# Temporary instruction files (auto-cleanup after 30 seconds)
+.vibe-temp/
+
+# Extension copies files to workspace .github/ folder  
+# Users should commit these if they want to keep them

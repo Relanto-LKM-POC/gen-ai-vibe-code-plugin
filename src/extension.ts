@@ -5,6 +5,7 @@ import { PromptManager } from './promptManager';
 import { ContextAnalyzer } from './contextAnalyzer';
 import { CopilotIntegration } from './copilotIntegration';
 import { ResourceManager } from './resourceManager';
+import { VibeVirtualFileSystemProvider } from './virtualFileSystemProvider';
 import { SpecDrivenDevelopmentPanel } from './ui/webviewPanel';
 import { AWSService } from './services/awsService';
 import { EstimationParser } from './services/estimationParser';
@@ -26,6 +27,7 @@ let jiraService: JiraService;
 let feedbackService: FeedbackService;
 let taskService: TaskService;
 let notificationManager: NotificationManager;
+let vibeVirtualFileSystemProvider: VibeVirtualFileSystemProvider;
 
 // Global timeout variable
 declare global {
@@ -43,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
         instructionManager = new InstructionManager(context.extensionPath);
         promptManager = new PromptManager(context.extensionPath);
         contextAnalyzer = new ContextAnalyzer();
-        copilotIntegration = new CopilotIntegration();
+        copilotIntegration = new CopilotIntegration(context);
         resourceManager = new ResourceManager();
 
         // Load resource files
@@ -58,6 +60,50 @@ export async function activate(context: vscode.ExtensionContext) {
         
         // Initialize notification manager
         notificationManager = NotificationManager.getInstance(context);
+
+        // Initialize Virtual File System Provider if enabled
+        // Virtual filesystem disabled - using original file copying approach
+        /*
+        const vibeConfig = vscode.workspace.getConfiguration('vibeCodeAssistant');
+        const enableVirtualFS = vibeConfig.get('enableVirtualFileSystem', false);
+        
+        if (enableVirtualFS) {
+            vibeVirtualFileSystemProvider = new VibeVirtualFileSystemProvider(context.extensionPath);
+            
+            // Register the virtual file system provider
+            const fsProviderDisposable = vscode.workspace.registerFileSystemProvider('vibe', vibeVirtualFileSystemProvider, {
+                isCaseSensitive: false,
+                isReadonly: true
+            });
+            context.subscriptions.push(fsProviderDisposable);
+            
+            // Add virtual workspace folder
+            setTimeout(async () => {
+                try {
+                    const workspaceFolders = vscode.workspace.workspaceFolders || [];
+                    const hasVibeFolder = workspaceFolders.some(folder => folder.uri.scheme === 'vibe');
+                    
+                    if (!hasVibeFolder) {
+                        const success = vscode.workspace.updateWorkspaceFolders(
+                            workspaceFolders.length, 0,
+                            {
+                                uri: vscode.Uri.parse('vibe:/'),
+                                name: '📋 Vibe Guidelines'
+                            }
+                        );
+                        
+                        if (success) {
+                            console.log('✅ Added Vibe virtual workspace folder');
+                        } else {
+                            console.log('⚠️ Failed to add Vibe virtual workspace folder');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error adding virtual workspace folder:', error);
+                }
+            }, 1000); // Delay to ensure workspace is ready
+        }
+        */
 
         // Initialize UI providers
         specDrivenDevelopmentPanel = new SpecDrivenDevelopmentPanel(context);
@@ -77,7 +123,20 @@ export async function activate(context: vscode.ExtensionContext) {
         // Initialize workspace with copilot instructions
         await initializeWorkspace();
 
-        // Show status bar - updated to open the new panel
+        // Show status bar - updated to include quick access menu
+        const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
+        const showVibeStatusBar = config.get('showVibeStatusBar', true);
+        
+        if (showVibeStatusBar) {
+            const vibeStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+            vibeStatusBarItem.text = "$(book) Vibe";
+            vibeStatusBarItem.tooltip = "Vibe Code Assistant - Quick access to instructions and prompts";
+            vibeStatusBarItem.command = 'specDrivenDevelopment.showVibeQuickPick';
+            vibeStatusBarItem.show();
+            context.subscriptions.push(vibeStatusBarItem);
+        }
+
+        // Show main status bar - updated to open the new panel
         const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         statusBarItem.text = "$(dashboard) Spec Driven Development";
         statusBarItem.tooltip = "Spec Driven Development - Click to open panel (AWS, JIRA, Feedback)";
@@ -1451,7 +1510,233 @@ Token will be stored securely in VS Code settings.`;
         editTaskCommand,
         saveTaskUpdatesCommand,
         deleteTaskCommand,
-        cleanupTaskCommand
+        cleanupTaskCommand,
+
+        // New Context Menu Commands
+        vscode.commands.registerCommand('specDrivenDevelopment.selectInstructions', async () => {
+            try {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (!activeEditor) {
+                    vscode.window.showWarningMessage('No active editor found');
+                    return;
+                }
+
+                // Mark as manual command to show notifications
+                copilotIntegration.setManualCommand();
+
+                // Get all instructions with pre-selection based on current file
+                const instructionsWithSelection = instructionManager.getAllInstructionsWithSelection(activeEditor.document.fileName);
+                
+                if (instructionsWithSelection.length === 0) {
+                    vscode.window.showInformationMessage('No instructions available');
+                    return;
+                }
+
+                // Create multi-select quick pick items
+                const quickPickItems: (vscode.QuickPickItem & { instruction: Instruction })[] = instructionsWithSelection.map(({ instruction, preSelected }) => ({
+                    label: `${preSelected ? '🟣 ' : '⚪ '}${instruction.name}`,
+                    description: `${instruction.mode} • ${instruction.id}${preSelected ? ' • 🟣 Auto-selected' : ''}`,
+                    detail: instruction.description,
+                    picked: preSelected,
+                    instruction: instruction
+                }));
+
+                // Show multi-select quick pick
+                const selectedItems = await vscode.window.showQuickPick(quickPickItems, {
+                    canPickMany: true,
+                    placeHolder: `Select instructions for ${path.basename(activeEditor.document.fileName)}`,
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                    ignoreFocusOut: true,
+                    title: `📋 Choose Instructions`
+                }) as (vscode.QuickPickItem & { instruction: Instruction })[] | undefined;
+
+                if (!selectedItems || selectedItems.length === 0) {
+                    vscode.window.showInformationMessage('No instructions selected.');
+                    return;
+                }
+
+                // Extract selected instructions
+                const selectedInstructions = selectedItems.map(item => item.instruction);
+                
+                // Apply selected instructions with auto-paste
+                await copilotIntegration.applyInstructionsToWorkspaceWithAutoPaste(selectedInstructions);
+                
+                // Show success message
+                vscode.window.showInformationMessage(
+                    `✅ Applied ${selectedInstructions.length} instruction(s)!\nSent to Copilot Chat: ${selectedInstructions.map(i => i.name).join(', ')}`
+                );
+
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to select instructions: ${error}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('specDrivenDevelopment.selectPrompts', async () => {
+            try {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (!activeEditor) {
+                    vscode.window.showWarningMessage('No active editor found');
+                    return;
+                }
+
+                // Get all prompts with pre-selection based on current file
+                const promptsWithSelection = promptManager.getAllPromptsWithSelection(activeEditor.document.fileName);
+                
+                if (promptsWithSelection.length === 0) {
+                    vscode.window.showInformationMessage('No prompts available');
+                    return;
+                }
+
+                // Create multi-select quick pick items
+                const quickPickItems: (vscode.QuickPickItem & { prompt: any })[] = promptsWithSelection.map(({ prompt, preSelected }) => ({
+                    label: `${preSelected ? '🟣 ' : '⚪ '}${prompt.name}`,
+                    description: `${prompt.mode} • ${prompt.category}${preSelected ? ' • 🟣 Auto-selected' : ''}`,
+                    detail: prompt.description,
+                    picked: preSelected,
+                    prompt: prompt
+                }));
+
+                // Show multi-select quick pick
+                const selectedItems = await vscode.window.showQuickPick(quickPickItems, {
+                    canPickMany: true,
+                    placeHolder: `Select prompts for ${path.basename(activeEditor.document.fileName)}`,
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                    ignoreFocusOut: true,
+                    title: `🎯 Choose Prompts`
+                }) as (vscode.QuickPickItem & { prompt: any })[] | undefined;
+
+                if (!selectedItems || selectedItems.length === 0) {
+                    vscode.window.showInformationMessage('No prompts selected.');
+                    return;
+                }
+
+                // Apply selected prompts
+                const selectedPrompts = selectedItems.map(item => item.prompt);
+                const promptSummary = selectedPrompts.map((p: any) => p.name).join(', ');
+                
+                await copilotIntegration.sendPromptsToCopilotChatWithAutoPaste(
+                    `Please help me with these prompts: ${promptSummary}`,
+                    selectedPrompts
+                );
+                
+                // Show success message
+                vscode.window.showInformationMessage(
+                    `✅ Applied ${selectedPrompts.length} prompt(s)!\nSent to Copilot Chat: ${promptSummary}`
+                );
+
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to select prompts: ${error}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('specDrivenDevelopment.selectResourceFiles', async () => {
+            try {
+                const activeEditor = vscode.window.activeTextEditor;
+                const fileExtension = activeEditor ? path.extname(activeEditor.document.fileName) : '';
+                const fileName = activeEditor ? path.basename(activeEditor.document.fileName) : '';
+                
+                // Get all resource files
+                const allResourceFiles = resourceManager.getAllResourceFiles();
+                const suggestedResources = resourceManager.suggestResourceFilesForContext(fileExtension, fileName);
+                
+                if (allResourceFiles.length === 0) {
+                    vscode.window.showInformationMessage('No resource files available');
+                    return;
+                }
+
+                // Create multi-select quick pick items
+                const quickPickItems: (vscode.QuickPickItem & { resourceFile: any })[] = allResourceFiles.map(resourceFile => {
+                    const isPreSelected = suggestedResources.some(s => s.id === resourceFile.id);
+                    return {
+                        label: `${isPreSelected ? '🟣 ' : '⚪ '}${resourceFile.name}`,
+                        description: `${resourceFile.type === 'vscode' ? '⚙️ VS Code' : '📚 How-to Guide'} • ${resourceFile.relativePath}${isPreSelected ? ' • 🟣 Auto-selected' : ''}`,
+                        detail: `Extension resource: ${resourceFile.relativePath}`,
+                        picked: isPreSelected,
+                        resourceFile: resourceFile
+                    };
+                });
+
+                // Show multi-select quick pick
+                const selectedItems = await vscode.window.showQuickPick(quickPickItems, {
+                    canPickMany: true,
+                    placeHolder: `Select resource files (${suggestedResources.length} relevant files pre-selected)`,
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                    ignoreFocusOut: true,
+                    title: `📚 Choose Resource Files`
+                }) as (vscode.QuickPickItem & { resourceFile: any })[] | undefined;
+
+                if (!selectedItems || selectedItems.length === 0) {
+                    vscode.window.showInformationMessage('No resource files selected.');
+                    return;
+                }
+
+                // Apply selected resource files
+                const selectedResources = selectedItems.map(item => item.resourceFile);
+                const resourceSummary = selectedResources.map((r: any) => r.name).join(', ');
+                
+                await copilotIntegration.sendResourcesToCopilotChatWithAutoPaste(
+                    `I want to use these resource files: ${resourceSummary}. Please help me use these resources.`,
+                    selectedResources
+                );
+                
+                // Show success message
+                vscode.window.showInformationMessage(
+                    `✅ Applied ${selectedResources.length} resource file(s)!\nSent to Copilot Chat: ${resourceSummary}`
+                );
+
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to select resource files: ${error}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('specDrivenDevelopment.showVibeQuickPick', async () => {
+            try {
+                const quickPickItems = [
+                    {
+                        label: '$(book) Select Instructions',
+                        description: 'Choose coding instructions for current file',
+                        detail: 'Apply relevant instructions to Copilot Chat',
+                        command: 'specDrivenDevelopment.selectInstructions'
+                    },
+                    {
+                        label: '$(target) Select Prompts',
+                        description: 'Choose contextual prompts for current file',
+                        detail: 'Apply specific prompts to Copilot Chat',
+                        command: 'specDrivenDevelopment.selectPrompts'
+                    },
+                    {
+                        label: '$(folder-library) Select Resources',
+                        description: 'Choose resource files (guides, configs)',
+                        detail: 'Reference extension resources in Copilot Chat',
+                        command: 'specDrivenDevelopment.selectResourceFiles'
+                    },
+                    {
+                        label: '$(dashboard) Open Panel',
+                        description: 'Open main Spec Driven Development panel',
+                        detail: 'Access AWS, JIRA, and feedback features',
+                        command: 'specDrivenDevelopment.openPanel'
+                    }
+                ];
+
+                const selected = await vscode.window.showQuickPick(quickPickItems, {
+                    placeHolder: 'Choose Vibe action',
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                    ignoreFocusOut: true,
+                    title: '📋 Vibe Code Assistant'
+                });
+
+                if (selected) {
+                    await vscode.commands.executeCommand(selected.command);
+                }
+
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to show Vibe quick pick: ${error}`);
+            }
+        })
 
     );
 }
@@ -1575,6 +1860,10 @@ export function deactivate() {
     if (feedbackService) {
         feedbackService.dispose();
     }
+    // Virtual filesystem disabled
+    // if (vibeVirtualFileSystemProvider) {
+    //     vibeVirtualFileSystemProvider.dispose();
+    // }
     // taskService doesn't have a dispose method, so no cleanup needed
     console.log('Spec Driven Development deactivated');
 }

@@ -161,22 +161,37 @@
         "command": "specDrivenDevelopment.applyWorkspacePrompts",
         "title": "Apply Workspace Contextual Prompts", 
         "category": "Spec Driven Development"
+      },
+      {
+        "command": "specDrivenDevelopment.selectInstructions",
+        "title": "Select Instructions",
+        "category": "Spec Driven Development"
+      },
+      {
+        "command": "specDrivenDevelopment.selectPrompts",
+        "title": "Select Prompts",
+        "category": "Spec Driven Development"
+      },
+      {
+        "command": "specDrivenDevelopment.selectResourceFiles",
+        "title": "Select Resource Files",
+        "category": "Spec Driven Development"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "specDrivenDevelopment.analyzeCode",
+          "submenu": "specDrivenDevelopment.vibeInstructions",
           "group": "specdd@1",
-          "when": "editorHasSelection || editorTextFocus"
+          "when": "editorTextFocus"
         },
         {
-          "command": "specDrivenDevelopment.suggestPrompt",
+          "submenu": "specDrivenDevelopment.vibePrompts", 
           "group": "specdd@2",
           "when": "editorTextFocus"
         },
         {
-          "command": "specDrivenDevelopment.applyResourceFiles",
+          "submenu": "specDrivenDevelopment.vibeResources",
           "group": "specdd@3",
           "when": "editorTextFocus"
         },
@@ -184,6 +199,24 @@
           "command": "specDrivenDevelopment.openPanel",
           "group": "specdd@4",
           "when": "editorTextFocus"
+        }
+      ],
+      "specDrivenDevelopment.vibeInstructions": [
+        {
+          "command": "specDrivenDevelopment.selectInstructions",
+          "group": "instructions@1"
+        }
+      ],
+      "specDrivenDevelopment.vibePrompts": [
+        {
+          "command": "specDrivenDevelopment.selectPrompts", 
+          "group": "prompts@1"
+        }
+      ],
+      "specDrivenDevelopment.vibeResources": [
+        {
+          "command": "specDrivenDevelopment.selectResourceFiles",
+          "group": "resources@1"
         }
       ],
       "explorer/context": [
@@ -221,6 +254,23 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "specDrivenDevelopment.vibeInstructions",
+        "label": "📋 Vibe Instructions",
+        "icon": "$(book)"
+      },
+      {
+        "id": "specDrivenDevelopment.vibePrompts", 
+        "label": "🎯 Vibe Prompts",
+        "icon": "$(target)"
+      },
+      {
+        "id": "specDrivenDevelopment.vibeResources",
+        "label": "📚 Vibe Resources", 
+        "icon": "$(folder-library)"
+      }
+    ],
     "views": {
       "specDrivenDevelopment": [
         {
@@ -340,6 +390,26 @@
           "type": "string",
           "default": "",
           "description": "GitHub Personal Access Token for creating issues (requires 'repo' or 'public_repo' scope)"
+        },
+        "specDrivenDevelopment.useExtensionResources": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use extension resources directly instead of copying to workspace (recommended)"
+        },
+        "specDrivenDevelopment.showVibeStatusBar": {
+          "type": "boolean", 
+          "default": true,
+          "description": "Show Vibe status bar item for quick access to instructions and prompts"
+        },
+        "vibeCodeAssistant.enableVirtualFileSystem": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable virtual file system to mount extension resources as workspace folder (deprecated - use Smart Temporary Copy instead)"
+        },
+        "vibeCodeAssistant.useSmartTempCopy": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use smart temporary copy approach for cleaner workspace experience (recommended)"
         }
       }
     },
