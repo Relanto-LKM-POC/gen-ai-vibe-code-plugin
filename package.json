@@ -88,6 +88,16 @@
         "category": "Spec Driven Development"
       },
       {
+        "command": "specDrivenDevelopment.debugFileAccess",
+        "title": "Debug File Access (Troubleshoot Copilot)",
+        "category": "Spec Driven Development"
+      },
+      {
+        "command": "specDrivenDevelopment.testPromptFileAccess",
+        "title": "Test Prompt File Access (Specific Test)",
+        "category": "Spec Driven Development"
+      },
+      {
         "command": "specDrivenDevelopment.connectAWS",
         "title": "Connect to AWS",
         "category": "Spec Driven Development"
@@ -296,8 +306,8 @@
       "properties": {
         "specDrivenDevelopment.autoApplyInstructions": {
           "type": "boolean",
-          "default": true,
-          "description": "Automatically apply relevant instructions when opening files"
+          "default": false,
+          "description": "Automatically apply relevant instructions when opening files (deprecated - use manual application for better control)"
         },
         "specDrivenDevelopment.enableContextualPrompts": {
           "type": "boolean",
@@ -410,6 +420,16 @@
           "type": "boolean",
           "default": true,
           "description": "Use smart temporary copy approach for cleaner workspace experience (recommended)"
+        },
+        "vibeCodeAssistant.tempFolderName": {
+          "type": "string",
+          "default": ".vibe",
+          "description": "Name of the temporary folder for Smart Temporary Copy (.vibe is recommended for better Copilot compatibility)"
+        },
+        "vibeCodeAssistant.autoCleanupTempFiles": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically clean up temporary files after Copilot interaction (not recommended - may break active Copilot sessions)"
         }
       }
     },

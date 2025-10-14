@@ -16,5 +16,8 @@ next_actions.jpg
 # Temporary instruction files (auto-cleanup after 30 seconds)
 .vibe-temp/
 
+# Smart Temporary Copy system files (temporary workspace copies)
+vibe-resources/
+
 # Extension copies files to workspace .github/ folder  
 # Users should commit these if they want to keep them

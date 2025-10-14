@@ -364,9 +364,9 @@ export class CopilotIntegration {
             console.log('📋 Copying message to clipboard for manual paste in Copilot Chat');
             await this.sendToCopilotChatClipboard(cleanMessage);
             
-            // Schedule cleanup of temp files if using smart temp copy
+            // Ensure .vibe is in .gitignore if using smart temp copy
             if (useSmartTempCopy) {
-                this.scheduleCleanup();
+                await this.ensureGitignoreHasVibe();
             }
             
         } catch (error) {
@@ -379,13 +379,16 @@ export class CopilotIntegration {
         let compactMessage = message;
         const useSmartTempCopy = this.isSmartTempCopyEnabled();
         
+        this.outputChannel.appendLine(`🔍 buildCompactCopilotMessage - Smart Temp Copy: ${useSmartTempCopy ? 'ENABLED' : 'DISABLED'}`);
+        
         if (instructions && instructions.length > 0) {
             compactMessage += '\n\n📋 **Apply these guidelines:**\n';
             const instructionPaths = instructions.map(instruction => {
                 const fileName = `${instruction.id}.instructions.md`;
                 if (useSmartTempCopy) {
-                    // Smart Temporary Copy approach
-                    const tempPath = `.vibe-temp/instructions/${fileName}`;
+                    // Smart Temporary Copy approach with RELATIVE path using configurable folder
+                    const tempFolderName = this.getTempFolderName();
+                    const tempPath = `${tempFolderName}/instructions/${fileName}`;
                     return `@workspace ${tempPath}`;
                 } else {
                     // Legacy approach - .github/ folder
@@ -400,12 +403,17 @@ export class CopilotIntegration {
             const promptFileName = `${prompt.id}.prompt.md`;
             compactMessage += '\n🎯 **Task prompt:**\n';
             if (useSmartTempCopy) {
-                // Smart Temporary Copy approach
-                const tempPromptPath = `.vibe-temp/prompts/${promptFileName}`;
+                // Smart Temporary Copy approach - include actual content
+                const tempFolderName = this.getTempFolderName();
+                const tempPromptPath = `${tempFolderName}/prompts/${promptFileName}`;
+                this.outputChannel.appendLine(`🎯 Using Smart Temp Copy for prompt: ${tempPromptPath}`);
+                
+                // Reference the file path for Copilot to access
                 compactMessage += `@workspace ${tempPromptPath}\n`;
             } else {
                 // Legacy approach - .github/ folder
                 const legacyPromptPath = `.github/prompts/${promptFileName}`;
+                this.outputChannel.appendLine(`🎯 Using Legacy approach for prompt: ${legacyPromptPath}`);
                 compactMessage += `@workspace ${legacyPromptPath}\n`;
             }
         }
@@ -690,7 +698,13 @@ export class CopilotIntegration {
      */
     private async sendResourcesToCopilotChat(message: string, resourceFiles: ResourceFile[]): Promise<void> {
         try {
-            const cleanMessage = this.buildResourcesCopilotMessage(message, resourceFiles);
+            const useSmartTempCopy = this.isSmartTempCopyEnabled();
+            if (useSmartTempCopy) {
+                // Ensure .vibe is in .gitignore
+                await this.ensureGitignoreHasVibe();
+            }
+            
+            const cleanMessage = await this.buildResourcesCopilotMessage(message, resourceFiles);
             await this.sendToCopilotChatClipboard(cleanMessage);
             
         } catch (error) {
@@ -704,7 +718,13 @@ export class CopilotIntegration {
      */
     public async sendResourcesToCopilotChatWithAutoPaste(message: string, resourceFiles: ResourceFile[]): Promise<void> {
         try {
-            const cleanMessage = this.buildResourcesCopilotMessage(message, resourceFiles);
+            const useSmartTempCopy = this.isSmartTempCopyEnabled();
+            if (useSmartTempCopy) {
+                // Ensure .vibe is in .gitignore
+                await this.ensureGitignoreHasVibe();
+            }
+            
+            const cleanMessage = await this.buildResourcesCopilotMessage(message, resourceFiles);
             await this.sendToCopilotChatWithAutoPaste(cleanMessage);
             
         } catch (error) {
@@ -767,7 +787,7 @@ export class CopilotIntegration {
     /**
      * Build Copilot message with resource file references
      */
-    private buildResourcesCopilotMessage(message: string, resourceFiles: ResourceFile[]): string {
+    private async buildResourcesCopilotMessage(message: string, resourceFiles: ResourceFile[]): Promise<string> {
         let compactMessage = message;
         
         // Add logging for resources message
@@ -775,13 +795,57 @@ export class CopilotIntegration {
         this.outputChannel.appendLine(`🔍 Resource Files Count: ${resourceFiles ? resourceFiles.length : 0}`);
         
         if (resourceFiles && resourceFiles.length > 0) {
-            // Group by type
-            const vsCodeFiles = resourceFiles.filter(f => f.type === 'vscode');
-            const howToFiles = resourceFiles.filter(f => f.type === 'howto');
+            const useSmartTempCopy = this.isSmartTempCopyEnabled();
             
-            if (vsCodeFiles.length > 0) {
-                compactMessage += '\n\n⚙️ **VS Code Configuration Files:**\n';
-                if (this.shouldUseExtensionResources()) {
+            if (useSmartTempCopy) {
+                // Use Smart Temporary Copy approach
+                this.outputChannel.appendLine('📄 Using Smart Temporary Copy for resources');
+                
+                // Copy resource files to temp workspace first
+                await this.copyResourceFilesToTempWorkspace(resourceFiles);
+                
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (workspaceFolders && workspaceFolders.length > 0) {
+                    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+                    
+                    // Group by type
+                    const vsCodeFiles = resourceFiles.filter(f => f.type === 'vscode');
+                    const howToFiles = resourceFiles.filter(f => f.type === 'howto');
+                    
+                    if (vsCodeFiles.length > 0) {
+                        compactMessage += '\n\n⚙️ **VS Code Configuration Files:**\n';
+                        const vscodeRefs = vsCodeFiles.map(file => {
+                            const tempFolderName = this.getTempFolderName();
+                            const tempPath = path.join(workspaceRoot, tempFolderName, '.vscode', file.name);
+                            this.outputChannel.appendLine(`⚙️ VS Code Temp Copy: ${file.name} -> ${tempPath}`);
+                            // Use forward slashes for Copilot workspace references
+                            return `@workspace ${tempFolderName}/.vscode/${file.name}`;
+                        });
+                        compactMessage += vscodeRefs.join('\n') + '\n';
+                    }
+
+                    if (howToFiles.length > 0) {
+                        compactMessage += '\n\n📚 **How-to Guides:**\n';
+                        const howtoRefs = howToFiles.map(file => {
+                            const tempFolderName = this.getTempFolderName();
+                            const tempPath = path.join(workspaceRoot, tempFolderName, 'how-to-guides', file.name);
+                            this.outputChannel.appendLine(`📚 How-to Temp Copy: ${file.name} -> ${tempPath}`);
+                            // Use forward slashes for Copilot workspace references
+                            return `@workspace ${tempFolderName}/how-to-guides/${file.name}`;
+                        });
+                        compactMessage += howtoRefs.join('\n') + '\n';
+                    }
+                }
+            } else {
+                // Fallback to extension resources
+                this.outputChannel.appendLine('📄 Using extension resources (fallback)');
+                
+                // Group by type
+                const vsCodeFiles = resourceFiles.filter(f => f.type === 'vscode');
+                const howToFiles = resourceFiles.filter(f => f.type === 'howto');
+                
+                if (vsCodeFiles.length > 0) {
+                    compactMessage += '\n\n⚙️ **VS Code Configuration Files:**\n';
                     const vscodeRefs = vsCodeFiles.map(file => {
                         const extensionPath = path.join(this.extensionContext.extensionPath, 'resources', file.relativePath);
                         this.outputChannel.appendLine(`⚙️ VS Code Resource: ${file.name} -> ${extensionPath}`);
@@ -789,29 +853,15 @@ export class CopilotIntegration {
                         return `@workspace file:${extensionPath}`;
                     });
                     compactMessage += vscodeRefs.join('\n') + '\n';
-                } else {
-                    const vscodeRefs = vsCodeFiles.map(file => {
-                        this.outputChannel.appendLine(`⚙️ VS Code Workspace: ${file.name} -> ${file.relativePath}`);
-                        return `@workspace ${file.relativePath}`;
-                    });
-                    compactMessage += vscodeRefs.join('\n') + '\n';
                 }
-            }
 
-            if (howToFiles.length > 0) {
-                compactMessage += '\n\n📚 **How-to Guides:**\n';
-                if (this.shouldUseExtensionResources()) {
+                if (howToFiles.length > 0) {
+                    compactMessage += '\n\n📚 **How-to Guides:**\n';
                     const howtoRefs = howToFiles.map(file => {
                         const extensionPath = path.join(this.extensionContext.extensionPath, 'resources', file.relativePath);
                         this.outputChannel.appendLine(`📚 How-to Resource: ${file.name} -> ${extensionPath}`);
                         this.outputChannel.appendLine(`   Exists: ${this.checkFileExists(extensionPath)}`);
                         return `@workspace file:${extensionPath}`;
-                    });
-                    compactMessage += howtoRefs.join('\n') + '\n';
-                } else {
-                    const howtoRefs = howToFiles.map(file => {
-                        this.outputChannel.appendLine(`📚 How-to Workspace: ${file.name} -> ${file.relativePath}`);
-                        return `@workspace ${file.relativePath}`;
                     });
                     compactMessage += howtoRefs.join('\n') + '\n';
                 }
@@ -828,6 +878,18 @@ export class CopilotIntegration {
      */
     public async sendPromptsToCopilotChatWithAutoPaste(message: string, prompts: Prompt[]): Promise<void> {
         try {
+            const useSmartTempCopy = this.isSmartTempCopyEnabled();
+            
+            if (useSmartTempCopy && prompts && prompts.length > 0) {
+                // Copy prompts to temp workspace for Smart Temporary Copy approach
+                for (const prompt of prompts) {
+                    await this.copyPromptToTempWorkspace(prompt);
+                }
+                this.outputChannel.appendLine(`✅ Copied ${prompts.length} prompts to temp workspace`);
+                // Ensure .vibe is in .gitignore
+                await this.ensureGitignoreHasVibe();
+            }
+            
             const cleanMessage = this.buildPromptOnlyCopilotMessage(message, prompts);
             await this.sendToCopilotChatWithAutoPaste(cleanMessage);
             
@@ -842,41 +904,37 @@ export class CopilotIntegration {
      */
     private buildPromptOnlyCopilotMessage(message: string, prompts: Prompt[]): string {
         let compactMessage = message;
-        const useVirtualFS = this.isVirtualFileSystemEnabled();
+        const useSmartTempCopy = this.isSmartTempCopyEnabled();
         
         // Add logging for prompt-only message
         this.outputChannel.appendLine('🔍 ===== PROMPT-ONLY MESSAGE PATH VERIFICATION =====');
         this.outputChannel.appendLine(`🔍 Prompts Count: ${prompts ? prompts.length : 0}`);
-        this.outputChannel.appendLine(`🔍 Virtual FileSystem Enabled: ${useVirtualFS}`);
+        this.outputChannel.appendLine(`🔍 Smart Temporary Copy Enabled: ${useSmartTempCopy}`);
         
         if (prompts && prompts.length > 0) {
-            compactMessage += '\n\n🎯 **Apply these prompts:**\n';
+            compactMessage += '\n\n'; // Just add space, let the prompt content speak for itself
             
-            if (useVirtualFS) {
-                // Virtual filesystem approach
-                const promptPaths = prompts.map(prompt => {
-                    const fileName = `${prompt.id}.prompt.md`;
-                    const virtualPath = `vibe://prompts/${fileName}`;
+            const promptPaths = prompts.map(prompt => {
+                const fileName = `${prompt.id}.prompt.md`;
+                if (useSmartTempCopy) {
+                    // Smart Temporary Copy approach - include file content directly
+                    const tempFolderName = this.getTempFolderName();
+                    const tempPath = `${tempFolderName}/prompts/${fileName}`;
+                    this.outputChannel.appendLine(`🎯 Using Smart Temp Copy for prompt: ${tempPath}`);
                     
-                    this.outputChannel.appendLine(`🎯 Virtual Prompt: ${prompt.id} -> ${virtualPath}`);
-                    return `@workspace ${virtualPath}`;
-                });
-                compactMessage += promptPaths.join('\n') + '\n';
-            } else {
-                // Fallback: File copying approach
-                const promptPaths = prompts.map(prompt => {
-                    const fileName = `${prompt.id}.prompt.md`;
-                    const workspacePath = `.github/prompts/${fileName}`;
-                    
-                    this.outputChannel.appendLine(`🎯 Workspace Prompt: ${prompt.id} -> ${workspacePath}`);
-                    return `@workspace ${workspacePath}`;
-                });
-                compactMessage += promptPaths.join('\n') + '\n';
-            }
+                    // Reference the file path for Copilot to access
+                    return `@workspace ${tempPath}`;
+                } else {
+                    // Legacy approach - .github/ folder
+                    const legacyPath = `.github/prompts/${fileName}`;
+                    this.outputChannel.appendLine(`🎯 Using Legacy approach for prompt: ${legacyPath}`);
+                    return `@workspace ${legacyPath}`;
+                }
+            });
+            compactMessage += promptPaths.join('\n') + '\n';
         }
         
         this.outputChannel.appendLine('🔍 ===== END PROMPT-ONLY MESSAGE PATH VERIFICATION =====');
-        compactMessage += '\n🤖 Help me with these specific prompts!';
         return compactMessage;
     }
 
@@ -910,9 +968,9 @@ export class CopilotIntegration {
             const cleanMessage = this.buildCompactCopilotMessage(message, instructions, prompt);
             await this.sendToCopilotChatWithAutoPaste(cleanMessage);
             
-            // Schedule cleanup of temp files if using smart temp copy
+            // Ensure .vibe is in .gitignore if using smart temp copy
             if (useSmartTempCopy) {
-                this.scheduleCleanup();
+                await this.ensureGitignoreHasVibe();
             }
             
             this.logToOutput(`Applied ${instructions.length} instructions: ${instructions.map(i => i.name).join(', ')}`);
@@ -1058,6 +1116,18 @@ export class CopilotIntegration {
         const enabled = config.get('useSmartTempCopy', true);
         this.outputChannel.appendLine(`⚙️ Smart Temporary Copy setting: ${enabled ? 'ENABLED' : 'DISABLED'}`);
         return enabled;
+    }
+
+    private getTempFolderName(): string {
+        const config = vscode.workspace.getConfiguration('vibeCodeAssistant');
+        const folderName = config.get('tempFolderName', '.vibe');
+        this.outputChannel.appendLine(`📁 Temp folder name: ${folderName}`);
+        return folderName;
+    }
+
+    private isAutoCleanupEnabled(): boolean {
+        const config = vscode.workspace.getConfiguration('vibeCodeAssistant');
+        return config.get('autoCleanupTempFiles', false);
     }
 
     private getExtensionResourcePath(resourceType: 'instructions' | 'prompts' | 'how-to-guides', fileName: string): string {
@@ -1257,26 +1327,138 @@ export class CopilotIntegration {
         this.outputChannel.appendLine(`[${timestamp}] ${message}`);
     }
 
-    private scheduleCleanup(): void {
-        // Schedule cleanup of temp files after 30 seconds
-        this.outputChannel.appendLine('⏰ Scheduled cleanup of temp files in 30 seconds');
-        setTimeout(async () => {
-            try {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders && workspaceFolders.length > 0) {
-                    const tempDir = vscode.Uri.file(path.join(workspaceFolders[0].uri.fsPath, '.vibe-temp'));
-                    await vscode.workspace.fs.delete(tempDir, { recursive: true });
-                    this.outputChannel.appendLine('🧹 Successfully cleaned up temporary instruction files');
-                    vscode.window.showInformationMessage('🧹 Temporary instruction files cleaned up');
-                }
-            } catch (error) {
-                // Cleanup failed, but that's okay - files may not exist
-                this.outputChannel.appendLine('⚠️ Cleanup completed (files may not have existed)');
+    private async ensureGitignoreHasVibe(): Promise<void> {
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                return;
             }
-        }, 30000); // 30 seconds delay
+
+            const workspaceRoot = workspaceFolders[0].uri.fsPath;
+            const gitignorePath = vscode.Uri.file(path.join(workspaceRoot, '.gitignore'));
+            
+            let gitignoreContent = '';
+            let fileExists = false;
+            
+            // Try to read existing .gitignore
+            try {
+                const fileContent = await vscode.workspace.fs.readFile(gitignorePath);
+                gitignoreContent = new TextDecoder().decode(fileContent);
+                fileExists = true;
+                this.outputChannel.appendLine('📄 Found existing .gitignore file');
+            } catch (error) {
+                this.outputChannel.appendLine('📄 No .gitignore found, will create one');
+            }
+
+            const tempFolderName = this.getTempFolderName();
+            
+            // Check if temp folder is already in .gitignore
+            if (gitignoreContent.includes(tempFolderName)) {
+                this.outputChannel.appendLine(`✅ ${tempFolderName} already in .gitignore`);
+                return;
+            }
+
+            // Add temp folder to .gitignore with proper comments
+            const vibeSection = `
+# Vibe Code Assistant - Temporary instruction files
+# These files are created temporarily when applying instructions to Copilot
+# and contain copies of selected instruction/prompt files for workspace access
+${tempFolderName}/
+`;
+
+            if (fileExists) {
+                gitignoreContent += vibeSection;
+            } else {
+                gitignoreContent = `# Generated .gitignore${vibeSection}`;
+            }
+
+            // Write the updated .gitignore
+            const encoder = new TextEncoder();
+            await vscode.workspace.fs.writeFile(gitignorePath, encoder.encode(gitignoreContent));
+            
+            this.outputChannel.appendLine(`✅ Added ${tempFolderName} to .gitignore with explanatory comments`);
+            
+        } catch (error) {
+            this.outputChannel.appendLine(`⚠️ Failed to update .gitignore: ${error}`);
+        }
     }
 
-    // Temporary file copying methods for hybrid approach
+    // Temporary file copying methods for Smart Temporary Copy approach
+    private async copyResourceFilesToTempWorkspace(resourceFiles: ResourceFile[]): Promise<void> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            this.outputChannel.appendLine('⚠️ No workspace folder found for resource copying');
+            throw new Error('No workspace folder found');
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        this.outputChannel.appendLine(`📁 Workspace root for resource copying: ${workspaceRoot}`);
+        
+        const fs = require('fs');
+        const encoder = new TextEncoder();
+        
+        for (const resourceFile of resourceFiles) {
+            this.outputChannel.appendLine(`📄 Processing resource file: ${resourceFile.name} (type: ${resourceFile.type})`);
+            
+            // Determine the appropriate temp directory based on resource type
+            let tempSubDir = 'resources';
+            if (resourceFile.type === 'vscode') {
+                tempSubDir = '.vscode';
+            } else if (resourceFile.type === 'howto') {
+                tempSubDir = 'how-to-guides';
+            }
+            
+            const tempFolderName = this.getTempFolderName();
+            const tempDir = path.join(workspaceRoot, tempFolderName, tempSubDir);
+            const tempDirUri = vscode.Uri.file(tempDir);
+            this.outputChannel.appendLine(`📁 Target temp directory: ${tempDir}`);
+            
+            // Ensure temp directory exists (create recursively)
+            try {
+                await vscode.workspace.fs.stat(tempDirUri);
+            } catch {
+                // Create directory recursively
+                const fs = require('fs');
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                    this.outputChannel.appendLine(`📁 Created temp directory: ${tempDir}`);
+                }
+            }
+            
+            // Copy the resource file
+            const sourcePath = path.join(this.extensionContext.extensionPath, 'resources', resourceFile.relativePath);
+            const destPath = path.join(tempDir, resourceFile.name);
+            const destUri = vscode.Uri.file(destPath);
+            
+            try {
+                if (fs.existsSync(sourcePath)) {
+                    const content = fs.readFileSync(sourcePath, 'utf8');
+                    await vscode.workspace.fs.writeFile(destUri, encoder.encode(content));
+                    this.outputChannel.appendLine(`📄 Temp copied resource: ${resourceFile.name} -> ${destPath}`);
+                    
+                    // Verify the file was copied correctly and is accessible
+                    try {
+                        const copiedContent = fs.readFileSync(destPath, 'utf8');
+                        const isAccessible = copiedContent.length > 0;
+                        this.outputChannel.appendLine(`✅ Verification: ${resourceFile.name} - Size: ${copiedContent.length} bytes, Accessible: ${isAccessible}`);
+                        
+                        // Additional verification - try to read via VS Code API
+                        const vscodeReadContent = await vscode.workspace.fs.readFile(destUri);
+                        const decodedContent = new TextDecoder().decode(vscodeReadContent);
+                        this.outputChannel.appendLine(`✅ VS Code API verification: ${resourceFile.name} - readable via workspace API: ${decodedContent.length > 0}`);
+                        
+                    } catch (verifyError) {
+                        this.outputChannel.appendLine(`⚠️ Verification failed for ${resourceFile.name}: ${verifyError}`);
+                    }
+                } else {
+                    this.outputChannel.appendLine(`⚠️ Source resource not found: ${sourcePath}`);
+                }
+            } catch (error) {
+                this.outputChannel.appendLine(`⚠️ Failed to copy resource ${resourceFile.name}: ${error}`);
+            }
+        }
+    }
+
     private async copyInstructionsToTempWorkspace(instructions: Instruction[]): Promise<void> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -1284,15 +1466,19 @@ export class CopilotIntegration {
         }
 
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        const tempDir = path.join(workspaceRoot, '.vibe-temp', 'instructions');
+        const tempFolderName = this.getTempFolderName();
+        const tempDir = path.join(workspaceRoot, tempFolderName, 'instructions');
         const tempDirUri = vscode.Uri.file(tempDir);
         
-        // Ensure temp directory exists
+        // Ensure temp directory exists (create recursively)
         try {
             await vscode.workspace.fs.stat(tempDirUri);
         } catch {
             await vscode.workspace.fs.createDirectory(tempDirUri);
         }
+        
+        // Force workspace refresh after creating directory
+        await this.refreshWorkspaceForCopilot();
         
         const fs = require('fs');
         const encoder = new TextEncoder();
@@ -1306,9 +1492,24 @@ export class CopilotIntegration {
             
             try {
                 if (fs.existsSync(sourcePath)) {
-                    const content = fs.readFileSync(sourcePath, 'utf8');
+                    const content = this.formatInstructionContent(instruction);
                     await vscode.workspace.fs.writeFile(destUri, encoder.encode(content));
                     this.outputChannel.appendLine(`📋 Temp copied: ${fileName} -> ${destPath}`);
+                    
+                    // Verify the file was copied correctly and is accessible
+                    try {
+                        const copiedContent = fs.readFileSync(destPath, 'utf8');
+                        const isAccessible = copiedContent.length > 0;
+                        this.outputChannel.appendLine(`✅ Verification: ${fileName} - Size: ${copiedContent.length} bytes, Accessible: ${isAccessible}`);
+                        
+                        // Additional verification - try to read via VS Code API
+                        const vscodeReadContent = await vscode.workspace.fs.readFile(destUri);
+                        const decodedContent = new TextDecoder().decode(vscodeReadContent);
+                        this.outputChannel.appendLine(`✅ VS Code API verification: ${fileName} - readable via workspace API: ${decodedContent.length > 0}`);
+                        
+                    } catch (verifyError) {
+                        this.outputChannel.appendLine(`⚠️ Verification failed for ${fileName}: ${verifyError}`);
+                    }
                 } else {
                     this.outputChannel.appendLine(`⚠️ Source not found: ${sourcePath}`);
                 }
@@ -1325,15 +1526,19 @@ export class CopilotIntegration {
         }
 
         const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        const tempDir = path.join(workspaceRoot, '.vibe-temp', 'prompts');
+        const tempFolderName = this.getTempFolderName();
+        const tempDir = path.join(workspaceRoot, tempFolderName, 'prompts');
         const tempDirUri = vscode.Uri.file(tempDir);
         
-        // Ensure temp directory exists  
+        // Ensure temp directory exists (create recursively)
         try {
             await vscode.workspace.fs.stat(tempDirUri);
         } catch {
             await vscode.workspace.fs.createDirectory(tempDirUri);
         }
+        
+        // Force workspace refresh after creating directory
+        await this.refreshWorkspaceForCopilot();
         
         const fs = require('fs');
         const encoder = new TextEncoder();
@@ -1346,15 +1551,442 @@ export class CopilotIntegration {
         
         try {
             if (fs.existsSync(sourcePath)) {
-                const content = fs.readFileSync(sourcePath, 'utf8');
+                const content = this.formatPromptContent(prompt);
                 await vscode.workspace.fs.writeFile(destUri, encoder.encode(content));
                 this.outputChannel.appendLine(`🎯 Temp copied prompt: ${fileName} -> ${destPath}`);
+                
+                // Verify the file was copied correctly and is accessible
+                try {
+                    const copiedContent = fs.readFileSync(destPath, 'utf8');
+                    const isAccessible = copiedContent.length > 0;
+                    this.outputChannel.appendLine(`✅ Verification: ${fileName} - Size: ${copiedContent.length} bytes, Accessible: ${isAccessible}`);
+                    
+                    // Additional verification - try to read via VS Code API
+                    const vscodeReadContent = await vscode.workspace.fs.readFile(destUri);
+                    const decodedContent = new TextDecoder().decode(vscodeReadContent);
+                    this.outputChannel.appendLine(`✅ VS Code API verification: ${fileName} - readable via workspace API: ${decodedContent.length > 0}`);
+                    
+                } catch (verifyError) {
+                    this.outputChannel.appendLine(`⚠️ Verification failed for ${fileName}: ${verifyError}`);
+                }
             } else {
                 this.outputChannel.appendLine(`⚠️ Source prompt not found: ${sourcePath}`);
             }
         } catch (error) {
             this.outputChannel.appendLine(`⚠️ Failed to copy prompt ${fileName}: ${error}`);
         }
+    }
+
+    /**
+     * Verify and list all files in temp folder
+     */
+    private async verifyVibeFolder(): Promise<void> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return;
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const tempFolderName = this.getTempFolderName();
+        const vibePath = path.join(workspaceRoot, tempFolderName);
+        
+        this.outputChannel.appendLine(`🔍 ===== ${tempFolderName.toUpperCase()} FOLDER VERIFICATION =====`);
+        
+        try {
+            const fs = require('fs');
+            if (fs.existsSync(vibePath)) {
+                const listFilesRecursively = (dir: string, prefix: string = '') => {
+                    const items = fs.readdirSync(dir);
+                    for (const item of items) {
+                        const fullPath = path.join(dir, item);
+                        const stats = fs.statSync(fullPath);
+                        if (stats.isDirectory()) {
+                            this.outputChannel.appendLine(`📁 ${prefix}${item}/`);
+                            listFilesRecursively(fullPath, prefix + '  ');
+                        } else {
+                            const size = stats.size;
+                            const relativePath = path.relative(vibePath, fullPath);
+                            this.outputChannel.appendLine(`📄 ${prefix}${item} (${size} bytes) - @workspace ${tempFolderName}/${relativePath.replace(/\\/g, '/')}`);
+                        }
+                    }
+                };
+                listFilesRecursively(vibePath);
+            } else {
+                this.outputChannel.appendLine(`⚠️ ${tempFolderName} folder does not exist`);
+            }
+        } catch (error) {
+            this.outputChannel.appendLine(`⚠️ Failed to verify ${tempFolderName} folder: ${error}`);
+        }
+        
+        this.outputChannel.appendLine(`🔍 ===== END ${tempFolderName.toUpperCase()} VERIFICATION =====`);
+    }
+
+    /**
+     * Send complete context to Copilot: Instructions + Prompts + Resources (all-in-one method)
+     */
+    public async sendCompleteCopilotContext(
+        message: string, 
+        instructions: Instruction[], 
+        prompt?: Prompt, 
+        resourceFiles?: ResourceFile[]
+    ): Promise<void> {
+        try {
+            const useSmartTempCopy = this.isSmartTempCopyEnabled();
+            
+            this.outputChannel.appendLine('🚀 ===== STARTING COMPLETE COPILOT CONTEXT =====');
+            this.outputChannel.appendLine(`📋 Instructions count: ${instructions ? instructions.length : 0}`);
+            this.outputChannel.appendLine(`🎯 Prompt: ${prompt ? prompt.name : 'none'}`);
+            this.outputChannel.appendLine(`📦 Resource files count: ${resourceFiles ? resourceFiles.length : 0}`);
+            this.outputChannel.appendLine(`💾 Smart Temp Copy enabled: ${useSmartTempCopy}`);
+            
+            if (useSmartTempCopy) {
+                const tempFolderName = this.getTempFolderName();
+                // Copy all files to temp folder
+                if (instructions && instructions.length > 0) {
+                    this.outputChannel.appendLine('📋 Copying instructions...');
+                    await this.copyInstructionsToTempWorkspace(instructions);
+                    this.outputChannel.appendLine(`✅ Copied ${instructions.length} instructions to ${tempFolderName}/`);
+                }
+                
+                if (prompt) {
+                    this.outputChannel.appendLine(`🎯 Copying prompt: ${prompt.name} (ID: ${prompt.id})`);
+                    await this.copyPromptToTempWorkspace(prompt);
+                    this.outputChannel.appendLine(`✅ Copied prompt "${prompt.name}" to ${tempFolderName}/`);
+                }
+                
+                if (resourceFiles && resourceFiles.length > 0) {
+                    this.outputChannel.appendLine('📦 Copying resource files...');
+                    await this.copyResourceFilesToTempWorkspace(resourceFiles);
+                    this.outputChannel.appendLine(`✅ Copied ${resourceFiles.length} resource files to ${tempFolderName}/`);
+                }
+                
+                // Ensure temp folder is in .gitignore
+                await this.ensureGitignoreHasVibe();
+                
+                // Verify all files are accessible
+                await this.verifyVibeFolder();
+            }
+            
+            // Build comprehensive message
+            let fullMessage = message;
+            
+            // Add instructions section
+            if (instructions && instructions.length > 0) {
+                fullMessage += '\n\n📋 **Apply these guidelines:**\n';
+                const instructionPaths = instructions.map(instruction => {
+                    const fileName = `${instruction.id}.instructions.md`;
+                    if (useSmartTempCopy) {
+                        // Use RELATIVE path (this is what works for Copilot)
+                        const tempFolderName = this.getTempFolderName();
+                        return `@workspace ${tempFolderName}/instructions/${fileName}`;
+                    } else {
+                        return `@workspace .github/instructions/${fileName}`;
+                    }
+                });
+                fullMessage += instructionPaths.join('\n') + '\n';
+            }
+            
+            // Add prompt section (include content directly as instructions)
+            if (prompt) {
+                const promptFileName = `${prompt.id}.prompt.md`;
+                
+                if (useSmartTempCopy) {
+                    const workspaceFolders = vscode.workspace.workspaceFolders;
+                    if (workspaceFolders && workspaceFolders.length > 0) {
+                        try {
+                            const fs = require('fs');
+                            const tempFolderName = this.getTempFolderName();
+                            const promptPath = path.join(workspaceFolders[0].uri.fsPath, tempFolderName, 'prompts', promptFileName);
+                            if (fs.existsSync(promptPath)) {
+                                const content = fs.readFileSync(promptPath, 'utf8');
+                                fullMessage += `\n\n${content}\n`;
+                                this.outputChannel.appendLine(`✅ Included prompt content as instructions (${content.length} chars)`);
+                            } else {
+                                fullMessage += `\n@workspace ${tempFolderName}/prompts/${promptFileName}\n`;
+                                this.outputChannel.appendLine(`⚠️ Could not include content - file not found: ${promptPath}`);
+                            }
+                        } catch (error) {
+                            this.outputChannel.appendLine(`⚠️ Could not include file content: ${error}`);
+                            const tempFolderName = this.getTempFolderName();
+                            fullMessage += `\n@workspace ${tempFolderName}/prompts/${promptFileName}\n`;
+                        }
+                    }
+                } else {
+                    fullMessage += `\n@workspace .github/prompts/${promptFileName}\n`;
+                }
+            }
+            
+            // Add resources section
+            if (resourceFiles && resourceFiles.length > 0) {
+                const vsCodeFiles = resourceFiles.filter(f => f.type === 'vscode');
+                const howToFiles = resourceFiles.filter(f => f.type === 'howto');
+                
+                if (vsCodeFiles.length > 0) {
+                    fullMessage += '\n\n⚙️ **VS Code Configuration Files:**\n';
+                    const vscodeRefs = vsCodeFiles.map(file => {
+                        if (useSmartTempCopy) {
+                            // Use RELATIVE path (consistent with instructions/prompts)
+                            const tempFolderName = this.getTempFolderName();
+                            return `@workspace ${tempFolderName}/.vscode/${file.name}`;
+                        } else {
+                            const extensionPath = path.join(this.extensionContext.extensionPath, 'resources', file.relativePath);
+                            return `@workspace file:${extensionPath}`;
+                        }
+                    });
+                    fullMessage += vscodeRefs.join('\n') + '\n';
+                }
+
+                if (howToFiles.length > 0) {
+                    fullMessage += '\n\n📚 **How-to Guides:**\n';
+                    const howtoRefs = howToFiles.map(file => {
+                        if (useSmartTempCopy) {
+                            // Use RELATIVE path (consistent with instructions/prompts)
+                            const tempFolderName = this.getTempFolderName();
+                            return `@workspace ${tempFolderName}/how-to-guides/${file.name}`;
+                        } else {
+                            const extensionPath = path.join(this.extensionContext.extensionPath, 'resources', file.relativePath);
+                            return `@workspace file:${extensionPath}`;
+                        }
+                    });
+                    fullMessage += howtoRefs.join('\n') + '\n';
+                }
+            }
+            
+            fullMessage += '\n🤖 Help me use these workspace resources to improve my code!';
+            
+            // Final verification before sending to Copilot
+            this.outputChannel.appendLine('📤 ===== FINAL MESSAGE TO COPILOT =====');
+            this.outputChannel.appendLine(fullMessage);
+            this.outputChannel.appendLine('📤 ===== END MESSAGE =====');
+            
+            // Send to Copilot with auto-paste
+            await this.sendToCopilotChatWithAutoPaste(fullMessage);
+            
+            this.outputChannel.appendLine('✅ Complete context sent to Copilot successfully');
+            
+        } catch (error) {
+            this.outputChannel.appendLine(`⚠️ Failed to send complete context to Copilot: ${error}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Test prompt file access specifically
+     */
+    public async testPromptFileAccess(): Promise<void> {
+        this.outputChannel.appendLine('🧪 ===== TESTING PROMPT FILE ACCESS =====');
+        
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                this.outputChannel.appendLine('❌ No workspace folder found');
+                return;
+            }
+
+            const workspaceRoot = workspaceFolders[0].uri.fsPath;
+            const tempFolderName = this.getTempFolderName();
+            this.outputChannel.appendLine(`📁 Workspace root: ${workspaceRoot}`);
+            
+            // Test specific file: go.review.prompt.md
+            const promptPath = path.join(workspaceRoot, tempFolderName, 'prompts', 'go.review.prompt.md');
+            const fs = require('fs');
+            
+            this.outputChannel.appendLine(`🔍 Testing file: ${promptPath}`);
+            
+            if (fs.existsSync(promptPath)) {
+                const content = fs.readFileSync(promptPath, 'utf8');
+                this.outputChannel.appendLine(`✅ File exists and readable - Size: ${content.length} bytes`);
+                this.outputChannel.appendLine(`📝 First 200 characters: ${content.substring(0, 200)}...`);
+                
+                // Test VS Code workspace API
+                const uri = vscode.Uri.file(promptPath);
+                try {
+                    const vsContent = await vscode.workspace.fs.readFile(uri);
+                    const decoded = new TextDecoder().decode(vsContent);
+                    this.outputChannel.appendLine(`✅ VS Code API can read file - Size: ${decoded.length} bytes`);
+                } catch (error) {
+                    this.outputChannel.appendLine(`❌ VS Code API failed: ${error}`);
+                }
+                
+                // Test what Copilot should see
+                this.outputChannel.appendLine(`🤖 Copilot reference: @workspace ${tempFolderName}/prompts/go.review.prompt.md`);
+                
+            } else {
+                this.outputChannel.appendLine(`❌ File does not exist: ${promptPath}`);
+                
+                // Check if the prompts folder exists
+                const promptsFolder = path.join(workspaceRoot, tempFolderName, 'prompts');
+                if (fs.existsSync(promptsFolder)) {
+                    this.outputChannel.appendLine(`📁 Prompts folder exists, listing contents:`);
+                    const files = fs.readdirSync(promptsFolder);
+                    files.forEach(file => {
+                        this.outputChannel.appendLine(`   📄 ${file}`);
+                    });
+                } else {
+                    this.outputChannel.appendLine(`❌ Prompts folder does not exist: ${promptsFolder}`);
+                }
+            }
+            
+        } catch (error) {
+            this.outputChannel.appendLine(`❌ Test failed: ${error}`);
+        }
+        
+        this.outputChannel.appendLine('🧪 ===== END PROMPT FILE ACCESS TEST =====');
+    }
+
+    /**
+     * Debug method to test file access for Copilot
+     */
+    public async debugFileAccess(): Promise<void> {
+        this.outputChannel.appendLine('🐛 ===== DEBUG FILE ACCESS TEST =====');
+        
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            this.outputChannel.appendLine('❌ No workspace folder found');
+            return;
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const tempFolderName = this.getTempFolderName();
+        const vibePath = path.join(workspaceRoot, tempFolderName);
+        
+        // Test if temp folder exists and is accessible
+        const fs = require('fs');
+        if (fs.existsSync(vibePath)) {
+            this.outputChannel.appendLine(`✅ ${tempFolderName} folder exists at: ${vibePath}`);
+            
+            // Test mcp.json specifically
+            const mcpPath = path.join(vibePath, '.vscode', 'mcp.json');
+            if (fs.existsSync(mcpPath)) {
+                try {
+                    const content = fs.readFileSync(mcpPath, 'utf8');
+                    this.outputChannel.appendLine(`✅ mcp.json accessible - Size: ${content.length} bytes`);
+                    this.outputChannel.appendLine(`📄 mcp.json absolute path: ${mcpPath}`);
+                    this.outputChannel.appendLine(`🔗 Copilot reference: @workspace ${tempFolderName}/.vscode/mcp.json`);
+                    
+                    // Test VS Code workspace API access
+                    const mcpUri = vscode.Uri.file(mcpPath);
+                    const vscodeContent = await vscode.workspace.fs.readFile(mcpUri);
+                    const decodedContent = new TextDecoder().decode(vscodeContent);
+                    this.outputChannel.appendLine(`✅ VS Code API can read mcp.json - Size: ${decodedContent.length} bytes`);
+                    
+                } catch (error) {
+                    this.outputChannel.appendLine(`❌ Failed to read mcp.json: ${error}`);
+                }
+            } else {
+                this.outputChannel.appendLine(`❌ mcp.json not found at: ${mcpPath}`);
+            }
+            
+            // Test prompt files specifically
+            const promptsPath = path.join(vibePath, 'prompts');
+            if (fs.existsSync(promptsPath)) {
+                this.outputChannel.appendLine(`✅ prompts folder exists at: ${promptsPath}`);
+                const promptFiles = fs.readdirSync(promptsPath);
+                for (const promptFile of promptFiles) {
+                    if (promptFile.endsWith('.prompt.md')) {
+                        const promptPath = path.join(promptsPath, promptFile);
+                        try {
+                            const content = fs.readFileSync(promptPath, 'utf8');
+                            this.outputChannel.appendLine(`✅ ${promptFile} accessible - Size: ${content.length} bytes`);
+                            this.outputChannel.appendLine(`📄 ${promptFile} absolute path: ${promptPath}`);
+                            this.outputChannel.appendLine(`🔗 Copilot reference: @workspace ${tempFolderName}/prompts/${promptFile}`);
+                        } catch (error) {
+                            this.outputChannel.appendLine(`❌ Failed to read ${promptFile}: ${error}`);
+                        }
+                    }
+                }
+            } else {
+                this.outputChannel.appendLine(`❌ prompts folder not found at: ${promptsPath}`);
+            }
+        } else {
+            this.outputChannel.appendLine(`❌ ${tempFolderName} folder not found at: ${vibePath}`);
+        }
+        
+        this.outputChannel.appendLine('🐛 ===== END DEBUG FILE ACCESS TEST =====');
+    }
+
+    /**
+     * Force VS Code to refresh the workspace for Copilot recognition
+     */
+    private async refreshWorkspaceForCopilot(): Promise<void> {
+        try {
+            // Refresh file explorer to make sure new files are visible
+            await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+            
+            // Give VS Code and Copilot time to recognize the new files
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.outputChannel.appendLine('🔄 Workspace refreshed for Copilot access');
+        } catch (error) {
+            this.outputChannel.appendLine(`⚠️ Could not refresh workspace: ${error}`);
+        }
+    }
+
+    /**
+     * Clean up temporary folder (optional cleanup)
+     */
+    public async cleanupVibeFolder(): Promise<void> {
+        try {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                return;
+            }
+
+            const tempFolderName = this.getTempFolderName();
+            const vibePath = path.join(workspaceFolders[0].uri.fsPath, tempFolderName);
+            const vibeUri = vscode.Uri.file(vibePath);
+            
+            // Check if folder exists before trying to delete it
+            try {
+                await vscode.workspace.fs.stat(vibeUri);
+                await vscode.workspace.fs.delete(vibeUri, { recursive: true, useTrash: false });
+                this.outputChannel.appendLine(`🧹 Cleaned up ${tempFolderName} folder`);
+            } catch (error) {
+                // Folder doesn't exist or couldn't be deleted - not a critical error
+                this.outputChannel.appendLine(`ℹ️ ${tempFolderName} folder cleanup: ${error}`);
+            }
+        } catch (error) {
+            this.outputChannel.appendLine(`⚠️ Cleanup failed: ${error}`);
+        }
+    }
+
+    /**
+     * Format instruction content for temporary file creation
+     */
+    private formatInstructionContent(instruction: Instruction): string {
+        return `# ${instruction.name}
+
+**ID:** ${instruction.id}
+**Mode:** ${instruction.mode}
+
+## Content
+
+${instruction.content}
+
+---
+*This file was temporarily created by Vibe Code Assistant for Copilot integration.*
+*Original instruction maintained in extension resources.*
+`;
+    }
+
+    /**
+     * Format prompt content for temporary file creation
+     */
+    private formatPromptContent(prompt: Prompt): string {
+        return `# ${prompt.name}
+
+**ID:** ${prompt.id}
+**Mode:** ${prompt.mode}
+**Triggers:** ${prompt.triggers.join(', ')}
+
+## Content
+
+${prompt.content}
+
+---
+*This file was temporarily created by Vibe Code Assistant for Copilot integration.*
+*Original prompt maintained in extension resources.*
+`;
     }
 
     public dispose(): void {

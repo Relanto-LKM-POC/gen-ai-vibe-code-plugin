@@ -117,8 +117,8 @@ export async function activate(context: vscode.ExtensionContext) {
         // Set up event listeners
         setupEventListeners(context);
 
-        // Auto-apply instructions on file open if enabled
-        setupAutoApplyInstructions(context);
+        // Auto-apply instructions disabled - use manual application for better control
+        // setupAutoApplyInstructions(context);
 
         // Initialize workspace with copilot instructions
         await initializeWorkspace();
@@ -360,7 +360,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 const promptSummary = selectedPrompts.map((p: any) => p.name).join(', ');
                 
                 await copilotIntegration.sendPromptsToCopilotChatWithAutoPaste(
-                    `Please help me with these prompts: ${promptSummary}`,
+                    `Please review my code according to the following guidelines:`,
                     selectedPrompts
                 );
                 
@@ -383,7 +383,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('specDrivenDevelopmentInstructions.focus');
     });
 
-    // Apply Copilot Instructions
+    // Apply Complete Copilot Context (Instructions + Prompts + Resources)
     const applyCopilotInstructionsCommand = vscode.commands.registerCommand('specDrivenDevelopment.applyCopilotInstructions', async () => {
         try {
             const activeEditor = vscode.window.activeTextEditor;
@@ -395,17 +395,34 @@ function registerCommands(context: vscode.ExtensionContext) {
             // Mark as manual command to show notifications
             copilotIntegration.setManualCommand();
 
+            // Get all available context
             const instructions = instructionManager.getInstructionsForFile(activeEditor.document.fileName);
+            const resourceFiles = resourceManager.getAllResourceFiles();
             
-            if (instructions.length === 0) {
-                vscode.window.showInformationMessage('No instructions available for this file type');
+            // Get prompts for the current file using context analyzer
+            const codeContext = contextAnalyzer.analyzeDocument(activeEditor.document);
+            const prompts = promptManager.suggestPromptForFile(activeEditor.document.fileName, codeContext);
+            const bestPrompt = prompts.length > 0 ? prompts[0] : undefined;
+            
+            if (instructions.length === 0 && !bestPrompt && resourceFiles.length === 0) {
+                vscode.window.showInformationMessage('No instructions, prompts, or resources available for this file type');
                 return;
             }
 
-            await copilotIntegration.applyInstructionsToWorkspace(instructions);
+            // Send everything to Copilot with a comprehensive message
+            const contextMessage = `I want to improve this ${activeEditor.document.languageId} file using all available guidance.`;
+            await copilotIntegration.sendCompleteCopilotContext(contextMessage, instructions, bestPrompt, resourceFiles);
+
+            // Show success notification
+            const totalItems = instructions.length + (bestPrompt ? 1 : 0) + resourceFiles.length;
+            vscode.window.showInformationMessage(
+                `✅ Applied complete context to Copilot: ${instructions.length} instructions, ` +
+                `${bestPrompt ? '1 prompt' : '0 prompts'}, ${resourceFiles.length} resources`
+            );
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to apply instructions: ${error}`);
+            console.error('Apply Copilot Instructions error:', error);
+            vscode.window.showErrorMessage(`Failed to apply context: ${error}`);
         }
     });
 
@@ -606,6 +623,18 @@ function registerCommands(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('workbench.view.extension.specDrivenDevelopment');
         // Then focus on the panel specifically
         await vscode.commands.executeCommand('specDrivenDevelopmentPanel.focus');
+    });
+
+    // Debug File Access Command (for troubleshooting Copilot file access)
+    const debugFileAccessCommand = vscode.commands.registerCommand('specDrivenDevelopment.debugFileAccess', async () => {
+        await copilotIntegration.debugFileAccess();
+        vscode.window.showInformationMessage('Debug file access test completed. Check the output panel for details.');
+    });
+
+    // Test Prompt File Access Command (specific for prompt issues)
+    const testPromptFileAccessCommand = vscode.commands.registerCommand('specDrivenDevelopment.testPromptFileAccess', async () => {
+        await copilotIntegration.testPromptFileAccess();
+        vscode.window.showInformationMessage('Prompt file access test completed. Check the output panel for details.');
     });
 
     const connectAWSCommand = vscode.commands.registerCommand('specDrivenDevelopment.connectAWS', async () => {
@@ -1214,7 +1243,7 @@ Token will be stored securely in VS Code settings.`;
             const promptSummary = selectedPrompts.map((p: any) => p.name).join(', ');
             
             await copilotIntegration.sendPromptsToCopilotChatWithAutoPaste(
-                `Please help me with these prompts for folder analysis (${folderContext.fileCount} files): ${promptSummary}`,
+                `Please review this folder analysis (${folderContext.fileCount} files) according to the following guidelines:`,
                 selectedPrompts
             );
             
@@ -1273,7 +1302,7 @@ Token will be stored securely in VS Code settings.`;
             const promptSummary = selectedPrompts.map((p: any) => p.name).join(', ');
             
             await copilotIntegration.sendPromptsToCopilotChatWithAutoPaste(
-                `Please help me with these prompts for workspace analysis (${workspaceContext.fileCount} files across ${workspaceContext.folderCount} folders): ${promptSummary}`,
+                `Please review this workspace analysis (${workspaceContext.fileCount} files across ${workspaceContext.folderCount} folders) according to the following guidelines:`,
                 selectedPrompts
             );
             
@@ -1486,6 +1515,8 @@ Token will be stored securely in VS Code settings.`;
         searchPromptsCommand,
         // New Spec Driven Development Panel Commands
         openPanelCommand,
+        debugFileAccessCommand,
+        testPromptFileAccessCommand,
         connectAWSCommand,
         refreshAWSConnectionCommand,
         getRealTimeAWSStatusCommand,
@@ -1617,7 +1648,7 @@ Token will be stored securely in VS Code settings.`;
                 const promptSummary = selectedPrompts.map((p: any) => p.name).join(', ');
                 
                 await copilotIntegration.sendPromptsToCopilotChatWithAutoPaste(
-                    `Please help me with these prompts: ${promptSummary}`,
+                    `Please review my code according to the following guidelines:`,
                     selectedPrompts
                 );
                 
@@ -1744,16 +1775,13 @@ Token will be stored securely in VS Code settings.`;
 function setupEventListeners(context: vscode.ExtensionContext) {
     // Listen for active editor changes
     const activeEditorChange = vscode.window.onDidChangeActiveTextEditor(async (editor: vscode.TextEditor | undefined) => {
-        if (editor && isAutoApplyEnabled()) {
+        // Auto-apply disabled - instructions now applied manually only
+        if (editor) {
             try {
                 const codeContext = contextAnalyzer.analyzeDocument(editor.document);
-                const instructions = instructionManager.getInstructionsForFile(editor.document.fileName);
-                
-                if (instructions.length > 0) {
-                    await copilotIntegration.applyInstructionsToWorkspace(instructions);
-                }
+                // Context analysis only - no automatic instruction application
             } catch (error) {
-                console.error('Failed to auto-apply instructions:', error);
+                console.error('Failed to analyze context:', error);
             }
         }
     });
