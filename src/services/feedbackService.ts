@@ -351,15 +351,27 @@ export class FeedbackService {
                 };
             } else {
                 // More detailed error handling
+                console.error('Detailed Salesforce error:', JSON.stringify(result, null, 2));
+                console.error('Detailed Salesforce error (raw):', result);
+                
                 let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-                if (result && result.errors && result.errors.length > 0) {
+                if (Array.isArray(result) && result.length > 0) {
+                    // Salesforce often returns an array of error objects
+                    const errors = result.map((err: any) => {
+                        if (err.errorCode && err.message) {
+                            return `${err.errorCode}: ${err.message}`;
+                        }
+                        return JSON.stringify(err);
+                    }).join('; ');
+                    errorMsg = errors; // Use the detailed error message directly
+                    console.error('Formatted error message:', errorMsg);
+                } else if (result && result.errors && result.errors.length > 0) {
                     const errors = result.errors.map((err: any) => `${err.statusCode}: ${err.message}`).join(', ');
-                    errorMsg = `Salesforce API Error - ${errors}`;
+                    errorMsg = errors;
                 } else if (result && result.message) {
-                    errorMsg = `Salesforce Error: ${result.message}`;
+                    errorMsg = result.message;
                 }
                 
-                console.error('Detailed Salesforce error:', result);
                 throw new Error(errorMsg);
             }
 

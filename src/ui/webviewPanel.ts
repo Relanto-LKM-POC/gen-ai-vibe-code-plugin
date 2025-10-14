@@ -309,12 +309,12 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                     
                     <div class="tab-container">
                         <div class="tabs">
-                            <button class="tab-button active" data-tab="aws-config">AWS Setup</button>
+                            <button class="tab-button active" data-tab="aws-config">Configurations</button>
                             <button class="tab-button" data-tab="feedback">Manage Features</button>
                             <button class="tab-button" data-tab="devsecops-hub">My Task List</button>
                         </div>
                         
-                        <!-- AWS Setup Tab -->
+                        <!-- Configurations Tab -->
                         <div class="tab-content active" id="aws-config">
                             <div class="status-section">
                                 <div class="status-indicator" id="aws-status-indicator">
@@ -380,7 +380,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         <!-- Manage Features Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
-                                <h3>Help & Support</h3>
+                                <h3>Create Feature</h3>
                                 
                                 <div class="input-group">
                                     <label for="feedback-name">Name: <span class="required">*</span></label>
