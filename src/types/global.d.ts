@@ -1,4 +1,4 @@
-// Global type declarations for Vibe Code Assistant
+// Global type declarations for Spec Driven Development
 
 declare global {
     var vibeAnalysisTimeout: NodeJS.Timeout | undefined;

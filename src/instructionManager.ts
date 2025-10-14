@@ -17,15 +17,24 @@ export class InstructionManager {
     private extensionPath: string;
 
     constructor(extensionPath: string) {
-        this.extensionPath = extensionPath;
+        // Handle both development and compiled scenarios
+        // In development: extensionPath points to extension root
+        // In compiled: __dirname is in 'out', so we need to go up one level
+        this.extensionPath = fs.existsSync(path.join(extensionPath, 'resources')) 
+            ? extensionPath 
+            : path.dirname(__dirname);
         this.loadInstructions();
     }
 
     private loadInstructions() {
         const instructionDir = path.join(this.extensionPath, 'resources', 'instructions');
         
+        console.log(`🔍 Debug: Looking for instructions in: ${instructionDir}`);
+        console.log(`🔍 Debug: Extension path: ${this.extensionPath}`);
+        console.log(`🔍 Debug: Instructions directory exists: ${fs.existsSync(instructionDir)}`);
+        
         if (!fs.existsSync(instructionDir)) {
-            vscode.window.showErrorMessage('Instructions directory not found');
+            vscode.window.showErrorMessage(`Instructions directory not found: ${instructionDir}`);
             return;
         }
 
@@ -45,7 +54,8 @@ export class InstructionManager {
             }
         });
 
-        console.log(`Loaded ${this.instructions.size} instruction files`);
+        console.log(`🔍 Debug: Loaded ${this.instructions.size} instruction files from ${instructionDir}`);
+        console.log(`🔍 Debug: Instruction names:`, Array.from(this.instructions.values()).map(i => i.name));
     }
 
     private parseInstruction(fileName: string, content: string, filePath: string): Instruction | null {
@@ -403,5 +413,189 @@ export class InstructionManager {
     public refreshInstructions(): void {
         this.instructions.clear();
         this.loadInstructions();
+    }
+
+    /**
+     * Get all instructions with pre-selection based on context (not just filename)
+     */
+    public getAllInstructionsWithSelectionForContext(context: any): { instruction: Instruction, preSelected: boolean }[] {
+        const allInstructions = this.getAllInstructions();
+        
+        return allInstructions.map(instruction => ({
+            instruction,
+            preSelected: this.isInstructionRelevantForContext(instruction, context)
+        })).sort((a, b) => {
+            // Sort by: pre-selected first, then alphabetically
+            if (a.preSelected && !b.preSelected) return -1;
+            if (!a.preSelected && b.preSelected) return 1;
+            return a.instruction.name.localeCompare(b.instruction.name);
+        });
+    }
+
+    /**
+     * Check if instruction is relevant for the given context
+     */
+    private isInstructionRelevantForContext(instruction: Instruction, context: any): boolean {
+        // Determine context level (file vs folder/workspace)
+        const isFileLevel = context.fileCount === 1 || (!context.fileCount && context.language && !context.languages);
+        const isMultiFileLevel = context.fileCount > 1 || (context.languages && context.languages.length > 0);
+
+        // Get instruction's target languages and technologies
+        const instructionLanguages = this.getInstructionLanguages(instruction);
+        const instructionTechnologies = this.getInstructionTechnologies(instruction);
+
+        // FILE LEVEL: Only select instructions that match the specific file
+        if (isFileLevel) {
+            const fileLanguage = context.language || (context.languages && context.languages[0]);
+            
+            // Language-specific matching (strict for single files)
+            if (fileLanguage && instructionLanguages.length > 0) {
+                const languageMatch = instructionLanguages.some(instrLang => 
+                    instrLang.toLowerCase() === fileLanguage.toLowerCase()
+                );
+                if (!languageMatch) {
+                    // Skip this instruction if it's for a different language
+                    return false;
+                }
+            }
+
+            // Technology-specific matching (strict for single files)
+            if (context.technologies && context.technologies.length > 0 && instructionTechnologies.length > 0) {
+                const techMatch = context.technologies.some((tech: string) => 
+                    instructionTechnologies.some(instrTech => 
+                        instrTech.toLowerCase().includes(tech.toLowerCase()) ||
+                        tech.toLowerCase().includes(instrTech.toLowerCase())
+                    )
+                );
+                if (!techMatch && !this.isGeneralInstruction(instruction)) {
+                    // Skip technology-specific instructions that don't match the file
+                    return false;
+                }
+            }
+        }
+
+        // FOLDER/WORKSPACE LEVEL: Allow multiple relevant instructions
+        if (isMultiFileLevel) {
+            // Language-based relevance (inclusive for multi-file contexts)
+            if (context.languages && context.languages.length > 0 && instructionLanguages.length > 0) {
+                const hasLanguageMatch = context.languages.some((lang: string) => 
+                    instructionLanguages.some(instrLang => 
+                        instrLang.toLowerCase() === lang.toLowerCase()
+                    )
+                );
+                if (hasLanguageMatch) {
+                    return true;
+                }
+            }
+
+            // Technology-based relevance (inclusive for multi-file contexts)
+            if (context.technologies && context.technologies.length > 0 && instructionTechnologies.length > 0) {
+                const hasTechMatch = context.technologies.some((tech: string) => 
+                    instructionTechnologies.some(instrTech => 
+                        instrTech.toLowerCase().includes(tech.toLowerCase()) ||
+                        tech.toLowerCase().includes(instrTech.toLowerCase())
+                    )
+                );
+                if (hasTechMatch) {
+                    return true;
+                }
+            }
+        }
+
+        // COMMON RELEVANCE CHECKS (for both file and multi-file levels)
+        
+        // Direct language matching
+        if (context.language && instructionLanguages.some(lang => 
+            lang.toLowerCase() === context.language.toLowerCase()
+        )) {
+            return true;
+        }
+
+        // Context-specific patterns
+        if (context.hasSecrets && instruction.name.toLowerCase().includes('security')) {
+            return true;
+        }
+
+        if (context.needsLinting && instruction.name.toLowerCase().includes('best-practices')) {
+            return true;
+        }
+
+        if (context.isReviewContext && instruction.name.toLowerCase().includes('review')) {
+            return true;
+        }
+
+        // Complexity-based
+        if (context.complexity === 'complex' && instruction.mode === 'design') {
+            return true;
+        }
+
+        // General instructions that apply to any context
+        if (this.isGeneralInstruction(instruction)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract languages from instruction ID and name
+     */
+    private getInstructionLanguages(instruction: Instruction): string[] {
+        const languages: string[] = [];
+        const text = `${instruction.id} ${instruction.name}`.toLowerCase();
+
+        // Common language patterns
+        const languagePatterns = {
+            'python': ['python', 'py'],
+            'golang': ['golang', 'go'],
+            'javascript': ['javascript', 'js'],
+            'typescript': ['typescript', 'ts'],
+            'java': ['java'],
+            'cpp': ['cpp', 'c++'],
+            'csharp': ['csharp', 'c#'],
+            'terraform': ['terraform', 'tf'],
+            'bash': ['bash', 'shell'],
+            'sql': ['sql'],
+            'yaml': ['yaml', 'yml'],
+            'json': ['json']
+        };
+
+        for (const [lang, patterns] of Object.entries(languagePatterns)) {
+            if (patterns.some(pattern => text.includes(pattern))) {
+                languages.push(lang);
+            }
+        }
+
+        return languages;
+    }
+
+    /**
+     * Check if instruction is general (applies to any language/technology)
+     */
+    private isGeneralInstruction(instruction: Instruction): boolean {
+        const generalPatterns = [
+            'best-practices',
+            'security',
+            'review',
+            'standards',
+            'estimation',
+            'requirements',
+            'documentation',
+            'testing',
+            'general'
+        ];
+
+        const instructionText = `${instruction.id} ${instruction.name}`.toLowerCase();
+        return generalPatterns.some(pattern => instructionText.includes(pattern));
+    }
+
+    /**
+     * Extract technologies mentioned in instruction content
+     */
+    private getInstructionTechnologies(instruction: Instruction): string[] {
+        const content = instruction.content.toLowerCase();
+        const technologies = ['go', 'python', 'terraform', 'javascript', 'typescript', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'otel', 'opentelemetry', 'observability', 'tracing', 'metrics', 'logging'];
+        
+        return technologies.filter(tech => content.includes(tech));
     }
 }

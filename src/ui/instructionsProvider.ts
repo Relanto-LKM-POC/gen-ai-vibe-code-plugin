@@ -54,12 +54,19 @@ export class InstructionsProvider implements vscode.TreeDataProvider<Instruction
         }
 
         return Array.from(categories).map(category => {
+            const displayName = category === '📍 Contextual' ? '📍 Contextual (Auto-Selected)' : category;
             const item = new InstructionItem(
-                category,
+                displayName,
                 vscode.TreeItemCollapsibleState.Expanded
             );
             item.contextValue = 'category';
             item.iconPath = this.getCategoryIcon(category);
+            
+            // Special description for contextual category
+            if (category === '📍 Contextual') {
+                item.description = 'Smart context-aware instructions';
+            }
+            
             return item;
         });
     }
@@ -82,19 +89,29 @@ export class InstructionsProvider implements vscode.TreeDataProvider<Instruction
         }
 
         return instructions.map(instruction => {
+            const isContextual = category === '📍 Contextual';
+            const displayName = isContextual ? `✨ ${instruction.name}` : instruction.name;
+            
             const item = new InstructionItem(
-                instruction.name,
+                displayName,
                 vscode.TreeItemCollapsibleState.None,
-                instruction.description
+                isContextual ? `🤖 Auto-selected: ${instruction.description}` : instruction.description
             );
             
-            item.contextValue = 'instruction';
+            item.contextValue = isContextual ? 'contextualInstruction' : 'instruction';
             item.command = {
-                command: 'vibeAssistant.openInstruction',
+                command: 'specDrivenDevelopment.openInstruction',
                 title: 'Open Instruction',
                 arguments: [instruction]
             };
-            item.tooltip = instruction.description;
+            
+            // Enhanced tooltip for contextual instructions
+            if (isContextual) {
+                item.tooltip = `📍 Context-aware selection\n\n${instruction.description}\n\nThis instruction was automatically selected based on your current file context.`;
+            } else {
+                item.tooltip = instruction.description;
+            }
+            
             item.iconPath = this.getInstructionIcon(instruction);
             
             return item;
@@ -104,7 +121,7 @@ export class InstructionsProvider implements vscode.TreeDataProvider<Instruction
     private getCategoryName(mode: string): string {
         const categoryNames: { [key: string]: string } = {
             'standards': '⭐ Best Practices',
-            'design': '🏗️ Architecture',
+            'design': '🏗️ Architecture', 
             'guide': '📖 Development Guide',
             'reference': '📚 Reference'
         };
@@ -124,33 +141,34 @@ export class InstructionsProvider implements vscode.TreeDataProvider<Instruction
     }
 
     private getCategoryIcon(category: string): vscode.ThemeIcon {
-        const iconMap: { [key: string]: string } = {
-            '⭐ Best Practices': 'star',
-            '🏗️ Architecture': 'organization',
-            '📖 Development Guide': 'book',
-            '📚 Reference': 'library',
-            '📍 Contextual': 'location'
+        const iconMap: { [key: string]: { name: string; color: vscode.ThemeColor } } = {
+            '⭐ Best Practices': { name: 'star-full', color: new vscode.ThemeColor('charts.yellow') },
+            '🏗️ Architecture': { name: 'organization', color: new vscode.ThemeColor('charts.blue') },
+            '📖 Development Guide': { name: 'book', color: new vscode.ThemeColor('charts.green') },
+            '📚 Reference': { name: 'library', color: new vscode.ThemeColor('charts.purple') },
+            '📍 Contextual': { name: 'location', color: new vscode.ThemeColor('charts.orange') }
         };
         
-        return new vscode.ThemeIcon(iconMap[category] || 'file');
+        const iconConfig = iconMap[category] || { name: 'file', color: new vscode.ThemeColor('icon.foreground') };
+        return new vscode.ThemeIcon(iconConfig.name, iconConfig.color);
     }
 
     private getInstructionIcon(instruction: Instruction): vscode.ThemeIcon {
-        // Icon based on instruction content/type
+        // Colorful icons based on instruction content/type
         if (instruction.id.includes('go')) {
-            return new vscode.ThemeIcon('go');
+            return new vscode.ThemeIcon('symbol-method', new vscode.ThemeColor('charts.blue'));
         } else if (instruction.id.includes('python')) {
-            return new vscode.ThemeIcon('python');
+            return new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('charts.green'));
         } else if (instruction.id.includes('terraform')) {
-            return new vscode.ThemeIcon('cloud');
+            return new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.orange'));
         } else if (instruction.id.includes('bash')) {
-            return new vscode.ThemeIcon('terminal');
+            return new vscode.ThemeIcon('terminal', new vscode.ThemeColor('terminal.ansiYellow'));
         } else if (instruction.mode === 'standards') {
-            return new vscode.ThemeIcon('check');
+            return new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed'));
         } else if (instruction.mode === 'design') {
-            return new vscode.ThemeIcon('organization');
+            return new vscode.ThemeIcon('organization', new vscode.ThemeColor('charts.purple'));
         } else {
-            return new vscode.ThemeIcon('file-code');
+            return new vscode.ThemeIcon('code', new vscode.ThemeColor('charts.foreground'));
         }
     }
 
@@ -181,7 +199,7 @@ export class InstructionItem extends vscode.TreeItem {
 }
 
 // Register command to handle instruction clicks
-vscode.commands.registerCommand('vibeAssistant.openInstruction', async (instruction: Instruction) => {
+vscode.commands.registerCommand('specDrivenDevelopment.openInstruction', async (instruction: Instruction) => {
     try {
         const doc = await vscode.workspace.openTextDocument({
             content: `# ${instruction.name}\n\n${instruction.content}`,

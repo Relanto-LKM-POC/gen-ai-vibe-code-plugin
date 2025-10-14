@@ -388,4 +388,175 @@ export class ContextAnalyzer {
 
         return extensionMap[language] || '';
     }
+
+    /**
+     * Analyze an entire folder and return aggregated context
+     */
+    public async analyzeFolderContext(folderUri: vscode.Uri): Promise<CodeContext & { fileCount: number; languages: string[] }> {
+        const files = await this.getAllFilesInFolder(folderUri);
+        const contexts: CodeContext[] = [];
+        const languages = new Set<string>();
+        const technologies = new Set<string>();
+        
+        for (const fileUri of files) {
+            try {
+                const document = await vscode.workspace.openTextDocument(fileUri);
+                const context = this.analyzeDocument(document);
+                contexts.push(context);
+                languages.add(context.language);
+                context.technologies.forEach(tech => technologies.add(tech));
+            } catch (error) {
+                console.log(`Skipping file ${fileUri.fsPath}: ${error}`);
+            }
+        }
+
+        return this.aggregateContexts(contexts, {
+            fileCount: files.length,
+            languages: Array.from(languages),
+            technologies: Array.from(technologies)
+        });
+    }
+
+    /**
+     * Analyze entire workspace and return aggregated context
+     */
+    public async analyzeWorkspaceContext(): Promise<CodeContext & { fileCount: number; folderCount: number; languages: string[] }> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            throw new Error('No workspace folders found');
+        }
+
+        const allContexts: CodeContext[] = [];
+        const languages = new Set<string>();
+        const technologies = new Set<string>();
+        let totalFiles = 0;
+        let folderCount = 0;
+
+        for (const workspaceFolder of workspaceFolders) {
+            const files = await this.getAllFilesInFolder(workspaceFolder.uri, true); // recursive
+            folderCount++;
+            totalFiles += files.length;
+
+            for (const fileUri of files) {
+                try {
+                    const document = await vscode.workspace.openTextDocument(fileUri);
+                    const context = this.analyzeDocument(document);
+                    allContexts.push(context);
+                    languages.add(context.language);
+                    context.technologies.forEach(tech => technologies.add(tech));
+                } catch (error) {
+                    console.log(`Skipping file ${fileUri.fsPath}: ${error}`);
+                }
+            }
+        }
+
+        return this.aggregateContexts(allContexts, {
+            fileCount: totalFiles,
+            folderCount: folderCount,
+            languages: Array.from(languages),
+            technologies: Array.from(technologies)
+        });
+    }
+
+    /**
+     * Get all files in a folder (with option for recursive)
+     */
+    private async getAllFilesInFolder(folderUri: vscode.Uri, recursive: boolean = false): Promise<vscode.Uri[]> {
+        const files: vscode.Uri[] = [];
+        const entries = await vscode.workspace.fs.readDirectory(folderUri);
+        
+        for (const [name, type] of entries) {
+            const fileUri = vscode.Uri.joinPath(folderUri, name);
+            
+            if (type === vscode.FileType.File) {
+                // Only include supported file types
+                if (this.isSupportedFileType(name)) {
+                    files.push(fileUri);
+                }
+            } else if (type === vscode.FileType.Directory && recursive) {
+                // Skip common ignored directories
+                if (!this.isIgnoredDirectory(name)) {
+                    const subFiles = await this.getAllFilesInFolder(fileUri, true);
+                    files.push(...subFiles);
+                }
+            }
+        }
+        
+        return files;
+    }
+
+    /**
+     * Check if file type is supported for analysis
+     */
+    private isSupportedFileType(fileName: string): boolean {
+        const supportedExtensions = ['.go', '.py', '.js', '.ts', '.tf', '.sh', '.bash', '.yml', '.yaml', '.json', '.jsx', '.tsx', '.java', '.c', '.cpp', '.cs', '.php', '.rb', '.rs', '.kt', '.swift'];
+        return supportedExtensions.some(ext => fileName.endsWith(ext));
+    }
+
+    /**
+     * Check if directory should be ignored
+     */
+    private isIgnoredDirectory(dirName: string): boolean {
+        const ignoredDirs = ['node_modules', '.git', '.github', 'out', 'dist', 'build', '__pycache__', '.terraform', '.vscode', 'vendor', 'target', 'bin', 'obj'];
+        return ignoredDirs.includes(dirName);
+    }
+
+    /**
+     * Aggregate multiple contexts into a single summary context
+     */
+    private aggregateContexts(contexts: CodeContext[], metadata: any): any {
+        if (contexts.length === 0) {
+            return { ...this.getDefaultContext(), ...metadata };
+        }
+
+        const aggregated = {
+            fileType: this.getMostCommonFileType(contexts),
+            language: this.getMostCommonLanguage(contexts), 
+            isReviewContext: contexts.some(c => c.isReviewContext),
+            hasSecrets: contexts.some(c => c.hasSecrets),
+            needsLinting: contexts.some(c => c.needsLinting),
+            complexity: this.getOverallComplexity(contexts),
+            technologies: this.getAllTechnologies(contexts),
+            fileSize: contexts.reduce((sum, c) => sum + c.fileSize, 0),
+            hasErrors: contexts.some(c => c.hasErrors),
+            ...metadata
+        };
+
+        return aggregated;
+    }
+
+    private getMostCommonFileType(contexts: CodeContext[]): string {
+        const typeCounts = contexts.reduce((acc, c) => {
+            acc[c.fileType] = (acc[c.fileType] || 0) + 1;
+            return acc;
+        }, {} as { [key: string]: number });
+        
+        return Object.keys(typeCounts).reduce((a, b) => typeCounts[a] > typeCounts[b] ? a : b, '');
+    }
+
+    private getMostCommonLanguage(contexts: CodeContext[]): string {
+        const langCounts = contexts.reduce((acc, c) => {
+            acc[c.language] = (acc[c.language] || 0) + 1;
+            return acc;
+        }, {} as { [key: string]: number });
+        
+        return Object.keys(langCounts).reduce((a, b) => langCounts[a] > langCounts[b] ? a : b, '');
+    }
+
+    private getOverallComplexity(contexts: CodeContext[]): 'simple' | 'medium' | 'complex' {
+        const complexityCounts = contexts.reduce((acc, c) => {
+            acc[c.complexity] = (acc[c.complexity] || 0) + 1;
+            return acc;
+        }, { simple: 0, medium: 0, complex: 0 });
+
+        if (complexityCounts.complex > contexts.length * 0.3) return 'complex';
+        if (complexityCounts.medium > contexts.length * 0.5) return 'medium';
+        return 'simple';
+    }
+
+    private getAllTechnologies(contexts: CodeContext[]): string[] {
+        const allTechs = new Set<string>();
+        contexts.forEach(c => c.technologies.forEach(tech => allTechs.add(tech)));
+        return Array.from(allTechs);
+    }
 }

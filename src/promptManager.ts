@@ -32,15 +32,24 @@ export class PromptManager {
     private extensionPath: string;
 
     constructor(extensionPath: string) {
-        this.extensionPath = extensionPath;
+        // Handle both development and compiled scenarios
+        // In development: extensionPath points to extension root
+        // In compiled: __dirname is in 'out', so we need to go up one level
+        this.extensionPath = fs.existsSync(path.join(extensionPath, 'resources')) 
+            ? extensionPath 
+            : path.dirname(__dirname);
         this.loadPrompts();
     }
 
     private loadPrompts() {
         const promptDir = path.join(this.extensionPath, 'resources', 'prompts');
         
+        console.log(`🔍 Debug: Looking for prompts in: ${promptDir}`);
+        console.log(`🔍 Debug: Extension path: ${this.extensionPath}`);
+        console.log(`🔍 Debug: Prompts directory exists: ${fs.existsSync(promptDir)}`);
+        
         if (!fs.existsSync(promptDir)) {
-            vscode.window.showErrorMessage('Prompts directory not found');
+            vscode.window.showErrorMessage(`Prompts directory not found: ${promptDir}`);
             return;
         }
 
@@ -49,7 +58,8 @@ export class PromptManager {
 
         const files = fs.readdirSync(promptDir).filter((file: string) => file.endsWith('.md'));
         
-        console.log(`📁 Found ${files.length} prompt files:`, files);
+        console.log(`� Debug: Found ${files.length} prompt files:`, files);
+        console.log(`🔍 Debug: Successfully loaded prompts:`, Array.from(this.prompts.keys()));
         
         files.forEach((file: string) => {
             try {
@@ -68,7 +78,8 @@ export class PromptManager {
             }
         });
 
-        console.log(`📋 Successfully loaded ${this.prompts.size} prompt files`);
+        console.log(`� Debug: Successfully loaded ${this.prompts.size} prompt files`);
+        console.log(`🔍 Debug: Prompt IDs:`, Array.from(this.prompts.keys()));
         
         // Log all loaded prompts for debugging
         this.prompts.forEach((prompt, id) => {
@@ -459,5 +470,193 @@ export class PromptManager {
         }
         
         return result;
+    }
+
+    /**
+     * Get all prompts with pre-selection based on context
+     */
+    public getAllPromptsWithSelectionForContext(context: any): { prompt: Prompt, preSelected: boolean }[] {
+        const allPrompts = this.getAllPrompts();
+        
+        return allPrompts.map(prompt => ({
+            prompt,
+            preSelected: this.isPromptRelevantForContext(prompt, context)
+        })).sort((a, b) => {
+            // Sort by: pre-selected first, then alphabetically
+            if (a.preSelected && !b.preSelected) return -1;
+            if (!a.preSelected && b.preSelected) return 1;
+            return a.prompt.name.localeCompare(b.prompt.name);
+        });
+    }
+
+    /**
+     * Check if prompt is relevant for the given context
+     */
+    private isPromptRelevantForContext(prompt: Prompt, context: any): boolean {
+        // Determine context level (file vs folder/workspace)
+        const isFileLevel = context.fileCount === 1 || (!context.fileCount && context.language && !context.languages);
+        const isMultiFileLevel = context.fileCount > 1 || (context.languages && context.languages.length > 0);
+
+        // Get prompt's target languages and technologies
+        const promptLanguages = this.getPromptLanguages(prompt);
+        const promptTechnologies = this.getPromptTechnologies(prompt);
+
+        // FILE LEVEL: Only select prompts that match the specific file
+        if (isFileLevel) {
+            const fileLanguage = context.language || (context.languages && context.languages[0]);
+            
+            // Language-specific matching (strict for single files)
+            if (fileLanguage && promptLanguages.length > 0) {
+                const languageMatch = promptLanguages.some(promptLang => 
+                    promptLang.toLowerCase() === fileLanguage.toLowerCase()
+                );
+                if (!languageMatch) {
+                    return false;
+                }
+            }
+
+            // Technology-specific matching (strict for single files)
+            if (context.technologies && context.technologies.length > 0 && promptTechnologies.length > 0) {
+                const techMatch = context.technologies.some((tech: string) => 
+                    promptTechnologies.some(promptTech => 
+                        promptTech.toLowerCase().includes(tech.toLowerCase()) ||
+                        tech.toLowerCase().includes(promptTech.toLowerCase())
+                    )
+                );
+                if (!techMatch && !this.isGeneralPrompt(prompt)) {
+                    return false;
+                }
+            }
+        }
+
+        // FOLDER/WORKSPACE LEVEL: Allow multiple relevant prompts
+        if (isMultiFileLevel) {
+            // Language-based relevance (inclusive for multi-file contexts)
+            if (context.languages && context.languages.length > 0 && promptLanguages.length > 0) {
+                const hasLanguageMatch = context.languages.some((lang: string) => 
+                    promptLanguages.some(promptLang => 
+                        promptLang.toLowerCase() === lang.toLowerCase()
+                    )
+                );
+                if (hasLanguageMatch) {
+                    return true;
+                }
+            }
+
+            // Technology-based relevance (inclusive for multi-file contexts)
+            if (context.technologies && context.technologies.length > 0 && promptTechnologies.length > 0) {
+                const hasTechMatch = context.technologies.some((tech: string) => 
+                    promptTechnologies.some(promptTech => 
+                        promptTech.toLowerCase().includes(tech.toLowerCase()) ||
+                        tech.toLowerCase().includes(promptTech.toLowerCase())
+                    )
+                );
+                if (hasTechMatch) {
+                    return true;
+                }
+            }
+        }
+
+        // COMMON RELEVANCE CHECKS (for both file and multi-file levels)
+
+        // Direct language matching
+        if (context.language && promptLanguages.some(lang => 
+            lang.toLowerCase() === context.language.toLowerCase()
+        )) {
+            return true;
+        }
+
+        // File size based (large projects need effort estimation)
+        if (context.fileCount && context.fileCount > 10 && prompt.id.includes('effort.estimation')) {
+            return true;
+        }
+
+        // Security context
+        if (context.hasSecrets && prompt.id.includes('secrets-detection')) {
+            return true;
+        }
+
+        // Review context
+        if (context.isReviewContext && prompt.id.includes('review')) {
+            return true;
+        }
+
+        // Linting context
+        if (context.needsLinting && prompt.id.includes('linting')) {
+            return true;
+        }
+
+        // General prompts that apply to any context
+        if (this.isGeneralPrompt(prompt)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract languages from prompt ID and content
+     */
+    private getPromptLanguages(prompt: Prompt): string[] {
+        const languages: string[] = [];
+        const text = `${prompt.id} ${prompt.name} ${prompt.content}`.toLowerCase();
+
+        // Common language patterns
+        const languagePatterns = {
+            'python': ['python', 'py'],
+            'golang': ['golang', 'go'],
+            'javascript': ['javascript', 'js'],
+            'typescript': ['typescript', 'ts'],
+            'java': ['java'],
+            'cpp': ['cpp', 'c++'],
+            'csharp': ['csharp', 'c#'],
+            'terraform': ['terraform', 'tf'],
+            'bash': ['bash', 'shell'],
+            'sql': ['sql'],
+            'yaml': ['yaml', 'yml'],
+            'json': ['json']
+        };
+
+        for (const [lang, patterns] of Object.entries(languagePatterns)) {
+            if (patterns.some(pattern => text.includes(pattern))) {
+                languages.push(lang);
+            }
+        }
+
+        return languages;
+    }
+
+    /**
+     * Extract technologies from prompt content
+     */
+    private getPromptTechnologies(prompt: Prompt): string[] {
+        const content = `${prompt.id} ${prompt.content}`.toLowerCase();
+        const technologies = [
+            'jenkins', 'github-actions', 'docker', 'kubernetes', 'aws', 'azure', 'gcp',
+            'terraform', 'ansible', 'otel', 'opentelemetry', 'tracing', 'metrics',
+            'react', 'vue', 'angular', 'node', 'express', 'spring', 'django'
+        ];
+        
+        return technologies.filter(tech => content.includes(tech));
+    }
+
+    /**
+     * Check if prompt is general (applies to any language/technology)
+     */
+    private isGeneralPrompt(prompt: Prompt): boolean {
+        const generalPatterns = [
+            'estimation',
+            'effort',
+            'review',
+            'linting',
+            'secrets-detection',
+            'security',
+            'documentation',
+            'testing',
+            'general'
+        ];
+
+        const promptText = `${prompt.id} ${prompt.name}`.toLowerCase();
+        return generalPatterns.some(pattern => promptText.includes(pattern));
     }
 }

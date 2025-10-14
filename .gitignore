@@ -5,5 +5,11 @@ out/
 .DS_Store
 Thumbs.db
 *.log
-.env
-*.secret
+.env# Environment files
+.env*
+.env*
+# Environment files
+# Environment files
+.env*
+action_items.txt
+API_CALLS.txt

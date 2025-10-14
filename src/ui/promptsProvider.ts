@@ -52,11 +52,19 @@ export class PromptsProvider implements vscode.TreeDataProvider<PromptItem> {
         }
 
         return Array.from(categories).map(category => {
+            const displayName = category === '🎯 Suggested' ? '🎯 Suggested (Auto-Selected)' : `${this.getCategoryIcon(category)} ${category}`;
             const item = new PromptItem(
-                category === '🎯 Suggested' ? category : `${this.getCategoryIcon(category)} ${category}`,
+                displayName,
                 vscode.TreeItemCollapsibleState.Expanded
             );
             item.contextValue = 'category';
+            
+            // Special styling for auto-selected prompts
+            if (category === '🎯 Suggested') {
+                item.iconPath = new vscode.ThemeIcon('target', new vscode.ThemeColor('charts.red'));
+                item.description = 'Context-aware suggestions';
+            }
+            
             return item;
         });
     }
@@ -74,19 +82,29 @@ export class PromptsProvider implements vscode.TreeDataProvider<PromptItem> {
         }
 
         return prompts.map(prompt => {
+            const isAutoSelected = category === '🎯 Suggested';
+            const displayName = isAutoSelected ? `✨ ${prompt.name}` : prompt.name;
+            
             const item = new PromptItem(
-                prompt.name,
+                displayName,
                 vscode.TreeItemCollapsibleState.None,
-                prompt.description
+                isAutoSelected ? `🤖 Auto-selected: ${prompt.description}` : prompt.description
             );
             
-            item.contextValue = 'prompt';
+            item.contextValue = isAutoSelected ? 'autoSelectedPrompt' : 'prompt';
             item.command = {
-                command: 'vibeAssistant.usePrompt',
+                command: 'specDrivenDevelopment.usePrompt',
                 title: 'Use Prompt',
                 arguments: [prompt]
             };
-            item.tooltip = prompt.description;
+            
+            // Enhanced tooltip for auto-selected prompts
+            if (isAutoSelected) {
+                item.tooltip = `🎯 Context-aware suggestion\n\n${prompt.description}\n\nThis prompt was automatically selected based on your current file context.`;
+            } else {
+                item.tooltip = prompt.description;
+            }
+            
             item.iconPath = this.getPromptIcon(prompt);
             
             return item;
@@ -106,23 +124,23 @@ export class PromptsProvider implements vscode.TreeDataProvider<PromptItem> {
     }
 
     private getPromptIcon(prompt: Prompt): vscode.ThemeIcon {
-        // Icon based on prompt category and mode
+        // Colorful icons based on prompt category and mode
         if (prompt.category === 'Security') {
-            return new vscode.ThemeIcon('shield');
+            return new vscode.ThemeIcon('shield', new vscode.ThemeColor('charts.red'));
         } else if (prompt.category === 'Code Review') {
-            return new vscode.ThemeIcon('search');
+            return new vscode.ThemeIcon('search', new vscode.ThemeColor('charts.blue'));
         } else if (prompt.category === 'Project Planning') {
-            return new vscode.ThemeIcon('project');
+            return new vscode.ThemeIcon('project', new vscode.ThemeColor('charts.purple'));
         } else if (prompt.category === 'Code Quality') {
-            return new vscode.ThemeIcon('check-all');
+            return new vscode.ThemeIcon('sparkle', new vscode.ThemeColor('charts.green'));
         } else if (prompt.mode === 'ask') {
-            return new vscode.ThemeIcon('question');
+            return new vscode.ThemeIcon('question', new vscode.ThemeColor('charts.orange'));
         } else if (prompt.mode === 'edit') {
-            return new vscode.ThemeIcon('edit');
+            return new vscode.ThemeIcon('edit', new vscode.ThemeColor('charts.yellow'));
         } else if (prompt.mode === 'agent') {
-            return new vscode.ThemeIcon('robot');
+            return new vscode.ThemeIcon('robot', new vscode.ThemeColor('charts.foreground'));
         } else {
-            return new vscode.ThemeIcon('comment');
+            return new vscode.ThemeIcon('comment-discussion', new vscode.ThemeColor('charts.foreground'));
         }
     }
 
@@ -166,7 +184,7 @@ export class PromptItem extends vscode.TreeItem {
 }
 
 // Register command to handle prompt clicks
-vscode.commands.registerCommand('vibeAssistant.usePrompt', async (prompt: Prompt) => {
+vscode.commands.registerCommand('specDrivenDevelopment.usePrompt', async (prompt: Prompt) => {
     try {
         // Get current editor context
         const activeEditor = vscode.window.activeTextEditor;
@@ -270,7 +288,7 @@ vscode.commands.registerCommand('vibeAssistant.usePrompt', async (prompt: Prompt
 });
 
 // Register command to preview prompt
-vscode.commands.registerCommand('vibeAssistant.previewPrompt', async (prompt: Prompt) => {
+vscode.commands.registerCommand('specDrivenDevelopment.previewPrompt', async (prompt: Prompt) => {
     try {
         const doc = await vscode.workspace.openTextDocument({
             content: `# ${prompt.name}\n\n**Description:** ${prompt.description}\n\n**Category:** ${prompt.category}\n\n**Mode:** ${prompt.mode}\n\n## Content\n\n${prompt.content}`,

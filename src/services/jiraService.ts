@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { AWSService } from './awsService';
 import { EstimationData } from './estimationParser';
 
@@ -59,51 +57,6 @@ export class JiraService {
         this.initializeFetch();
     }
 
-    /**
-     * Read environment variable from .env file
-     */
-    private readFromEnvFile(key: string): string | undefined {
-        try {
-            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            if (!workspaceRoot) return undefined;
-            
-            const envPath = path.join(workspaceRoot, '.env');
-            if (!fs.existsSync(envPath)) return undefined;
-            
-            const envContent = fs.readFileSync(envPath, 'utf-8');
-            const lines = envContent.split('\n');
-            
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith(`${key}=`) && !trimmedLine.startsWith('#')) {
-                    const value = trimmedLine.substring(`${key}=`.length);
-                    return value.replace(/^["']|["']$/g, '');
-                }
-            }
-            
-            return undefined;
-        } catch (error) {
-            console.warn(`Failed to read .env file: ${(error as Error).message}`);
-            return undefined;
-        }
-    }
-
-    /**
-     * Get Salesforce base URL from environment variables
-     */
-    private getSalesforceBaseUrl(): string {
-        return this.readFromEnvFile('SALESFORCE_BASE_URL') || 
-               'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
-    }
-
-    /**
-     * Get Salesforce cookies with browser ID from environment variables
-     */
-    private getSalesforceCookies(): string {
-        const browserId = this.readFromEnvFile('SALESFORCE_BROWSER_ID') || 'Wxh7VwjWEfCrsYsz4ODIvg';
-        return `BrowserId=${browserId}; CookieConsentPolicy=0:0; LSKey-c$CookieConsentPolicy=0:0`;
-    }
-
     private async initializeFetch(): Promise<void> {
         if (!fetch) {
             try {
@@ -155,7 +108,7 @@ export class JiraService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Cookie': this.getSalesforceCookies()
+                    'Cookie': 'BrowserId=Wxh7VwjWEfCrsYsz4ODIvg; CookieConsentPolicy=0:0; LSKey-c$CookieConsentPolicy=0:0'
                 },
                 body: authParams.toString()
             });
@@ -203,7 +156,7 @@ export class JiraService {
      */
     private async matchEpicTicket(accessToken: string, devsecopsId: string): Promise<SalesforceTicketMatch> {
         try {
-            const baseUrl = this.getSalesforceBaseUrl();
+            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${devsecopsId}%25%27`;
             const queryUrl = `${baseUrl}/services/data/v56.0/query/?q=${query}`;
 
@@ -244,7 +197,7 @@ export class JiraService {
         estimatedHours: number
     ): Promise<void> {
         try {
-            const baseUrl = this.getSalesforceBaseUrl();
+            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             const updateUrl = `${baseUrl}/services/data/v56.0/sobjects/Feedback__c/${recordId}`;
 
             const updateData = {

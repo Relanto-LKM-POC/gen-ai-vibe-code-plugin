@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export interface EstimationData {
     originalText: string;
@@ -80,38 +78,9 @@ export class EstimationParser {
         this.setupEventListeners();
     }
 
-    /**
-     * Read environment variable from .env file
-     */
-    private readFromEnvFile(key: string): string | undefined {
-        try {
-            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            if (!workspaceRoot) return undefined;
-            
-            const envPath = path.join(workspaceRoot, '.env');
-            if (!fs.existsSync(envPath)) return undefined;
-            
-            const envContent = fs.readFileSync(envPath, 'utf-8');
-            const lines = envContent.split('\n');
-            
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith(`${key}=`) && !trimmedLine.startsWith('#')) {
-                    const value = trimmedLine.substring(`${key}=`.length);
-                    return value.replace(/^["']|["']$/g, '');
-                }
-            }
-            
-            return undefined;
-        } catch (error) {
-            console.warn(`Failed to read .env file: ${(error as Error).message}`);
-            return undefined;
-        }
-    }
-
     private setupEventListeners() {
         // Check if automatic document parsing is enabled (disabled by default to prevent unwanted notifications)
-        const autoParsingEnabled = vscode.workspace.getConfiguration('vibeAssistant').get('enableAutoDocumentParsing', false);
+        const autoParsingEnabled = vscode.workspace.getConfiguration('specDrivenDevelopment').get('enableAutoDocumentParsing', false);
         
         if (autoParsingEnabled) {
             // Listen for GitHub Copilot chat responses
@@ -122,7 +91,7 @@ export class EstimationParser {
                 }
             });
         } else {
-            console.log('Vibe Assistant: Automatic document parsing disabled to prevent unwanted notifications. Enable in settings if needed.');
+            console.log('Spec Driven Development: Automatic document parsing disabled to prevent unwanted notifications. Enable in settings if needed.');
         }
 
         // Listen for chat panel changes if available
@@ -276,19 +245,15 @@ export class EstimationParser {
     }
 
     private convertToHours(value: number, unit: 'hours' | 'days' | 'weeks' | 'months'): number {
-        const hoursPerDay = parseInt(this.readFromEnvFile('HOURS_PER_DAY') || '8');
-        const hoursPerWeek = parseInt(this.readFromEnvFile('HOURS_PER_WEEK') || '40');
-        const hoursPerMonth = parseInt(this.readFromEnvFile('HOURS_PER_MONTH') || '160');
-
         switch (unit) {
             case 'hours':
                 return value;
             case 'days':
-                return value * hoursPerDay;
+                return value * 8; // Assuming 8-hour work days
             case 'weeks':
-                return value * hoursPerWeek;
+                return value * 40; // Assuming 40-hour work weeks
             case 'months':
-                return value * hoursPerMonth;
+                return value * 160; // Assuming 4 weeks per month
             default:
                 return value;
         }
@@ -322,12 +287,12 @@ export class EstimationParser {
             // Store the most recent estimation globally
             if (estimations.length > 0) {
                 const bestEstimation = estimations[0]; // Already sorted by confidence/specificity
-                await this.context.globalState.update('vibeAssistant.estimationData', bestEstimation);
+                await this.context.globalState.update('specDrivenDevelopment.estimationData', bestEstimation);
                 
                 // Store all estimations for history
-                const existingHistory = this.context.globalState.get<EstimationData[]>('vibeAssistant.estimationHistory', []);
+                const existingHistory = this.context.globalState.get<EstimationData[]>('specDrivenDevelopment.estimationHistory', []);
                 const updatedHistory = [bestEstimation, ...existingHistory.slice(0, 9)]; // Keep last 10
-                await this.context.globalState.update('vibeAssistant.estimationHistory', updatedHistory);
+                await this.context.globalState.update('specDrivenDevelopment.estimationHistory', updatedHistory);
             }
         } catch (error) {
             console.error('Failed to cache estimations:', error);
@@ -335,7 +300,7 @@ export class EstimationParser {
     }
 
     private notifyEstimationsFound(estimations: EstimationData[]): void {
-        if (!vscode.workspace.getConfiguration('vibeAssistant').get('showEstimationNotifications', true)) {
+        if (!vscode.workspace.getConfiguration('specDrivenDevelopment').get('showEstimationNotifications', true)) {
             return;
         }
 
@@ -348,29 +313,29 @@ export class EstimationParser {
             'Dismiss'
         ).then(selection => {
             if (selection === 'Open DEVSECOPS Hub') {
-                vscode.commands.executeCommand('vibeAssistant.openPanel');
+                vscode.commands.executeCommand('specDrivenDevelopment.openPanel');
             }
         });
 
         // Notify webview if available
         try {
-            vscode.commands.executeCommand('vibeAssistant.showEstimationNotification', bestEstimation);
+            vscode.commands.executeCommand('specDrivenDevelopment.showEstimationNotification', bestEstimation);
         } catch (error) {
             // Command might not be available yet, ignore
         }
     }
 
     public async getCurrentEstimation(): Promise<EstimationData | undefined> {
-        return this.context.globalState.get<EstimationData>('vibeAssistant.estimationData');
+        return this.context.globalState.get<EstimationData>('specDrivenDevelopment.estimationData');
     }
 
     public async getEstimationHistory(): Promise<EstimationData[]> {
-        return this.context.globalState.get<EstimationData[]>('vibeAssistant.estimationHistory', []);
+        return this.context.globalState.get<EstimationData[]>('specDrivenDevelopment.estimationHistory', []);
     }
 
     public async clearEstimations(): Promise<void> {
-        await this.context.globalState.update('vibeAssistant.estimationData', undefined);
-        await this.context.globalState.update('vibeAssistant.estimationHistory', []);
+        await this.context.globalState.update('specDrivenDevelopment.estimationData', undefined);
+        await this.context.globalState.update('specDrivenDevelopment.estimationHistory', []);
     }
 
     // Method to manually trigger parsing of currently active editor
@@ -419,7 +384,7 @@ export class EstimationParser {
             
             // Notify the webview to update the estimation
             try {
-                vscode.commands.executeCommand('vibeAssistant.updateEstimationData', bestEstimation);
+                vscode.commands.executeCommand('specDrivenDevelopment.updateEstimationData', bestEstimation);
             } catch (error) {
                 console.warn('Failed to update estimation data:', error);
             }
@@ -431,7 +396,7 @@ export class EstimationParser {
                 'Dismiss'
             ).then(selection => {
                 if (selection === 'Open DEVSECOPS Hub') {
-                    vscode.commands.executeCommand('vibeAssistant.openPanel');
+                    vscode.commands.executeCommand('specDrivenDevelopment.openPanel');
                 }
             });
         } else {
