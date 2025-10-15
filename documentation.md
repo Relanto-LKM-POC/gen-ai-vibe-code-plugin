@@ -1,24 +1,5 @@
 # Spec Driven Development - Documentation
 
-## 📋 Action Items
-
-### Priority: High
-- [ ] **Action Item Title**
-  - **Description**: Brief description of what needs to be done
-  - **Assigned To**: Name/Team
-  - **Status**: Not Started | In Progress | Completed | Blocked
-  - **Due Date**: YYYY-MM-DD
-  - **Notes**: Additional context or considerations
-
-- [ ] **Action Item Title**
-  - **Description**: 
-  - **Assigned To**: 
-  - **Status**: 
-  - **Due Date**: 
-  - **Notes**: 
-
----
-
 ## 🐛 Known Issues
 
 ### Issue: .spec-driven-files Addition to Workspace
@@ -46,3 +27,28 @@ All resource files (Instructions, Prompts, MCP configs, How-To Guides) are physi
 
 #### Future Considerations
 - Monitor GitHub Copilot API updates for virtual file system support
+
+---
+## 📋 Action Items
+
+### Priority: High
+- [ ] **Implement WIP Limit Configuration**
+  - **Description**: Add configurable Work-in-Progress limit (default: 2) to prevent overloading active features
+  - **Assigned To**: Development Team
+  - **Status**: Not Started
+  - **Due Date**: TBD
+  - **Notes**: WIP limit should be user-configurable through extension settings
+
+- [ ] **Create Configuration Module (config.ts)**
+  - **Description**: Centralize all URL variables and configuration data in a dedicated config.ts file
+  - **Assigned To**: Development Team
+  - **Status**: Not Started
+  - **Due Date**: TBD
+  - **Notes**: Single source of truth for all environment URLs and configuration parameters
+
+- [ ] **TaskManager PRD Integration**
+  - **Description**: Integrate Product Requirements Document (PRD) data into TaskManager to auto-populate feature creation in Manage Features tab
+  - **Assigned To**: Development Team
+  - **Status**: Not Started
+  - **Due Date**: TBD
+  - **Notes**: Streamline feature creation workflow by leveraging existing PRD data 
