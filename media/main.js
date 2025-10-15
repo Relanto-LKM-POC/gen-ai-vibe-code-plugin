@@ -610,9 +610,9 @@
         function updateStep() {
             if (currentStep < steps.length) {
                 loadingSteps.innerHTML = `
-                    ${steps.slice(0, currentStep).map(step => `<div>✅ ${step}</div>`).join('')}
-                    ${currentStep < steps.length ? `<div>⏳ ${steps[currentStep]}</div>` : ''}
-                    ${steps.slice(currentStep + 1).map(step => `<div>⏸️ ${step}</div>`).join('')}
+                    ${steps.slice(0, currentStep).map(step => `<div class="step-completed">✅ ${step}</div>`).join('')}
+                    ${currentStep < steps.length ? `<div class="step-in-progress">⏳ ${steps[currentStep]}</div>` : ''}
+                    ${steps.slice(currentStep + 1).map(step => `<div class="step-pending">⏸️ ${step}</div>`).join('')}
                 `;
                 currentStep++;
                 setTimeout(updateStep, 1000);
@@ -1106,7 +1106,7 @@
         // Show different action buttons based on task type
         let actionButtonsHTML = '';
         if (taskType === 'wip') {
-            // WIP tasks: Edit, Delete, Cleanup buttons
+            // WIP tasks: Edit, Delete, Archive buttons
             actionButtonsHTML = `
                 <div class="task-actions">
                     <button class="task-action-btn edit" data-action="edit" data-task-id="${task.Id}" data-task-data='${JSON.stringify(task).replace(/'/g, "&apos;")}'>
@@ -1116,7 +1116,7 @@
                         Delete
                     </button>
                     <button class="task-action-btn cleanup" data-action="cleanup" data-task-id="${task.Id}" data-task-name="${task.Name}">
-                        Cleanup
+                        Archive
                     </button>
                 </div>`;
         } else if (taskType === 'archived') {

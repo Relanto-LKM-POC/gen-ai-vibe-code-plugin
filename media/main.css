@@ -11,6 +11,8 @@
     --vscode-input-border: var(--vscode-input-border);
     --vscode-textLink-foreground: var(--vscode-textLink-foreground);
     --vscode-textLink-activeForeground: var(--vscode-textLink-activeForeground);
+    --cisco-blue: #00BCEB;
+    --cisco-blue-hover: #00A3D1;
 }
 
 .container {
@@ -60,8 +62,8 @@
 }
 
 .tab-button.active {
-    border-bottom-color: var(--vscode-textLink-foreground);
-    color: var(--vscode-textLink-foreground);
+    border-bottom-color: var(--cisco-blue);
+    color: var(--cisco-blue);
 }
 
 .tab-content {
@@ -167,12 +169,12 @@
 }
 
 .primary-button {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--cisco-blue);
+    color: white;
 }
 
 .primary-button:hover:not(:disabled) {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--cisco-blue-hover);
 }
 
 .primary-button:disabled {
@@ -406,8 +408,54 @@
 }
 
 .loading-steps {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    margin-top: 15px;
+    padding: 10px 0;
+}
+
+.loading-steps > div {
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-left: 3px solid transparent;
+    background-color: var(--vscode-input-background);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.loading-steps > div:first-child {
+    margin-top: 0;
+}
+
+.loading-steps > div:last-child {
+    margin-bottom: 0;
+}
+
+.loading-steps .step-completed {
+    border-left-color: #4caf50;
+    color: var(--vscode-foreground);
+    opacity: 0.9;
+}
+
+.loading-steps .step-in-progress {
+    border-left-color: var(--cisco-blue);
+    background-color: rgba(0, 188, 235, 0.1);
+    font-weight: 500;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.loading-steps .step-pending {
+    border-left-color: var(--vscode-border-color);
+    opacity: 0.6;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
 }
 
 /* Result Styles */
@@ -612,21 +660,21 @@
 
 /* Colorful tab styling */
 .tab-button.active {
-    border-bottom-color: #4ecdc4;
-    color: #4ecdc4;
-    background: linear-gradient(180deg, transparent 0%, rgba(78, 205, 196, 0.1) 100%);
+    border-bottom-color: var(--cisco-blue);
+    color: var(--cisco-blue);
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 188, 235, 0.1) 100%);
 }
 
 /* Enhanced button styling */
 .primary-button {
-    background: linear-gradient(135deg, var(--vscode-button-background), var(--vscode-button-hoverBackground));
+    background: linear-gradient(135deg, var(--cisco-blue), var(--cisco-blue-hover));
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
 }
 
 .primary-button:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 8px rgba(0, 188, 235, 0.3);
 }
 
 /* Required field styling */
@@ -653,13 +701,13 @@
 }
 
 .task-nav-buttons .secondary-button.active {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border-color: var(--vscode-button-background);
+    background-color: var(--cisco-blue);
+    color: white;
+    border-color: var(--cisco-blue);
 }
 
 .task-nav-buttons .secondary-button:not(.active):hover {
-    border-color: var(--vscode-textLink-foreground);
+    border-color: var(--cisco-blue);
 }
 
 .task-list-container {
