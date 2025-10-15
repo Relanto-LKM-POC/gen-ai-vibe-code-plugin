@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2025-10-15
+
+### UI/UX Improvements
+- **Renamed "AWS Setup" to "Configurations"** - More descriptive tab name reflecting broader configuration options
+- **Updated "Help & Support" to "Create Feature"** - Clearer indication of the tab's purpose for feature submission
+
+### Enhanced Error Handling
+- **Improved Salesforce API Error Reporting** - Now displays specific error codes and detailed messages instead of generic HTTP errors
+- **Enhanced Error Parsing** - Better handling of array-based Salesforce error responses with comprehensive error extraction
+- **Advanced Debug Logging** - Added JSON-formatted error logging and raw error output for easier troubleshooting
+- **User-Friendly Error Messages** - Displays actionable error information (e.g., "STORAGE_LIMIT_EXCEEDED: storage limit exceeded")
+
+### Bug Fixes
+- **Error Message Display** - Fixed issue where generic "HTTP 400: Bad Request" was shown instead of specific Salesforce error details
+- **Error Logging Enhancement** - Added multiple logging levels for better debugging and error tracking
+
+---
+
 ## [1.0.0] - 2025-01-08
 
 ### Initial Release - Intelligent Development Enhancement with Enterprise Integration

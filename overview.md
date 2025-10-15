@@ -4,7 +4,7 @@
 
 ## 🚀 What is Spec Driven Development?
 
-Spec Driven Development is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade project management capabilities. It provides **language-specific best practices**, **smart development prompts**, **AWS Secrets Manager integration**, and **Salesforce feature management** in a unified development experience.
+Spec Driven Development is a comprehensive VS Code extension that combines intelligent development resources with enterprise-grade project management capabilities. It provides **language-specific best practices**, **smart development prompts**, **AWS integration**, and **Salesforce feature management** in a unified development experience.
 
 ## ✨ Core Capabilities
 
@@ -21,16 +21,16 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 - **Initiative & Epic Management** - Smart filtering and relationship-based data loading
 
 ### 🎯 **Project Management**
-- **Effort Estimation Parser** - Intelligent parsing of time estimates from multiple formats
 - **Feature Workflow** - Complete feature lifecycle from submission to tracking
 - **Real-time Status Monitoring** - Live connection status for AWS and Salesforce
 - **Comprehensive Logging** - Detailed audit trails for all operations
 
 ### 🛠️ **Developer Experience**
-- **Three-Tab Interface** - AWS Setup, Manage Features, and My Task List in one panel
+- **Three-Tab Interface** - Configurations, Manage Features, and My Task List in one panel
 - **Context-Aware Commands** - Smart commands that work at file and folder levels
 - **Progressive Loading** - Efficient data loading with relationship-based filtering
 - **Error Recovery** - Graceful error handling with actionable user guidance
+- **Enhanced Error Reporting** - Detailed Salesforce API error messages with specific error codes
 
 ## 🎯 Use Cases
 
@@ -61,9 +61,9 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 4. **Access the panel** by clicking the "Spec Driven Development" status bar item
 
 ### **Enterprise Integration** (Optional Setup)
-1. **Configure AWS CLI** with `aws configure` 
+1. **Configure AWS CLI** with `Configurations` 
 2. **Store Salesforce credentials** in AWS Secrets Manager
-3. **Open the panel** and use the AWS Setup tab to establish connections
+3. **Open the panel** and use the Configurations tab to establish connections
 4. **Submit feature** using the Manage Features tab with full Salesforce integration
 
 ## 🛠️ Available Commands
@@ -71,10 +71,9 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 ### **Development Commands**
 | Command | Shortcut | Description |
 |---------|----------|-------------|
-| **Analyze Code & Apply Instructions** | `Ctrl+Shift+V A` | Apply contextual coding instructions to current file |
-| **Apply Contextual Prompts** | `Ctrl+Shift+V P` | Get smart prompts for your current context |
+| **Analyze Code & Apply Instructions** | Right-click menu | Apply contextual coding instructions  |
+| **Apply Contextual Prompts** | Right-click menu | Get smart prompts for your current context |
 | **Add Workspace Guidelines** | Right-click menu | Add comprehensive development resources to workspace |
-| **Analyze Folder & Apply Instructions** | Right-click menu | Apply instructions at folder level |
 
 ### **Enterprise Commands**
 | Command | Description |
@@ -83,7 +82,6 @@ Spec Driven Development is a comprehensive VS Code extension that combines intel
 | **Connect to AWS** | Establish AWS Secrets Manager connection |
 | **Submit Feature** | Submit feature to Salesforce with JIRA integration |
 | **Update JIRA Issue** | Update tasks with effort estimation |
-| **Parse Copilot Estimation** | Extract effort estimates from GitHub Copilot Chat |
 
 ## 📋 Supported Technologies
 
@@ -109,8 +107,8 @@ When you use "Add Workspace Guidelines", the extension creates:
 
 ```
 your-project/
-├── resources/
-│   ├── instructions/          # 📚 Language-specific best practices
+├── .spec-driven-files/
+│   ├── instructions/          # 📚 Contextual Coding Instructions
 │   │   ├── go.best-practices.instructions.md
 │   │   ├── go.development.instructions.md
 │   │   ├── go.design-architecture.instructions.md
@@ -120,19 +118,19 @@ your-project/
 │   │   ├── terraform.instructions.md
 │   │   ├── bash.instructions.md
 │   │   └── software.requirements.instructions.md
-│   ├── prompts/               # 🎯 Smart development prompts
+│   ├── prompts/               # 🎯 Smart Development Prompts
 │   │   ├── go.review.prompt.md
 │   │   ├── software.effort.estimation.prompt.md
 │   │   ├── secrets-detection.prompt.md
 │   │   ├── linting.prompt.md
 │   │   └── jenkins.estimation.prompt.md
-│   └── how-to-guides/         # 📖 Development workflow guides
-│       ├── vibe-workflow.md
-│       ├── vs-copilot-how-to-instructions.md
-│       ├── vs-copilot-how-to-mcp-server.md
-│       └── vs-copilot-how-to-prompts.md
-├── .vscode/                   # ⚙️ VS Code workspace settings
-│   └── mcp.json              # MCP server configurations
+│   ├── how-to-guides/         # 📖 Development Workflow Guides
+│   │   └── vibe-workflow.md
+│   │   └── vs-copilot-how-to-instructions.md
+│   │   └── vs-copilot-how-to-mcp-server.md
+│   │   └── vs-copilot-how-to-prompts.md
+│   └── .vscode/                   # ⚙️ VS Code Workspace Settings
+│       └──  mcp.json              # MCP server configurations
 └── your-existing-code/        # Your project files remain unchanged
 ```
 
@@ -180,7 +178,7 @@ your-project/
 ## 📊 Performance & Package Info
 
 - **Extension ID**: `spec-driven-development`
-- **Version**: 1.0.0
+- **Version**: 1.0.1
 - **Package Size**: Optimized for fast loading with webpack
 - **Activation**: Instant activation on supported language files
 - **Memory Impact**: Minimal VS Code performance impact
@@ -192,14 +190,12 @@ For detailed usage instructions, examples, and troubleshooting, visit our [GitHu
 
 ## 🤝 Support & Feature
 
-- **Issues & Bug Reports**: [GitHub Issues](https://github.com/Relanto-LKM-POC/spec-driven-development/issues)
-- **Feature Requests**: Submit via GitHub Issues
 - **Documentation**: Available in the repository README
 - **Community**: Join our discussions on GitHub
 
 ## 📄 License
 
-MIT License - see [LICENSE](https://github.com/Relanto-LKM-POC/spec-driven-development/blob/main/LICENSE) file for details.
+MIT License - see [LICENSE](https://github.com/Relanto-LKM-POC/spec-driven-development/blob/feature-1/LICENSE) file for details.
 
 ---
 

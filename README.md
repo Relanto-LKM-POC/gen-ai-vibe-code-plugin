@@ -20,15 +20,15 @@ The extension provides three main capabilities:
 - **Workspace Guidelines** - Automatically adds development resources to your workspace
 
 ### � **Enterprise Integration**
-- **AWS Secrets Manager Integration** - Secure credential management using your AWS CLI configuration
+- **AWS Integration** - Secure credential management using your AWS CLI configuration
 - **Salesforce Feature System** - Direct integration with Salesforce for feature submission
 - **JIRA Task Management** - Update and track JIRA tasks with effort estimation
 - **Initiative & Epic Management** - Smart filtering and relationship-based dropdowns
 
 ### 🎯 **Project Management**
-- **Effort Estimation Parser** - Intelligent parsing of time estimates from various formats
 - **Feature History Tracking** - Complete audit trail of submitted feature
 - **Real-time Status Monitoring** - Live connection status for AWS and Salesforce
+- **Enhanced Error Reporting** - Detailed Salesforce API error messages with specific error codes for faster troubleshooting
 - **Enterprise-grade Logging** - Comprehensive error reporting and diagnostics
 
 ---
@@ -38,19 +38,19 @@ The extension provides three main capabilities:
 ### 1. **Install the Extension**
 Install from the VS Code Marketplace or use the Command Palette (`Ctrl+Shift+P` → "Extensions: Install Extensions")
 
-### 2. **Access the Panel**
-- Click the "Spec Driven Development" status bar item, or
-- Use Command Palette: "Spec Driven Development: Open Panel"
-
-### 3. **Development Resources** (Works Immediately)
+### 2. **Development Resources** (Works Immediately)
 - Right-click any folder → "Add Workspace Guidelines"
 - Use "Analyze Code & Apply Instructions" command
 - Access comprehensive language-specific best practices
 
+### 3. **Access the Panel**
+- Click the "Spec Driven Development" status bar item, or
+- Use Command Palette: "Spec Driven Development: Open Panel"
+
 ### 4. **Enterprise Features** (Optional Setup)
-- **AWS Setup**: Ensure AWS CLI is configured with Secrets Manager access
+- **Configurations Tab**: Ensure AWS CLI is configured with Secrets Manager access
 - **Salesforce Integration**: Store Salesforce credentials in AWS Secrets Manager
-- **Connect**: Use the AWS Setup tab to establish connections
+- **Connect**: Use the Configurations tab to establish connections
 
 ---
 
@@ -114,7 +114,6 @@ When you use "Add Workspace Guidelines", the extension creates:
 - **Project Structure Analysis** - Understands your project layout and dependencies
 
 ### 🛠️ **Development Tools**
-- **Effort Estimation Parser** - Intelligent parsing of time estimates from text (hours, days, weeks, months)
 - **Resource Management** - Automated creation and management of development resources
 - **Contextual Instructions** - Dynamic application of best practices based on your code
 - **Smart Prompts** - Context-aware development prompts and suggestions
@@ -185,21 +184,13 @@ Store your Salesforce credentials as a JSON secret:
 }
 ```
 
-#### **Salesforce Connected App Setup**
-1. Create a Connected App in Salesforce Setup
-2. Enable OAuth settings with these scopes:
-   - `api` - Access and manage your data
-   - `refresh_token` - Retain access indefinitely
-3. Note the Consumer Key (Client ID) and Consumer Secret (Client Secret)
-
 ### 📁 **Generated Project Structure**
 
 When you use "Add Workspace Guidelines", the extension creates:
-
 ```
 your-project/
-├── resources/
-│   ├── instructions/         # 📚 Language-specific best practices
+├── .spec-driven-files/
+│   ├── instructions/          # 📚 Contextual Coding Instructions
 │   │   ├── go.best-practices.instructions.md
 │   │   ├── go.development.instructions.md
 │   │   ├── go.design-architecture.instructions.md
@@ -209,20 +200,20 @@ your-project/
 │   │   ├── terraform.instructions.md
 │   │   ├── bash.instructions.md
 │   │   └── software.requirements.instructions.md
-│   ├── prompts/              # 🎯 Smart development prompts
+│   ├── prompts/               # 🎯 Smart Development Prompts
 │   │   ├── go.review.prompt.md
 │   │   ├── software.effort.estimation.prompt.md
 │   │   ├── secrets-detection.prompt.md
 │   │   ├── linting.prompt.md
 │   │   └── jenkins.estimation.prompt.md
-│   └── how-to-guides/        # 📖 Development workflow guides
-│       ├── vibe-workflow.md
-│       ├── vs-copilot-how-to-instructions.md
-│       ├── vs-copilot-how-to-mcp-server.md
-│       └── vs-copilot-how-to-prompts.md
-├── .vscode/                  # ⚙️ VS Code workspace settings
-│   └── mcp.json              # MCP server configurations  
-└── your-existing-code/       # Your project files remain unchanged
+│   ├── how-to-guides/         # 📖 Development Workflow Guides
+│   │   └── vibe-workflow.md
+│   │   └── vs-copilot-how-to-instructions.md
+│   │   └── vs-copilot-how-to-mcp-server.md
+│   │   └── vs-copilot-how-to-prompts.md
+│   └── .vscode/                   # ⚙️ VS Code Workspace Settings
+│       └──  mcp.json              # MCP server configurations
+└── your-existing-code/        # Your project files remain unchanged
 ```
 
 **Note**: The extension adds resources to your workspace but never modifies your existing code files.
@@ -253,9 +244,8 @@ Output: Structured time estimates with configurable work hours
 1. Developer gets task: "EPIC-DEVSECOPS-123: Implement user authentication"
 2. Use "Add Workspace Guidelines" → Gets Go best practices, security guidelines
 3. Code with enhanced context and instructions
-4. Use "Parse Copilot Estimation" → Extract time estimate from AI chat
-5. "Update JIRA Issue" → Automatically update Salesforce with 40-hour estimate
-6. "Submit Feature" → Complete feature loop with initiative/epic tracking
+4. Use "Edit" button in WIP Tickets sub-panel → Automatically update Salesforce data
+5. Click "Done" → Complete feature loop with initiative/epic tracking
 ```
 
 ### **🔍 Smart Context Detection**
@@ -280,8 +270,6 @@ When working with different technologies, the extension provides targeted guidan
 - **Bash scripts** → Security practices, error handling, portability
 - **Mixed projects** → Relevant instructions for all detected languages
 
----
-
 ## 🧠 Smart Detection & Intelligence
 
 ### 🔍 **Automatic Technology Detection**
@@ -294,28 +282,6 @@ When working with different technologies, the extension provides targeted guidan
 | **Infrastructure** | AWS, Azure, GCP, Docker, Kubernetes | Cloud-specific Terraform practices and container guidelines |
 | **Databases** | PostgreSQL, MongoDB, Redis | Database integration and query optimization patterns |
 | **CI/CD** | Jenkins, GitHub Actions, GitLab CI | Pipeline optimization and estimation guides |
-
-### 📊 **Intelligent Effort Estimation**
-
-The EstimationParser supports multiple input formats and provides structured output:
-
-```text
-Supported Input Formats:
-✅ "Total Estimated Effort: 28-45 person-days"
-✅ "Final Estimate: 40 hours (5 days)"  
-✅ "Backend: 3 days, Frontend: 2 days, Testing: 1 day"
-✅ "Development will take approximately 2-3 weeks"
-✅ "5 story points" (with configurable conversion rates)
-✅ "2 sprints" (with configurable sprint duration)
-
-Configurable Time Units:
-• HOURS_PER_DAY=8 (default)
-• HOURS_PER_WEEK=40 (default)  
-• HOURS_PER_MONTH=160 (default)
-• STORY_POINTS_TO_HOURS=8 (configurable)
-• HOURS_PER_SPRINT=80 (configurable)
-```
-
 ---
 
 ## 🏗️ Extension Architecture
@@ -364,7 +330,7 @@ Built with TypeScript and VS Code Extension API:
 3. Look for error messages and warnings
 
 **Common Log Messages:**
-- `AWS authentication failed` - Run `aws configure` to set up credentials
+- `AWS authentication failed` - Run `Configurations` to set up credentials
 - `Salesforce credentials not available` - Check AWS Secrets Manager secret format
 - `No active editor found` - Use context menu on folders/files instead
 
@@ -430,7 +396,7 @@ npm run watch
 ### 📦 **Package Details**
 - **Extension ID**: `spec-driven-development`
 - **Publisher**: Gen-Ai-publisher
-- **Version**: 1.0.0
+- **Version**: 1.0.1
 - **License**: MIT
 - **VS Code Compatibility**: 1.74.0+
 - **Languages Supported**: Go, Python, Terraform, Bash, JavaScript, TypeScript
@@ -485,62 +451,3 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 **Enhance your development workflow with intelligent context analysis and comprehensive resources.** 🚀
 
 </div>
-
-
-
-## To Implement
-
-┌─────────────────────────────────────────────────────────────────┐
-│                       SPEC DRIVEN DEVELOPMENT UI                │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                           MAIN NAVIGATION                       │
-│  ┌───────────┐     ┌────────────────┐    ┌───────────────────┐  │
-│  │ AWS Setup │     │ Manage Features │    │ My Task List     │  │
-│  └───────────┘     └────────────────┘    └────────┬──────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                                          │
-                                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       MY TASK LIST SECTION                      │
-│  ┌─────────────────┐      ┌────────────────┐                    │
-│  │Retrieve My WIP  │◄────►│Running Task    │                    │
-│  │List             │      │List            │                    │
-│  └────────┬────────┘      └───────┬────────┘                    │
-│           │                       │                             │
-│           │                       ▼                             │
-│           │             ┌────────────────────┐                  │
-│           └────────────►│  Task List Display │                  │
-│                         │  - DEVSECOPS-12345 │                  │
-│                         │  - DEVSECOPS-12346 │                  │
-│                         │  - DEVSECOPS-12347 │                  │
-│                         └──────────┬─────────┘                  │
-│                                    │                            │
-│                                    ▼                            │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │               TASK OPERATIONS                          │     │
-│  │  ┌────────┐     ┌────────┐      ┌─────────┐           │     │
-│  │  │  Edit  │     │ Delete │      │ Cleanup │           │     │
-│  │  └───┬────┘     └───┬────┘      └────┬────┘           │     │
-│  │      │              │                │                │     │
-│  │      ▼              ▼                ▼                │     │
-│  │ ┌─────────────┐ ┌─────────────┐ ┌──────────────┐     │     │
-│  │ │Manage       │ │Removes      │ │Removes task  │     │     │
-│  │ │Feedback     │ │feature from │ │from the list │     │     │
-│  │ │- Populate   │ │DevSecOps    │ │              │     │     │
-│  │ │  details    │ │Hub          │ │              │     │     │
-│  │ │- Submit     │ │             │ │              │     │     │
-│  │ └─────────────┘ └─────────────┘ └──────────────┘     │     │
-│  └────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   DEVSECOPS HUB INTEGRATION                     │
-│  ┌────────────────┐    ┌─────────────────┐                      │
-│  │ Task Retrieval │    │ Task Management │                      │
-│  │ API            │    │ API             │                      │
-│  └────────────────┘    └─────────────────┘                      │
-└─────────────────────────────────────────────────────────────────┘
