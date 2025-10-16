@@ -1281,26 +1281,26 @@ Token will be stored securely in VS Code settings.`;
     // Task Management Commands
     const retrieveWipTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveWipTasks', async (options: any = {}) => {
         try {
-            console.log('Retrieve WIP tasks command triggered with options:', options);
+            console.log('Retrieve WIP tickets command triggered with options:', options);
             
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Retrieving WIP tasks...',
+                title: 'Retrieving WIP tickets...',
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 20, message: 'Checking AWS connection...' });
                 console.log('Checking AWS connection status...');
                 
-                progress.report({ increment: 30, message: 'Fetching WIP tasks from Salesforce...' });
+                progress.report({ increment: 30, message: 'Fetching WIP tickets from Salesforce...' });
                 console.log('Calling taskService.retrieveWipTasks()...');
                 
                 const result = await taskService.retrieveWipTasks(options);
-                console.log(`Retrieved ${result.tasks.length} WIP tasks (${result.totalCount} total):`, result);
+                console.log(`Retrieved ${result.tasks.length} WIP tickets (${result.totalCount} total):`, result);
                 
                 const foundStartRecord = (options.offset || 0) + 1;
                 const foundEndRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const foundRangeText = result.totalCount > 0 ? `${foundStartRecord}-${foundEndRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                progress.report({ increment: 50, message: `Found ${foundRangeText} WIP tasks` });
+                progress.report({ increment: 50, message: `Found ${foundRangeText} WIP tickets` });
                 
                 if (specDrivenDevelopmentPanel) {
                     console.log('Sending WIP task list to webview...');
@@ -1319,11 +1319,11 @@ Token will be stored securely in VS Code settings.`;
                 const startRecord = (options.offset || 0) + 1;
                 const endRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const rangeText = result.totalCount > 0 ? `${startRecord}-${endRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} WIP tasks${searchText}`);
+                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} WIP tickets${searchText}`);
             });
         } catch (error) {
             console.error('Error in retrieveWipTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve WIP tasks: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to retrieve WIP tickets: ${(error as Error).message}`);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'wip', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1332,21 +1332,21 @@ Token will be stored securely in VS Code settings.`;
 
     const retrieveRunningTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveRunningTasks', async (options: any = {}) => {
         try {
-            console.log('Retrieve running tasks command triggered with options:', options);
+            console.log('Retrieve all tickets command triggered with options:', options);
             
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Retrieving running tasks...',
+                title: 'Retrieving all tickets...',
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 20, message: 'Checking AWS connection...' });
                 console.log('Checking AWS connection status...');
                 
-                progress.report({ increment: 30, message: 'Fetching tasks from Salesforce...' });
+                progress.report({ increment: 30, message: 'Fetching tickets from Salesforce...' });
                 console.log('Calling taskService.retrieveRunningTasks()...');
                 
                 const result = await taskService.retrieveRunningTasks(options);
-                console.log(`Retrieved ${result.tasks.length} running tasks (${result.totalCount} total):`, result);
+                console.log(`Retrieved ${result.tasks.length} tickets (${result.totalCount} total):`, result);
                 
                 const foundStartRecord = (options.offset || 0) + 1;
                 const foundEndRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
@@ -1370,11 +1370,11 @@ Token will be stored securely in VS Code settings.`;
                 const startRecord = (options.offset || 0) + 1;
                 const endRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const rangeText = result.totalCount > 0 ? `${startRecord}-${endRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} tasks${searchText}`);
+                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} tickets${searchText}`);
             });
         } catch (error) {
             console.error('Error in retrieveRunningTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve tasks: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to retrieve tickets: ${(error as Error).message}`);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'running', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1383,29 +1383,29 @@ Token will be stored securely in VS Code settings.`;
 
     const retrieveArchivedTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveArchivedTasks', async (options: any = {}) => {
         try {
-            console.log('Retrieve archived tasks command triggered with options:', options);
+            console.log('Retrieve archived tickets command triggered with options:', options);
             
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Retrieving archived tasks...',
+                title: 'Retrieving archived tickets...',
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 20, message: 'Checking AWS connection...' });
                 console.log('Checking AWS connection status...');
                 
-                progress.report({ increment: 30, message: 'Fetching archived tasks from Salesforce...' });
+                progress.report({ increment: 30, message: 'Fetching archived tickets from Salesforce...' });
                 console.log('Calling taskService.retrieveArchivedTasks()...');
                 
                 const result = await taskService.retrieveArchivedTasks(options);
-                console.log(`Retrieved ${result.tasks.length} archived tasks (${result.totalCount} total):`, result);
+                console.log(`Retrieved ${result.tasks.length} archived tickets (${result.totalCount} total):`, result);
                 
                 const foundStartRecord = (options.offset || 0) + 1;
                 const foundEndRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const foundRangeText = result.totalCount > 0 ? `${foundStartRecord}-${foundEndRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                progress.report({ increment: 50, message: `Found ${foundRangeText} archived tasks` });
+                progress.report({ increment: 50, message: `Found ${foundRangeText} archived tickets` });
                 
                 if (specDrivenDevelopmentPanel) {
-                    console.log('Sending archived task list to webview...');
+                    console.log('Sending archived ticket list to webview...');
                     specDrivenDevelopmentPanel.sendTaskList(result.tasks, 'archived', {
                         totalCount: result.totalCount,
                         hasMore: result.hasMore,
@@ -1421,11 +1421,11 @@ Token will be stored securely in VS Code settings.`;
                 const startRecord = (options.offset || 0) + 1;
                 const endRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const rangeText = result.totalCount > 0 ? `${startRecord}-${endRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} archived tasks${searchText}`);
+                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} archived tickets${searchText}`);
             });
         } catch (error) {
             console.error('Error in retrieveArchivedTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve archived tasks: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to retrieve archived tickets: ${(error as Error).message}`);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'archived', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1489,8 +1489,8 @@ Token will be stored securely in VS Code settings.`;
 
     const saveTaskUpdatesCommand = vscode.commands.registerCommand('specDrivenDevelopment.saveTaskUpdates', async (updateData: any) => {
         try {
-            const { taskId, updates } = updateData;
-            console.log('Save task updates command triggered:', taskId, updates);
+            const { taskId, updates, taskType } = updateData;
+            console.log('Save task updates command triggered:', taskId, updates, 'taskType:', taskType);
             
             const result = await taskService.updateTask(taskId, updates);
             
@@ -1500,8 +1500,15 @@ Token will be stored securely in VS Code settings.`;
             
             if (result.success) {
                 vscode.window.showInformationMessage('✅ Task updated successfully!');
-                // Refresh the task list
-                vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks');
+                // Refresh the appropriate task list based on which list was being viewed
+                if (taskType === 'wip') {
+                    vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks');
+                } else if (taskType === 'archived') {
+                    vscode.commands.executeCommand('specDrivenDevelopment.retrieveArchivedTasks');
+                } else {
+                    // Default to running tasks list
+                    vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks');
+                }
             } else {
                 vscode.window.showErrorMessage(`❌ Failed to update task: ${result.message}`);
             }

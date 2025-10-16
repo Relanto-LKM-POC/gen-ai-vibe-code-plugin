@@ -12,7 +12,8 @@
         allEpics: [], // Store all epics for filtering
         pagination: null, // Store pagination state
         currentTaskList: [], // Store current task list
-        editingTask: null // Store currently editing task data
+        editingTask: null, // Store currently editing task data
+        currentTaskType: null // Track which task list is currently displayed (wip, running, archived)
     };
 
     // Unit conversion function
@@ -126,7 +127,7 @@
         const archivedTasksBtn = document.getElementById('archived-tasks-btn');
 
         retrieveWipBtn?.addEventListener('click', () => {
-            console.log('WIP tasks button clicked');
+            console.log('WIP tickets button clicked');
             setActiveTaskTab('wip');
             showSearchContainer(); // Enable search for WIP tasks too
             loadWipTasks();
@@ -1029,6 +1030,7 @@
         // Store current state
         currentState.currentTaskList = tasks;
         currentState.pagination = pagination;
+        currentState.currentTaskType = taskType; // Track which task list is currently displayed
         
         const taskCount = document.getElementById('task-count');
         const taskEmptyState = document.getElementById('task-empty-state');
@@ -1322,7 +1324,7 @@
                     const taskEmptyState = document.getElementById('task-empty-state');
                     const taskList = document.getElementById('task-list');
                     if (taskEmptyState) {
-                        taskEmptyState.innerHTML = '<p>No archived tasks remaining.</p>';
+                        taskEmptyState.innerHTML = '<p>No archived tickets remaining.</p>';
                         taskEmptyState.style.display = 'block';
                     }
                     if (taskList) taskList.style.display = 'none';
@@ -1635,7 +1637,7 @@
 
         vscode.postMessage({
             command: 'saveTaskUpdates',
-            data: { taskId, updates }
+            data: { taskId, updates, taskType: currentState.currentTaskType }
         });
 
         hideTaskEditModal();

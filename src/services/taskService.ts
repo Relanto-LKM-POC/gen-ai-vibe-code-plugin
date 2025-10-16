@@ -78,7 +78,7 @@ export class TaskService {
                 `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Status__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
-            console.log('WIP Tasks Query:', query);
+            console.log('WIP tickets Query:', query);
 
             const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
                 method: 'GET',
@@ -124,7 +124,7 @@ export class TaskService {
             // Calculate approximate total after filtering (subtract cleaned up tasks from total)
             const approximateTotalCount = Math.max(0, totalCount - cleanedUpTasks.length);
             
-            console.log(`Retrieved ${data.records?.length || 0} WIP tasks, ${filteredTasks.length} after filtering ${cleanedUpTasks.length} cleaned up tasks (${totalCount} original total, ~${approximateTotalCount} estimated remaining)`);
+            console.log(`Retrieved ${data.records?.length || 0} WIP tickets, ${filteredTasks.length} after filtering ${cleanedUpTasks.length} cleaned up tasks (${totalCount} original total, ~${approximateTotalCount} estimated remaining)`);
 
             return {
                 tasks: filteredTasks,
@@ -132,7 +132,7 @@ export class TaskService {
                 hasMore: (offset + limit) < approximateTotalCount
             };
         } catch (error) {
-            console.error('Error retrieving WIP tasks:', error);
+            console.error('Error retrieving WIP tickets:', error);
             throw error;
         }
     }
@@ -210,13 +210,13 @@ export class TaskService {
                 hasMore: (offset + limit) < totalCount
             };
         } catch (error) {
-            console.error('Error retrieving running tasks:', error);
+            console.error('Error retrieving all tickets:', error);
             throw error;
         }
     }
 
     /**
-     * Retrieve Archived tasks (locally cleaned up) with pagination and search
+     * Retrieve Archived tickets (locally cleaned up) with pagination and search
      */
     async retrieveArchivedTasks(options: { limit?: number; offset?: number; searchTerm?: string } = {}): Promise<{ tasks: Task[]; totalCount: number; hasMore: boolean }> {
         try {
@@ -281,7 +281,7 @@ export class TaskService {
                 hasMore: (offset + limit) < totalCount
             };
         } catch (error) {
-            console.error('Error retrieving archived tasks:', error);
+            console.error('Error retrieving archived tickets:', error);
             throw error;
         }
     }
