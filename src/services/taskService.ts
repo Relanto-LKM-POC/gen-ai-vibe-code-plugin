@@ -230,19 +230,16 @@ export class TaskService {
                 console.warn('Failed to get WIP total count, using records length');
             }
 
-            // Filter out locally cleaned up tasks
+            // Filter out locally cleaned up tasks (client-side only)
             const cleanedUpTasks = this.context.workspaceState.get<string[]>('cleanedUpTaskIds', []);
             const filteredTasks = (data.records || []).filter((task: Task) => !cleanedUpTasks.includes(task.Id));
             
-            // Calculate approximate total after filtering (subtract cleaned up tasks from total)
-            const approximateTotalCount = Math.max(0, totalCount - cleanedUpTasks.length);
-            
-            console.log(`Retrieved ${data.records?.length || 0} WIP tickets, ${filteredTasks.length} after filtering ${cleanedUpTasks.length} cleaned up tasks (${totalCount} original total, ~${approximateTotalCount} estimated remaining)`);
+            console.log(`Retrieved ${data.records?.length || 0} WIP tickets, ${filteredTasks.length} after filtering ${cleanedUpTasks.length} locally cleaned up tasks (total count: ${totalCount})`);
 
             return {
                 tasks: filteredTasks,
-                totalCount: approximateTotalCount, // Use estimated total after removing cleaned up tasks
-                hasMore: (offset + limit) < approximateTotalCount
+                totalCount: totalCount, // Use real Salesforce count for consistency across all users
+                hasMore: (offset + limit) < totalCount
             };
         } catch (error) {
             console.error('Error retrieving WIP tickets:', error);
