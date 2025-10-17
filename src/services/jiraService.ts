@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { AWSService } from './awsService';
 import { EstimationData } from './estimationParser';
+import { CONFIG, getSalesforceAuthUrl, getSalesforceApiUrl } from '../config/config';
 
 // Dynamic import for node-fetch to handle ES modules in CommonJS environment
 let fetch: any;
@@ -95,7 +96,6 @@ export class JiraService {
                 ? salesforceCredentials.password
                 : salesforceCredentials.password + salesforceCredentials.security_token;
 
-            const authUrl = 'https://test.salesforce.com/services/oauth2/token';
             const authParams = new URLSearchParams({
                 grant_type: 'password',
                 client_id: salesforceCredentials.client_id,
@@ -104,7 +104,7 @@ export class JiraService {
                 password: fullPassword
             });
 
-            const response = await fetch(authUrl, {
+            const response = await fetch(getSalesforceAuthUrl(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -141,9 +141,9 @@ export class JiraService {
             
             // Cache the token for 30 minutes (conservative based on observed 30-minute expiry)
             this.cachedAuthToken = authData.access_token;
-            this.tokenExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+            this.tokenExpiry = new Date(Date.now() + CONFIG.cache.tokenTTL); // 30 minutes from now
 
-            console.log('Salesforce authentication successful, token cached for 30 minutes');
+            console.log(`Salesforce authentication successful, token cached for ${CONFIG.cache.tokenTTL / (60 * 1000)} minutes`);
             return authData.access_token;
 
         } catch (error) {
@@ -157,9 +157,8 @@ export class JiraService {
      */
     private async matchEpicTicket(accessToken: string, devsecopsId: string): Promise<SalesforceTicketMatch> {
         try {
-            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${devsecopsId}%25%27`;
-            const queryUrl = `${baseUrl}/services/data/v56.0/query/?q=${query}`;
+            const queryUrl = getSalesforceApiUrl(`${CONFIG.api.endpoints.query}/?q=${query}`);
 
             const response = await fetch(queryUrl, {
                 method: 'GET',
@@ -198,8 +197,7 @@ export class JiraService {
         estimatedHours: number
     ): Promise<void> {
         try {
-            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
-            const updateUrl = `${baseUrl}/services/data/v56.0/sobjects/Feedback__c/${recordId}`;
+            const updateUrl = getSalesforceApiUrl(`${CONFIG.api.endpoints.feedback}/${recordId}`);
 
             const updateData = {
                 Estimated_Effort_Hours__c: estimatedHours,

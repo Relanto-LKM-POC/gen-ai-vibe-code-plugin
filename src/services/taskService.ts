@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { AWSService } from './awsService';
 import { JiraService } from './jiraService';
+import { CONFIG, getSalesforceApiUrl, getSalesforceQueryUrl, getSalesforceFeedbackUrl } from '../config/config';
 
 export interface Task {
     Id: string;
@@ -20,7 +21,6 @@ export class TaskService {
     private context: vscode.ExtensionContext;
     private awsService: AWSService;
     private jiraService: JiraService;
-    private salesforceBaseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
 
     // Static properties for concurrent request protection
     private static tokenRequestMutex = new Map<string, Promise<string>>();
@@ -77,9 +77,9 @@ export class TaskService {
      * Execute token request with network retry and 401 handling
      */
     private async executeTokenRequest(): Promise<string> {
-        const maxRetries = 3;
-        const baseDelay = 1000; // 1 second
-        const maxDelay = 10000; // 10 seconds
+        const maxRetries = CONFIG.retry.maxRetries;
+        const baseDelay = CONFIG.retry.baseDelay;
+        const maxDelay = CONFIG.retry.maxDelay;
         
         let lastError: Error | undefined;
 
@@ -193,7 +193,7 @@ export class TaskService {
 
             console.log('WIP tickets Query:', query);
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
+            const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -214,7 +214,7 @@ export class TaskService {
             
             let totalCount = data.records?.length || 0;
             try {
-                const countResponse = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${countQuery}`, {
+                const countResponse = await fetch(getSalesforceQueryUrl(countQuery), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -277,7 +277,7 @@ export class TaskService {
                 `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
+            const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -298,7 +298,7 @@ export class TaskService {
             
             let totalCount = data.records?.length || 0;
             try {
-                const countResponse = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${countQuery}`, {
+                const countResponse = await fetch(getSalesforceQueryUrl(countQuery), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -368,7 +368,7 @@ export class TaskService {
                 `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
+            const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -448,7 +448,7 @@ export class TaskService {
 
             console.log('Updating task with payload:', updatePayload);
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/sobjects/Feedback__c/${taskId}`, {
+            const response = await fetch(getSalesforceFeedbackUrl(taskId), {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -481,7 +481,7 @@ export class TaskService {
                 'SELECT Id, Name FROM Epic__c ORDER BY Name ASC'
             );
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/query/?q=${query}`, {
+            const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -509,7 +509,7 @@ export class TaskService {
         try {
             const token = await this.getAccessToken();
 
-            const response = await fetch(`${this.salesforceBaseUrl}/services/data/v56.0/sobjects/Feedback__c/${taskId}`, {
+            const response = await fetch(getSalesforceFeedbackUrl(taskId), {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,

@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
-import { config } from '../utils/configurationManager';
 import { NotificationManager } from './notificationManager';
 import { JiraService } from './jiraService';
 import { AWSService } from './awsService';
+import { CONFIG, getSalesforceApiUrl, getSalesforceDescribeUrl, getSalesforceQueryUrl } from '../config/config';
 
 export interface FeedbackData {
     name: string; // Component name for Salesforce
@@ -90,9 +90,9 @@ export class FeedbackService {
      * Execute token request with network retry and 401 handling
      */
     private async executeTokenRequest(): Promise<string> {
-        const maxRetries = 3;
-        const baseDelay = 1000; // 1 second
-        const maxDelay = 10000; // 10 seconds
+        const maxRetries = CONFIG.retry.maxRetries;
+        const baseDelay = CONFIG.retry.baseDelay;
+        const maxDelay = CONFIG.retry.maxDelay;
         
         let lastError: Error | undefined;
 
@@ -191,11 +191,9 @@ export class FeedbackService {
             }
 
             const accessToken = await this.getAccessTokenWithRetryAndProtection();
-            // Use the same hardcoded URL as JiraService for now
-            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             
             // Try querying the describe API to understand the Initiative__c field relationship
-            const describeResponse = await fetch(`${baseUrl}/services/data/v56.0/sobjects/Feedback__c/describe`, {
+            const describeResponse = await fetch(getSalesforceDescribeUrl('feedback'), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -215,7 +213,7 @@ export class FeedbackService {
                 console.log(`Initiative__c field references: ${referencedObject}`);
                 
                 // Now query the correct object
-                const response = await fetch(`${baseUrl}/services/data/v56.0/query/?q=SELECT+Id%2CName+FROM+${referencedObject}`, {
+                const response = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+${referencedObject}`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -234,7 +232,7 @@ export class FeedbackService {
                 }));
             } else {
                 // Fallback to CX_Initiative__c based on discovered field relationship
-                const response = await fetch(`${baseUrl}/services/data/v56.0/query/?q=SELECT+Id%2CName+FROM+CX_Initiative__c`, {
+                const response = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+CX_Initiative__c`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -276,11 +274,9 @@ export class FeedbackService {
             }
 
             const accessToken = await this.getAccessTokenWithRetryAndProtection();
-            // Use the same hardcoded URL as JiraService for now
-            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             
             // First check if Initiative__c field exists on Epic__c object
-            const describeResponse = await fetch(`${baseUrl}/services/data/v56.0/sobjects/Epic__c/describe`, {
+            const describeResponse = await fetch(getSalesforceDescribeUrl('epic'), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -303,7 +299,7 @@ export class FeedbackService {
             query += `+FROM+Epic__c+ORDER+BY+CreatedDate+DESC`;
             
             console.log(`Epic query: ${query}`);
-            const response = await fetch(`${baseUrl}/services/data/v56.0/query/?q=${query}`, {
+            const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -369,8 +365,6 @@ export class FeedbackService {
         try {
             // Get Salesforce access token
             const accessToken = await this.getAccessTokenWithRetryAndProtection();
-            // Use the same hardcoded URL as JiraService for now
-            const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
 
             // Prepare Salesforce payload
             const salesforcePayload: any = {
@@ -389,7 +383,7 @@ export class FeedbackService {
 
             console.log('Submitting to Salesforce:', salesforcePayload);
 
-            const response = await fetch(`${baseUrl}/services/data/v56.0/sobjects/Feedback__c/`, {
+            const response = await fetch(getSalesforceApiUrl(CONFIG.api.endpoints.feedback + '/'), {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -420,7 +414,7 @@ export class FeedbackService {
                     const retryDelay = 2000; // 2 seconds
                     
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                        const queryResponse = await fetch(`${baseUrl}/services/data/v56.0/query/?q=SELECT+Id%2CJira_Link__c+FROM+Feedback__c+ORDER+BY+CreatedDate+DESC+LIMIT+1`, {
+                        const queryResponse = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CJira_Link__c+FROM+Feedback__c+ORDER+BY+CreatedDate+DESC+LIMIT+1`), {
                             method: 'GET',
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,

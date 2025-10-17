@@ -11,7 +11,7 @@ import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
 import { FeedbackService } from './services/feedbackService';
 import { TaskService } from './services/taskService';
-import { config } from './utils/configurationManager';
+// GitHub configuration removed - only using Salesforce config now
 import { NotificationManager } from './services/notificationManager';
 
 let instructionManager: InstructionManager;
@@ -91,14 +91,11 @@ export async function activate(context: vscode.ExtensionContext) {
             const action = await vscode.window.showInformationMessage(
                 '🎉 Welcome to Spec Driven Development! Click the status bar to open the management panel with AWS integration, JIRA connectivity, and feedback system.',
                 'Open Panel',
-                'Learn More',
                 'Got it'
             );
             
             if (action === 'Open Panel') {
                 vscode.commands.executeCommand('specDrivenDevelopment.openPanel');
-            } else if (action === 'Learn More') {
-                vscode.env.openExternal(vscode.Uri.parse(config.getDocumentationUrls().readme));
             }
             
             await context.globalState.update('hasShownWelcome', true);
@@ -876,108 +873,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
-    const configureGitHubTokenCommand = vscode.commands.registerCommand('specDrivenDevelopment.configureGitHubToken', async () => {
-        try {
-            const currentToken = config.getGitHubToken();
-            const hasToken = currentToken && currentToken.length > 0;
-            
-            const message = hasToken 
-                ? 'GitHub token is configured. Do you want to update it?'
-                : 'GitHub token is required to create issues directly. Do you want to configure it now?';
-                
-            const actions = hasToken 
-                ? ['Configure Token', 'Help', 'Test Token']
-                : ['Configure Token', 'Help'];
-            
-            const action = await vscode.window.showInformationMessage(message, ...actions);
-
-            if (action === 'Configure Token') {
-                const token = await vscode.window.showInputBox({
-                    prompt: 'Enter your GitHub Personal Access Token',
-                    password: true,
-                    placeHolder: 'ghp_xxxxxxxxxxxxxxxxxxxx',
-                    value: hasToken ? '***********' : '',
-                    validateInput: (value) => {
-                        if (!value || value.length < 10) {
-                            return 'Please enter a valid GitHub token';
-                        }
-                        if (value === '***********') {
-                            return 'Please enter your actual token, not the placeholder';
-                        }
-                        return null;
-                    }
-                });
-
-                if (token && token !== '***********') {
-                    await config.setGitHubToken(token);
-                    vscode.window.showInformationMessage('✅ GitHub token configured successfully!');
-                }
-            } else if (action === 'Help') {
-                const helpMessage = `To create a GitHub Personal Access Token:
-
-1. Go to GitHub Settings → Developer settings → Personal access tokens
-2. Click "Generate new token (classic)"
-3. Give it a name like "Spec Driven Development Extension"
-4. Select scopes: 'repo' (for private repos) or 'public_repo' (for public repos only)
-5. Click "Generate token"
-6. Copy the token (you won't see it again!)
-7. Run this command again to configure it
-
-Token will be stored securely in VS Code settings.`;
-                
-                vscode.window.showInformationMessage(helpMessage, 'Open GitHub Settings').then(result => {
-                    if (result === 'Open GitHub Settings') {
-                        vscode.env.openExternal(vscode.Uri.parse(config.getDocumentationUrls().tokenSettings));
-                    }
-                });
-            } else if (action === 'Test Token') {
-                // Test the current token by making a simple API call
-                vscode.window.showInformationMessage('Testing GitHub token...');
-                try {
-                    // Test authentication
-                    const userResponse = await fetch(`${config.getApiEndpoints().github.baseUrl}/user`, {
-                        headers: {
-                            'Authorization': `token ${currentToken}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    
-                    if (!userResponse.ok) {
-                        vscode.window.showErrorMessage('❌ Token is invalid or expired. Please reconfigure.');
-                        return;
-                    }
-                    
-                    const user = await userResponse.json();
-                    
-                    // Test repository access
-                    const repoResponse = await fetch(`${config.getApiEndpoints().github.baseUrl}/repos/${config.getApiEndpoints().github.repoOwner}/${config.getApiEndpoints().github.repoName}`, {
-                        headers: {
-                            'Authorization': `token ${currentToken}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    
-                    if (!repoResponse.ok) {
-                        vscode.window.showErrorMessage('❌ Token cannot access repository. Please check permissions.');
-                        return;
-                    }
-                    
-                    const repo = await repoResponse.json();
-                    const permissions = repo.permissions || {};
-                    
-                    if (permissions.push || permissions.admin) {
-                        vscode.window.showInformationMessage(`✅ Token is valid and can create issues!\nAuthenticated as: ${user.login}\nRepository access: ✅ Write permissions`);
-                    } else {
-                        vscode.window.showWarningMessage(`⚠️ Token is valid but has limited permissions.\nAuthenticated as: ${user.login}\nRepository access: ❌ Read-only\n\nTo create issues, please update your token with 'repo' scope.`);
-                    }
-                } catch (error) {
-                    vscode.window.showErrorMessage(`❌ Failed to test token: ${(error as Error).message}`);
-                }
-            }
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to configure GitHub token: ${(error as Error).message}`);
-        }
-    });
+    // GitHub token configuration command removed - not needed for Salesforce-only functionality
 
     // Analyze Folder Code & Apply Instructions
     const analyzeFolderCodeCommand = vscode.commands.registerCommand('specDrivenDevelopment.analyzeFolderCode', async (folderUri: vscode.Uri) => {
@@ -1598,7 +1494,6 @@ Token will be stored securely in VS Code settings.`;
         viewFeedbackHistoryCommand,
         exportFeedbackHistoryCommand,
         clearFeedbackHistoryCommand,
-        configureGitHubTokenCommand,
         analyzeFolderCodeCommand,
         analyzeWorkspaceCodeCommand,
         applyFolderPromptsCommand,
