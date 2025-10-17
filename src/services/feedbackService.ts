@@ -53,11 +53,124 @@ export class FeedbackService {
     private jiraService: JiraService;
     private awsService: AWSService;
 
+    // Static properties for concurrent request protection
+    private static tokenRequestMutex = new Map<string, Promise<string>>();
+
     constructor(context: vscode.ExtensionContext, awsService: AWSService) {
         this.context = context;
         this.notificationManager = NotificationManager.getInstance(context);
         this.awsService = awsService;
         this.jiraService = new JiraService(context, awsService);
+    }
+
+    /**
+     * Enhanced token retrieval with retry and concurrent request protection
+     */
+    private async getAccessTokenWithRetryAndProtection(): Promise<string> {
+        const requestKey = 'salesforce_token_feedback';
+        
+        // Concurrent request protection - reuse existing promise if another request is in progress
+        if (FeedbackService.tokenRequestMutex.has(requestKey)) {
+            console.log('Token request already in progress for FeedbackService, waiting for existing request...');
+            return await FeedbackService.tokenRequestMutex.get(requestKey)!;
+        }
+
+        const tokenPromise = this.executeTokenRequest();
+        FeedbackService.tokenRequestMutex.set(requestKey, tokenPromise);
+
+        try {
+            return await tokenPromise;
+        } finally {
+            // Always clean up the mutex
+            FeedbackService.tokenRequestMutex.delete(requestKey);
+        }
+    }
+
+    /**
+     * Execute token request with network retry and 401 handling
+     */
+    private async executeTokenRequest(): Promise<string> {
+        const maxRetries = 3;
+        const baseDelay = 1000; // 1 second
+        const maxDelay = 10000; // 10 seconds
+        
+        let lastError: Error | undefined;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // Use existing JiraService authentication
+                return await (this.jiraService as any).authenticateWithSalesforce();
+                
+            } catch (error) {
+                lastError = error as Error;
+                const is401Error = lastError.message.includes('401') || 
+                                 lastError.message.includes('Authentication failed') ||
+                                 lastError.message.includes('Unauthorized') ||
+                                 lastError.message.includes('invalid_grant');
+                
+                const isNetworkError = lastError.message.includes('fetch') ||
+                                     lastError.message.includes('network') ||
+                                     lastError.message.includes('timeout') ||
+                                     lastError.message.includes('ECONNRESET') ||
+                                     lastError.message.includes('ENOTFOUND');
+
+                console.log(`Token request attempt ${attempt + 1} failed (FeedbackService):`, {
+                    error: lastError.message,
+                    is401Error,
+                    isNetworkError,
+                    willRetry: attempt < maxRetries - 1
+                });
+
+                // Handle 401 errors - clear cache and retry once
+                if (is401Error && attempt === 0) {
+                    console.log('401 detected in FeedbackService, clearing token cache and retrying...');
+                    
+                    // Clear the cached token in JiraService
+                    (this.jiraService as any).cachedAuthToken = undefined;
+                    (this.jiraService as any).tokenExpiry = undefined;
+                    
+                    // Immediate retry for 401 (don't wait)
+                    continue;
+                }
+                
+                // Handle network errors with exponential backoff
+                if (isNetworkError && attempt < maxRetries - 1) {
+                    const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+                    const jitter = Math.random() * 0.1 * delay; // 10% jitter
+                    const finalDelay = delay + jitter;
+                    
+                    console.log(`Network error detected in FeedbackService, retrying after ${Math.round(finalDelay)}ms...`);
+                    await this.sleep(finalDelay);
+                    continue;
+                }
+
+                // For non-retryable errors, break immediately
+                if (!isNetworkError && !is401Error) {
+                    break;
+                }
+
+                // Final network retry
+                if (attempt < maxRetries - 1 && isNetworkError) {
+                    const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+                    await this.sleep(delay);
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        // All retries exhausted
+        const errorMessage = `Failed to obtain Salesforce token after ${maxRetries} attempts: ${lastError?.message}`;
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+    }
+
+    /**
+     * Sleep utility for retry delays
+     */
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /**
@@ -77,7 +190,7 @@ export class FeedbackService {
                 throw new Error('Salesforce credentials not available. Please ensure AWS is connected and credentials are configured.');
             }
 
-            const accessToken = await (this.jiraService as any).authenticateWithSalesforce();
+            const accessToken = await this.getAccessTokenWithRetryAndProtection();
             // Use the same hardcoded URL as JiraService for now
             const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             
@@ -162,7 +275,7 @@ export class FeedbackService {
                 throw new Error('Salesforce credentials not available. Please ensure AWS is connected and credentials are configured.');
             }
 
-            const accessToken = await (this.jiraService as any).authenticateWithSalesforce();
+            const accessToken = await this.getAccessTokenWithRetryAndProtection();
             // Use the same hardcoded URL as JiraService for now
             const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
             
@@ -255,7 +368,7 @@ export class FeedbackService {
     private async submitToSalesforce(feedbackData: FeedbackData): Promise<FeedbackSubmissionResult> {
         try {
             // Get Salesforce access token
-            const accessToken = await (this.jiraService as any).authenticateWithSalesforce();
+            const accessToken = await this.getAccessTokenWithRetryAndProtection();
             // Use the same hardcoded URL as JiraService for now
             const baseUrl = 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com';
 

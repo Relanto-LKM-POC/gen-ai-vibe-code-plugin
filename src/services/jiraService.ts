@@ -139,10 +139,11 @@ export class JiraService {
 
             const authData = await response.json() as SalesforceAuthResponse;
             
-            // Cache the token for 1 hour (Salesforce tokens typically last 2 hours)
+            // Cache the token for 30 minutes (conservative based on observed 30-minute expiry)
             this.cachedAuthToken = authData.access_token;
-            this.tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+            this.tokenExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
 
+            console.log('Salesforce authentication successful, token cached for 30 minutes');
             return authData.access_token;
 
         } catch (error) {
