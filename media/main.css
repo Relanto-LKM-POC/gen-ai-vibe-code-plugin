@@ -82,12 +82,15 @@
     margin-bottom: 20px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--vscode-panel-border);
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .section-header h3 {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
+    flex-shrink: 0;
 }
 
 .import-taskmaster-btn {
@@ -103,6 +106,7 @@
     gap: 6px;
     transition: all 0.2s ease;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .import-taskmaster-btn:hover {
@@ -135,10 +139,12 @@
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .task-dropdown {
     flex: 1;
+    min-width: 150px;
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
@@ -146,6 +152,8 @@
     padding: 6px 8px;
     font-size: 12px;
     min-height: 28px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .task-dropdown:focus {
@@ -164,6 +172,8 @@
     white-space: nowrap;
     transition: all 0.2s ease;
     font-weight: 500;
+    flex-shrink: 0;
+    min-width: fit-content;
 }
 
 .import-selected-btn:hover:not(:disabled) {
@@ -1246,6 +1256,32 @@
 }
 
 /* Responsive adjustments */
+@media (max-width: 400px) {
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .import-taskmaster-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .task-selection-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .task-dropdown {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .import-selected-btn {
+        width: 100%;
+    }
+}
+
 @media (max-width: 300px) {
     .task-header {
         flex-direction: column;

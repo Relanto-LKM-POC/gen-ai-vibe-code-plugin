@@ -417,7 +417,45 @@
         }
     }
 
-
+    function clearFeedbackForm() {
+        // Clear all form fields
+        document.getElementById('feedback-name').value = '';
+        document.getElementById('feedback-type').value = '';
+        document.getElementById('estimated-hours').value = '';
+        document.getElementById('initiative').value = '';
+        document.getElementById('epic').value = '';
+        document.getElementById('feedback-description').value = '';
+        document.getElementById('acceptance-criteria').value = '';
+        
+        // Hide acceptance criteria group if visible
+        const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
+        if (acceptanceCriteriaGroup) {
+            acceptanceCriteriaGroup.style.display = 'none';
+        }
+        
+        // Hide feedback result message
+        const feedbackResult = document.getElementById('feedback-result');
+        if (feedbackResult) {
+            feedbackResult.style.display = 'none';
+            feedbackResult.innerHTML = '';
+        }
+        
+        // Clear task selection dropdown
+        const taskDropdown = document.getElementById('task-dropdown');
+        if (taskDropdown) {
+            taskDropdown.innerHTML = '<option value="">Choose a task...</option>';
+            taskDropdown.value = '';
+        }
+        
+        // Hide task selection section
+        const taskSelectionSection = document.getElementById('task-selection-section');
+        if (taskSelectionSection) {
+            taskSelectionSection.style.display = 'none';
+        }
+        
+        // Clear current imported task
+        currentState.currentImportedTask = null;
+    }
 
     function setupNotificationEventListeners() {
         // Notification elements removed - no event listeners needed
@@ -800,7 +838,13 @@
 
     // Feedback Results
     function showFeedbackResult(result) {
+        console.log('showFeedbackResult called with:', result);
         const feedbackResult = document.getElementById('feedback-result');
+        
+        if (!feedbackResult) {
+            console.error('Feedback result element not found!');
+            return;
+        }
         
         if (result.success) {
             // Extract Jira ticket ID from Jira URL if available
@@ -851,12 +895,26 @@
                         <span class="result-label">Error:</span>
                         <span class="result-value error-text">${result.error}</span>
                     </div>` : ''}
+                    ${result.existingTicketId ? `
+                    <div class="result-item">
+                        <span class="result-label">Existing Ticket:</span>
+                        <span class="result-value">${result.existingTicketId}</span>
+                    </div>` : ''}
+                    ${result.existingJiraUrl ? `
+                    <div class="result-item">
+                        <span class="result-label">JIRA Link:</span>
+                        <span class="result-value"><a href="${result.existingJiraUrl}" target="_blank">View in JIRA</a></span>
+                    </div>` : ''}
                 </div>
             `;
         }
         
         feedbackResult.style.display = 'block';
-        // Remove the timeout - let the message stay persistent like JIRA updates
+        
+        // Scroll the feedback result into view so user can see it
+        feedbackResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Message stays persistent - user can see it until they clear the form or take action
     }
 
     function showImportResult(result) {
@@ -1503,15 +1561,14 @@
                 break;
             case 'feedbackResult':
                 showFeedbackResult(message.data);
-                // Clear current imported task on successful submission
+                // Clear form and reset state ONLY on successful submission
                 if (message.data.success) {
-                    currentState.currentImportedTask = null;
-                    // Also hide task selection section if visible
-                    const taskSelectionSection = document.getElementById('task-selection-section');
-                    if (taskSelectionSection) {
-                        taskSelectionSection.style.display = 'none';
-                    }
+                    // Add delay to allow user to see the success message and click JIRA link
+                    setTimeout(() => {
+                        clearFeedbackForm();
+                    }, 8000); // 8 second delay to show success message
                 }
+                // On failure, keep the form data so user can fix and resubmit
                 break;
             case 'initiativesLoaded':
                 populateInitiativesDropdown(message.data);
@@ -1586,11 +1643,13 @@ Do you want to submit it again?`);
             // User confirmed, proceed with submission
             submitFeedbackData(result.feedbackData);
         } else {
-            // User cancelled, show cancelled message
+            // User cancelled, show cancelled message with existing ticket info
             showFeedbackResult({
                 success: false,
-                message: 'Submission cancelled by user',
-                error: 'Duplicate submission cancelled'
+                message: 'Submission cancelled',
+                error: 'Duplicate submission cancelled',
+                existingTicketId: displayTicketId,
+                existingJiraUrl: result.previousSubmission.jiraUrl
             });
         }
     }
