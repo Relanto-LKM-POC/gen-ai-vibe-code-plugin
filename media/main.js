@@ -1988,8 +1988,8 @@ Do you want to submit it again?`);
             typeField.dispatchEvent(new Event('change'));
         }
         
-        // Handle acceptance criteria for story type
-        if (acceptanceCriteriaField && taskData.type === 'story' && taskData.acceptanceCriteria) {
+        // Handle acceptance criteria for story type (case-insensitive check)
+        if (acceptanceCriteriaField && taskData.type && taskData.type.toLowerCase() === 'story' && taskData.acceptanceCriteria) {
             acceptanceCriteriaField.value = taskData.acceptanceCriteria;
         }
     }

@@ -38,6 +38,7 @@ export interface SalesforceTicketMatch {
     Name: string;
     Epic__c: string;
     Jira_Link__c: string;
+    Status__c?: string;
 }
 
 export interface SalesforceQueryResponse {
@@ -157,7 +158,7 @@ export class JiraService {
      */
     private async matchEpicTicket(accessToken: string, devsecopsId: string): Promise<SalesforceTicketMatch> {
         try {
-            const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${devsecopsId}%25%27`;
+            const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c%2CStatus__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${devsecopsId}%25%27`;
             const queryUrl = getSalesforceApiUrl(`${CONFIG.api.endpoints.query}/?q=${query}`);
 
             const response = await fetch(queryUrl, {
@@ -225,7 +226,7 @@ export class JiraService {
         }
     }
 
-    public async validateJiraIssue(jiraId: string): Promise<{isValid: boolean; error?: string}> {
+    public async validateJiraIssue(jiraId: string): Promise<{isValid: boolean; error?: string; status?: string}> {
         try {
             // Basic format validation for DEVSECOPS tickets
             if (!jiraId.match(/^DEVSECOPS-\d+$/)) {
@@ -241,7 +242,8 @@ export class JiraService {
                 const ticketMatch = await this.matchEpicTicket(accessToken, jiraId);
                 
                 return {
-                    isValid: true
+                    isValid: true,
+                    status: ticketMatch.Status__c || 'Unknown'
                 };
             } catch (error) {
                 return {

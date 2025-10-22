@@ -243,8 +243,6 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
         }
     }
 
-
-
     private handleGetEstimationData() {
         // Get cached estimation data
         const estimationData = this._context.globalState.get('specDrivenDevelopment.estimationData');

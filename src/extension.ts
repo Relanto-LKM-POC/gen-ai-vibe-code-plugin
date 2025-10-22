@@ -858,6 +858,79 @@ function registerCommands(context: vscode.ExtensionContext) {
             // Check if current task was already submitted
             const existingSubmission = submittedTasks.find(task => task.taskId === data.taskId);
             
+            // If there's a previous submission, verify the JIRA ticket still exists
+            if (existingSubmission && existingSubmission.jiraUrl) {
+                try {
+                    // Extract JIRA ticket ID from URL
+                    const jiraTicketMatch = existingSubmission.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+                    if (jiraTicketMatch) {
+                        const jiraTicketId = jiraTicketMatch[1];
+                        console.log(`Verifying if JIRA ticket ${jiraTicketId} still exists...`);
+                        
+                        // Verify ticket exists in JIRA
+                        const validationResult = await jiraService.validateJiraIssue(jiraTicketId);
+                        
+                        if (!validationResult.isValid) {
+                            // Ticket no longer exists, remove from cache and allow resubmission
+                            console.log(`JIRA ticket ${jiraTicketId} no longer exists. Removing from cache and allowing resubmission.`);
+                            const updatedTasks = submittedTasks.filter(task => task.taskId !== data.taskId);
+                            await context.globalState.update('specDrivenDevelopment.submittedTaskMasterTasks', updatedTasks);
+                            
+                            // Allow submission to proceed
+                            const result = {
+                                isDuplicate: false,
+                                feedbackData: data.feedbackData,
+                                previousSubmission: null
+                            };
+                            
+                            if (specDrivenDevelopmentPanel) {
+                                specDrivenDevelopmentPanel.sendDuplicateCheckResult(result);
+                            }
+                            return;
+                        }
+                        
+                        // Check if ticket status is DONE
+                        if (validationResult.status && validationResult.status.toUpperCase() === 'DONE') {
+                            // Ticket is marked as DONE, remove from cache and allow resubmission
+                            console.log(`JIRA ticket ${jiraTicketId} is marked as DONE. Removing from cache and allowing resubmission.`);
+                            const updatedTasks = submittedTasks.filter(task => task.taskId !== data.taskId);
+                            await context.globalState.update('specDrivenDevelopment.submittedTaskMasterTasks', updatedTasks);
+                            
+                            // Allow submission to proceed
+                            const result = {
+                                isDuplicate: false,
+                                feedbackData: data.feedbackData,
+                                previousSubmission: null
+                            };
+                            
+                            if (specDrivenDevelopmentPanel) {
+                                specDrivenDevelopmentPanel.sendDuplicateCheckResult(result);
+                            }
+                            return;
+                        }
+                        
+                        console.log(`JIRA ticket ${jiraTicketId} still exists with status: ${validationResult.status || 'Unknown'}. Showing duplicate warning.`);
+                    }
+                } catch (validationError) {
+                    console.error('Error validating JIRA ticket existence:', validationError);
+                    // If validation fails, assume ticket might not exist and remove from cache
+                    const updatedTasks = submittedTasks.filter(task => task.taskId !== data.taskId);
+                    await context.globalState.update('specDrivenDevelopment.submittedTaskMasterTasks', updatedTasks);
+                    
+                    // Allow submission to proceed
+                    const result = {
+                        isDuplicate: false,
+                        feedbackData: data.feedbackData,
+                        previousSubmission: null
+                    };
+                    
+                    if (specDrivenDevelopmentPanel) {
+                        specDrivenDevelopmentPanel.sendDuplicateCheckResult(result);
+                    }
+                    return;
+                }
+            }
+            
             const result = {
                 isDuplicate: !!existingSubmission,
                 feedbackData: data.feedbackData,
