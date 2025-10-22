@@ -508,7 +508,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                         Tickets List
                                     </button>
                                     <button class="secondary-button" id="archived-tasks-btn">
-                                        Archived Tickets
+                                        Done Tickets
                                     </button>
                                 </div>
                                 

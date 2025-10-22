@@ -1366,29 +1366,29 @@ function registerCommands(context: vscode.ExtensionContext) {
 
     const retrieveArchivedTasksCommand = vscode.commands.registerCommand('specDrivenDevelopment.retrieveArchivedTasks', async (options: any = {}) => {
         try {
-            console.log('Retrieve archived tickets command triggered with options:', options);
+            console.log('Retrieve done tickets command triggered with options:', options);
             
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Retrieving archived tickets...',
+                title: 'Retrieving done tickets...',
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 20, message: 'Checking AWS connection...' });
                 console.log('Checking AWS connection status...');
                 
-                progress.report({ increment: 30, message: 'Fetching archived tickets from Salesforce...' });
+                progress.report({ increment: 30, message: 'Fetching done tickets from Salesforce...' });
                 console.log('Calling taskService.retrieveArchivedTasks()...');
                 
                 const result = await taskService.retrieveArchivedTasks(options);
-                console.log(`Retrieved ${result.tasks.length} archived tickets (${result.totalCount} total):`, result);
+                console.log(`Retrieved ${result.tasks.length} done tickets (${result.totalCount} total):`, result);
                 
                 const foundStartRecord = (options.offset || 0) + 1;
                 const foundEndRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const foundRangeText = result.totalCount > 0 ? `${foundStartRecord}-${foundEndRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                progress.report({ increment: 50, message: `Found ${foundRangeText} archived tickets` });
+                progress.report({ increment: 50, message: `Found ${foundRangeText} done tickets` });
                 
                 if (specDrivenDevelopmentPanel) {
-                    console.log('Sending archived ticket list to webview...');
+                    console.log('Sending done ticket list to webview...');
                     specDrivenDevelopmentPanel.sendTaskList(result.tasks, 'archived', {
                         totalCount: result.totalCount,
                         hasMore: result.hasMore,
@@ -1404,11 +1404,11 @@ function registerCommands(context: vscode.ExtensionContext) {
                 const startRecord = (options.offset || 0) + 1;
                 const endRecord = Math.min((options.offset || 0) + result.tasks.length, result.totalCount);
                 const rangeText = result.totalCount > 0 ? `${startRecord}-${endRecord} of ${result.totalCount}` : result.tasks.length.toString();
-                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} archived tickets${searchText}`);
+                vscode.window.showInformationMessage(`✅ Retrieved ${rangeText} done tickets${searchText}`);
             });
         } catch (error) {
             console.error('Error in retrieveArchivedTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve archived tickets: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to retrieve done tickets: ${(error as Error).message}`);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'archived', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }

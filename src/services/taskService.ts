@@ -326,7 +326,7 @@ export class TaskService {
     }
 
     /**
-     * Retrieve Archived tickets (locally cleaned up) with pagination and search
+     * Retrieve Done tickets (locally cleaned up) with pagination and search
      */
     async retrieveArchivedTasks(options: { limit?: number; offset?: number; searchTerm?: string } = {}): Promise<{ tasks: Task[]; totalCount: number; hasMore: boolean }> {
         try {
@@ -391,7 +391,7 @@ export class TaskService {
                 hasMore: (offset + limit) < totalCount
             };
         } catch (error) {
-            console.error('Error retrieving archived tickets:', error);
+            console.error('Error retrieving done tickets:', error);
             throw error;
         }
     }
@@ -529,7 +529,7 @@ export class TaskService {
     }
 
     /**
-     * Cleanup (Delete) a task - stores locally as archived without modifying Salesforce
+     * Cleanup (Delete) a task - stores locally as done without modifying Salesforce
      */
     async cleanupTask(taskId: string): Promise<any> {
         try {
@@ -550,7 +550,7 @@ export class TaskService {
     }
 
     /**
-     * Restore a task from archived back to active status
+     * Restore a task from done back to active status
      */
     async restoreTask(taskId: string): Promise<any> {
         try {

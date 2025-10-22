@@ -143,7 +143,7 @@
         });
 
         archivedTasksBtn?.addEventListener('click', () => {
-            console.log('Archived tasks button clicked');
+            console.log('Done tasks button clicked');
             setActiveTaskTab('archived');
             showSearchContainer();
             loadArchivedTasks();
@@ -1061,7 +1061,7 @@
             if (taskListTitle) taskListTitle.textContent = 'WIP Tickets';
         } else if (tabType === 'archived') {
             archivedTasksBtn?.classList.add('active');
-            if (taskListTitle) taskListTitle.textContent = 'Archived Tickets';
+            if (taskListTitle) taskListTitle.textContent = 'Done Tickets';
         } else {
             runningTasksBtn?.classList.add('active');
             if (taskListTitle) taskListTitle.textContent = 'Tickets List';
@@ -1298,7 +1298,7 @@
         // Show different action buttons based on task type
         let actionButtonsHTML = '';
         if (taskType === 'wip') {
-            // WIP tasks: Edit, Delete, Archive buttons
+            // WIP tasks: Edit, Delete, Done buttons
             actionButtonsHTML = `
                 <div class="task-actions">
                     <button class="task-action-btn edit" data-action="edit" data-task-id="${task.Id}" data-task-data='${JSON.stringify(task).replace(/'/g, "&apos;")}'>
@@ -1308,11 +1308,11 @@
                         Delete
                     </button>
                     <button class="task-action-btn cleanup" data-action="cleanup" data-task-id="${task.Id}" data-task-name="${task.Name}">
-                        Archive
+                        Done
                     </button>
                 </div>`;
         } else if (taskType === 'archived') {
-            // Archived tasks: View and Restore buttons
+            // Done tasks: View and Restore buttons
             actionButtonsHTML = `
                 <div class="task-actions">
                     <button class="task-action-btn view" data-action="view" data-task-id="${task.Id}" data-task-data='${JSON.stringify(task).replace(/'/g, "&apos;")}'>
@@ -1514,7 +1514,7 @@
                     const taskEmptyState = document.getElementById('task-empty-state');
                     const taskList = document.getElementById('task-list');
                     if (taskEmptyState) {
-                        taskEmptyState.innerHTML = '<p>No archived tickets remaining.</p>';
+                        taskEmptyState.innerHTML = '<p>No done tickets remaining.</p>';
                         taskEmptyState.style.display = 'block';
                     }
                     if (taskList) taskList.style.display = 'none';
