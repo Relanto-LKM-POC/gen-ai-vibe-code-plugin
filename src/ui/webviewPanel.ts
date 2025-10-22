@@ -97,6 +97,14 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('specDrivenDevelopment.saveTaskUpdates', message.data);
                         break;
                     
+                    case 'importTaskMaster':
+                        vscode.commands.executeCommand('specDrivenDevelopment.importTaskMaster');
+                        break;
+                    
+                    case 'checkDuplicateTaskMaster':
+                        vscode.commands.executeCommand('specDrivenDevelopment.checkDuplicateTaskMaster', message.data);
+                        break;
+                    
                     case 'searchTasks':
                         if (message.data.taskType === 'wip') {
                             vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks', message.data);
@@ -213,6 +221,24 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'showTaskEditForm',
                 data: taskData
+            });
+        }
+    }
+
+    public sendTaskMasterData(taskData: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'populateFromTaskMaster',
+                data: taskData
+            });
+        }
+    }
+
+    public sendDuplicateCheckResult(result: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'duplicateTaskMasterCheck',
+                data: result
             });
         }
     }
@@ -380,7 +406,27 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         <!-- Manage Features Tab -->
                         <div class="tab-content" id="feedback">
                             <div class="section">
-                                <h3>Create Feature</h3>
+                                <div class="section-header">
+                                    <h3>Create Feature</h3>
+                                    <button class="import-taskmaster-btn" id="import-taskmaster-btn">
+                                        📥 Import from TaskMaster
+                                    </button>
+                                </div>
+
+                                <!-- Task Selection (Hidden by default) -->
+                                <div class="task-selection-section" id="task-selection-section" style="display: none;">
+                                    <div class="task-selection-content">
+                                        <label for="task-dropdown">Select TaskMaster Task:</label>
+                                        <div class="task-selection-row">
+                                            <select id="task-dropdown" class="task-dropdown">
+                                                <option value="">Choose a task...</option>
+                                            </select>
+                                            <button class="import-selected-btn" id="import-selected-btn" disabled>
+                                                Import Selected
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <div class="input-group">
                                     <label for="feedback-name">Name: <span class="required">*</span></label>

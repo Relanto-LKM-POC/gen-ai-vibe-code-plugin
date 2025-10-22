@@ -11,6 +11,7 @@ import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
 import { FeedbackService } from './services/feedbackService';
 import { TaskService } from './services/taskService';
+import { TaskMasterService } from './services/taskMasterService';
 // GitHub configuration removed - only using Salesforce config now
 import { NotificationManager } from './services/notificationManager';
 
@@ -768,6 +769,31 @@ function registerCommands(context: vscode.ExtensionContext) {
         try {
             const result = await feedbackService.submitFeedback(data);
             
+            // If submission was successful and data contains TaskMaster task info, store it
+            if (result.success && data.taskMasterTask) {
+                try {
+                    const submittedTasks = context.globalState.get<any[]>('specDrivenDevelopment.submittedTaskMasterTasks', []);
+                    
+                    const newSubmission = {
+                        taskId: data.taskMasterTask.id,
+                        taskTitle: data.taskMasterTask.title,
+                        submittedAt: new Date().toISOString(),
+                        ticketId: result.ticketId,
+                        jiraUrl: result.jiraUrl, // Store Jira URL for duplicate checking
+                        epicId: data.epicId
+                    };
+                    
+                    // Add to submitted tasks list
+                    submittedTasks.push(newSubmission);
+                    await context.globalState.update('specDrivenDevelopment.submittedTaskMasterTasks', submittedTasks);
+                    
+                    console.log(`TaskMaster task ${data.taskMasterTask.id} marked as submitted: ${result.ticketId}`);
+                } catch (storageError) {
+                    console.error('Failed to store TaskMaster submission info:', storageError);
+                    // Don't fail the whole submission for storage errors
+                }
+            }
+            
             // Send result back to webview
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendFeedbackResult(result);
@@ -775,7 +801,15 @@ function registerCommands(context: vscode.ExtensionContext) {
 
             // Also show VS Code notification
             if (result.success) {
-                vscode.window.showInformationMessage(`✅ Feature submitted successfully! Ticket: ${result.ticketId}`);
+                // Extract Jira ticket ID from URL if available
+                let displayTicketId = result.ticketId || 'Unknown';
+                if (result.jiraUrl) {
+                    const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+                    if (jiraTicketMatch) {
+                        displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+                    }
+                }
+                vscode.window.showInformationMessage(`✅ Feature submitted successfully! Ticket: ${displayTicketId}`);
             } else {
                 vscode.window.showErrorMessage(`❌ Failed to submit feature: ${result.error}`);
             }
@@ -793,6 +827,59 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
             
             vscode.window.showErrorMessage(errorMessage);
+        }
+    });
+
+    const importTaskMasterCommand = vscode.commands.registerCommand('specDrivenDevelopment.importTaskMaster', async () => {
+        try {
+            const taskDataArray = await TaskMasterService.loadTaskFromWorkspace();
+            
+            // Send data to webview
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskMasterData(taskDataArray);
+            }
+
+            if (taskDataArray.length === 1) {
+                vscode.window.showInformationMessage('TaskMaster task imported successfully!');
+            } else {
+                vscode.window.showInformationMessage(`Found ${taskDataArray.length} tasks. Please select one to import.`);
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            vscode.window.showErrorMessage(`Failed to import TaskMaster data: ${errorMessage}`);
+        }
+    });
+
+    const checkDuplicateTaskMasterCommand = vscode.commands.registerCommand('specDrivenDevelopment.checkDuplicateTaskMaster', async (data: any) => {
+        try {
+            // Get stored submitted tasks from global state
+            const submittedTasks = context.globalState.get<any[]>('specDrivenDevelopment.submittedTaskMasterTasks', []);
+            
+            // Check if current task was already submitted
+            const existingSubmission = submittedTasks.find(task => task.taskId === data.taskId);
+            
+            const result = {
+                isDuplicate: !!existingSubmission,
+                feedbackData: data.feedbackData,
+                previousSubmission: existingSubmission || null
+            };
+
+            // Send result back to webview
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendDuplicateCheckResult(result);
+            }
+        } catch (error) {
+            console.error('Error checking duplicate TaskMaster submission:', error);
+            // On error, allow submission to proceed
+            const result = {
+                isDuplicate: false,
+                feedbackData: data.feedbackData,
+                previousSubmission: null
+            };
+            
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendDuplicateCheckResult(result);
+            }
         }
     });
 
@@ -1491,6 +1578,8 @@ function registerCommands(context: vscode.ExtensionContext) {
         loadInitiativesCommand,
         loadEpicsCommand,
         submitFeedbackCommand,
+        importTaskMasterCommand,
+        checkDuplicateTaskMasterCommand,
         viewFeedbackHistoryCommand,
         exportFeedbackHistoryCommand,
         clearFeedbackHistoryCommand,

@@ -74,6 +74,109 @@
     display: block;
 }
 
+/* Tab Header Styles for Import Button */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.import-taskmaster-btn {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border);
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.import-taskmaster-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.import-taskmaster-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Task Selection Section */
+.task-selection-section {
+    background-color: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.task-selection-content label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--vscode-foreground);
+}
+
+.task-selection-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.task-dropdown {
+    flex: 1;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+.task-dropdown:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+.import-selected-btn {
+    background-color: var(--cisco-blue);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.import-selected-btn:hover:not(:disabled) {
+    background-color: var(--cisco-blue-hover);
+}
+
+.import-selected-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
 /* Status Styles */
 .status-section {
     margin-bottom: 20px;

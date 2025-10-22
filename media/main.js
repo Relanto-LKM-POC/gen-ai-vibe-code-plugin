@@ -13,7 +13,9 @@
         pagination: null, // Store pagination state
         currentTaskList: [], // Store current task list
         editingTask: null, // Store currently editing task data
-        currentTaskType: null // Track which task list is currently displayed (wip, running, archived)
+        currentTaskType: null, // Track which task list is currently displayed (wip, running, archived)
+        availableTasks: [], // Store available TaskMaster tasks
+        currentImportedTask: null // Store currently imported TaskMaster task for duplicate checking
     };
 
     // Unit conversion function
@@ -231,6 +233,9 @@
     function setupFeedbackEventListeners() {
         const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
         const loadDataBtn = document.getElementById('load-data-btn');
+        const importTaskMasterBtn = document.getElementById('import-taskmaster-btn');
+        const importSelectedBtn = document.getElementById('import-selected-btn');
+        const taskDropdown = document.getElementById('task-dropdown');
         const feedbackTypeSelect = document.getElementById('feedback-type');
         const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
 
@@ -295,15 +300,80 @@
                 return;
             }
 
-            vscode.postMessage({ 
-                command: 'submitFeedback', 
-                data: feedbackData 
-            });
+            // Check for duplicate TaskMaster task submission
+            if (currentState.currentImportedTask) {
+                checkForDuplicateSubmission(feedbackData);
+            } else {
+                // No TaskMaster task imported, proceed with submission
+                submitFeedbackData(feedbackData);
+            }
         });
 
         // Handle refresh dropdowns
         loadDataBtn.addEventListener('click', () => {
             loadFeedbackDropdowns();
+        });
+
+        // Handle import from TaskMaster
+        if (importTaskMasterBtn) {
+            importTaskMasterBtn.addEventListener('click', () => {
+                // Disable button during import
+                importTaskMasterBtn.disabled = true;
+                importTaskMasterBtn.textContent = '📥 Loading Tasks...';
+                
+                vscode.postMessage({ command: 'importTaskMaster' });
+            });
+        }
+
+        // Handle task dropdown selection
+        if (taskDropdown) {
+            taskDropdown.addEventListener('change', () => {
+                if (importSelectedBtn) {
+                    importSelectedBtn.disabled = !taskDropdown.value;
+                }
+            });
+        }
+
+        // Handle import selected task
+        if (importSelectedBtn) {
+            importSelectedBtn.addEventListener('click', () => {
+                const selectedIndex = parseInt(taskDropdown.value);
+                if (!isNaN(selectedIndex) && currentState.availableTasks && currentState.availableTasks[selectedIndex]) {
+                    const selectedTask = currentState.availableTasks[selectedIndex];
+                    populateSingleTask(selectedTask);
+                    console.log(`TaskMaster task "${selectedTask.title}" imported successfully`);
+                }
+            });
+        }
+    }
+
+    // Function to check for duplicate TaskMaster task submission
+    function checkForDuplicateSubmission(feedbackData) {
+        // Ask for submitted tasks from extension
+        vscode.postMessage({ 
+            command: 'checkDuplicateTaskMaster',
+            data: {
+                taskId: currentState.currentImportedTask.id,
+                taskTitle: currentState.currentImportedTask.title,
+                feedbackData: feedbackData
+            }
+        });
+    }
+
+    // Function to actually submit feedback data
+    function submitFeedbackData(feedbackData) {
+        // Include TaskMaster task info if available
+        const submissionData = {
+            ...feedbackData,
+            taskMasterTask: currentState.currentImportedTask ? {
+                id: currentState.currentImportedTask.id,
+                title: currentState.currentImportedTask.title
+            } : null
+        };
+
+        vscode.postMessage({ 
+            command: 'submitFeedback', 
+            data: submissionData 
         });
     }
 
@@ -733,6 +803,15 @@
         const feedbackResult = document.getElementById('feedback-result');
         
         if (result.success) {
+            // Extract Jira ticket ID from Jira URL if available
+            let displayTicketId = result.ticketId || 'N/A';
+            if (result.jiraUrl) {
+                const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+                if (jiraTicketMatch) {
+                    displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+                }
+            }
+            
             feedbackResult.className = 'feedback-result success';
             feedbackResult.innerHTML = `
                 <div class="result-header">
@@ -742,7 +821,7 @@
                 <div class="result-details">
                     <div class="result-item">
                         <span class="result-label">Ticket ID:</span>
-                        <span class="result-value">${result.ticketId || 'N/A'}</span>
+                        <span class="result-value">${displayTicketId}</span>
                     </div>
                     <div class="result-item">
                         <span class="result-label">Status:</span>
@@ -778,6 +857,59 @@
         
         feedbackResult.style.display = 'block';
         // Remove the timeout - let the message stay persistent like JIRA updates
+    }
+
+    function showImportResult(result) {
+        const feedbackResult = document.getElementById('feedback-result');
+        
+        if (result.success) {
+            feedbackResult.className = 'feedback-result success';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">📥</span>
+                    <span class="result-title">TaskMaster Data Imported Successfully</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Task Name:</span>
+                        <span class="result-value">${result.taskData?.name || 'N/A'}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Type:</span>
+                        <span class="result-value">${result.taskData?.type || 'N/A'}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Estimation:</span>
+                        <span class="result-value">${result.taskData?.estimation || 'N/A'} hours</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Next Steps:</span>
+                        <span class="result-value">Please select Initiative and Epic before submitting</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            feedbackResult.className = 'feedback-result error';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">❌</span>
+                    <span class="result-title">Failed to Import TaskMaster Data</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Message:</span>
+                        <span class="result-value">${result.message}</span>
+                    </div>
+                    ${result.error ? `
+                    <div class="result-item">
+                        <span class="result-label">Error:</span>
+                        <span class="result-value error-text">${result.error}</span>
+                    </div>` : ''}
+                </div>
+            `;
+        }
+        
+        feedbackResult.style.display = 'block';
     }
 
 
@@ -1371,6 +1503,15 @@
                 break;
             case 'feedbackResult':
                 showFeedbackResult(message.data);
+                // Clear current imported task on successful submission
+                if (message.data.success) {
+                    currentState.currentImportedTask = null;
+                    // Also hide task selection section if visible
+                    const taskSelectionSection = document.getElementById('task-selection-section');
+                    if (taskSelectionSection) {
+                        taskSelectionSection.style.display = 'none';
+                    }
+                }
                 break;
             case 'initiativesLoaded':
                 populateInitiativesDropdown(message.data);
@@ -1400,8 +1541,59 @@
                 console.log('Task restored notification received:', message.data);
                 handleTaskRestored(message.data.taskId);
                 break;
+            case 'populateFromTaskMaster':
+                console.log('TaskMaster data received:', message.data);
+                populateFromTaskMaster(message.data);
+                break;
+            case 'duplicateTaskMasterCheck':
+                console.log('Duplicate check result:', message.data);
+                handleDuplicateCheckResult(message.data);
+                break;
         }
     });
+
+    // Handle duplicate check result and show confirmation dialog if needed
+    function handleDuplicateCheckResult(result) {
+        if (result.isDuplicate) {
+            showDuplicateSubmissionDialog(result);
+        } else {
+            // No duplicate, proceed with submission
+            submitFeedbackData(result.feedbackData);
+        }
+    }
+
+    // Show duplicate submission confirmation dialog
+    function showDuplicateSubmissionDialog(result) {
+        // Extract Jira ticket ID from the previous submission if available
+        let displayTicketId = result.previousSubmission.ticketId;
+        if (result.previousSubmission.jiraUrl) {
+            const jiraTicketMatch = result.previousSubmission.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+            if (jiraTicketMatch) {
+                displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+            }
+        }
+
+        const confirmed = confirm(`⚠️ Duplicate Submission Warning
+
+Task "${result.previousSubmission.taskTitle}" was already submitted:
+• Jira Ticket: ${displayTicketId}
+• Submitted: ${new Date(result.previousSubmission.submittedAt).toLocaleDateString()}
+• Epic: ${result.previousSubmission.epicId || 'N/A'}
+
+Do you want to submit it again?`);
+
+        if (confirmed) {
+            // User confirmed, proceed with submission
+            submitFeedbackData(result.feedbackData);
+        } else {
+            // User cancelled, show cancelled message
+            showFeedbackResult({
+                success: false,
+                message: 'Submission cancelled by user',
+                error: 'Duplicate submission cancelled'
+            });
+        }
+    }
 
     // Task Edit Modal Functions
     function setupTaskEditModal() {
@@ -1641,6 +1833,106 @@
         });
 
         hideTaskEditModal();
+    }
+
+    // Function to populate form from TaskMaster data
+    function populateFromTaskMaster(taskDataArray) {
+        try {
+            // Re-enable the import button first
+            const importBtn = document.getElementById('import-taskmaster-btn');
+            if (importBtn) {
+                importBtn.disabled = false;
+                importBtn.textContent = '📥 Import from TaskMaster';
+            }
+
+            // Store tasks in state
+            currentState.availableTasks = Array.isArray(taskDataArray) ? taskDataArray : [taskDataArray];
+            
+            const taskSelectionSection = document.getElementById('task-selection-section');
+            const taskDropdown = document.getElementById('task-dropdown');
+            
+            if (currentState.availableTasks.length === 1) {
+                // Single task - import directly and hide dropdown
+                if (taskSelectionSection) {
+                    taskSelectionSection.style.display = 'none';
+                }
+                populateSingleTask(currentState.availableTasks[0]);
+                console.log(`TaskMaster task "${currentState.availableTasks[0].title}" imported successfully`);
+            } else if (currentState.availableTasks.length > 1) {
+                // Multiple tasks - show dropdown
+                if (taskSelectionSection) {
+                    taskSelectionSection.style.display = 'block';
+                }
+                
+                // Populate dropdown
+                if (taskDropdown) {
+                    taskDropdown.innerHTML = '<option value="">Choose a task...</option>';
+                    currentState.availableTasks.forEach((task, index) => {
+                        const option = document.createElement('option');
+                        option.value = index.toString();
+                        option.textContent = `Task ${index + 1}: ${task.title}`;
+                        taskDropdown.appendChild(option);
+                    });
+                }
+                
+                console.log(`Found ${currentState.availableTasks.length} tasks. Please select one to import.`);
+            } else {
+                throw new Error('No valid tasks found in TaskMaster file');
+            }
+
+        } catch (error) {
+            console.error('Error populating form from TaskMaster:', error);
+            
+            // Re-enable button on error
+            const importBtn = document.getElementById('import-taskmaster-btn');
+            if (importBtn) {
+                importBtn.disabled = false;
+                importBtn.textContent = '📥 Import from TaskMaster';
+            }
+            
+            // Hide dropdown on error
+            const taskSelectionSection = document.getElementById('task-selection-section');
+            if (taskSelectionSection) {
+                taskSelectionSection.style.display = 'none';
+            }
+            
+            showImportResult({
+                success: false,
+                message: 'Failed to load TaskMaster data',
+                error: error.message
+            });
+        }
+    }
+
+    // Function to populate form with a single task
+    function populateSingleTask(taskData) {
+        // Store current imported task for duplicate checking
+        currentState.currentImportedTask = taskData;
+        
+        // Populate form fields
+        const nameField = document.getElementById('feedback-name');
+        const descriptionField = document.getElementById('feedback-description');
+        const estimatedHoursField = document.getElementById('estimated-hours');
+        const typeField = document.getElementById('feedback-type');
+        const acceptanceCriteriaField = document.getElementById('acceptance-criteria');
+        
+        if (nameField) nameField.value = taskData.title || '';
+        if (descriptionField) descriptionField.value = taskData.description || '';
+        if (estimatedHoursField) estimatedHoursField.value = taskData.estimation || '';
+        
+        // Handle type field - capitalize first letter to match dropdown options
+        if (typeField && taskData.type) {
+            const typeValue = taskData.type.charAt(0).toUpperCase() + taskData.type.slice(1).toLowerCase();
+            typeField.value = typeValue;
+            
+            // Trigger change event to show/hide acceptance criteria
+            typeField.dispatchEvent(new Event('change'));
+        }
+        
+        // Handle acceptance criteria for story type
+        if (acceptanceCriteriaField && taskData.type === 'story' && taskData.acceptanceCriteria) {
+            acceptanceCriteriaField.value = taskData.acceptanceCriteria;
+        }
     }
 
     // Initialize when DOM is loaded
