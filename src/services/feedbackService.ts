@@ -13,6 +13,9 @@ export interface FeedbackData {
     acceptanceCriteria?: string; // Only for Story type
     initiativeId: string;
     epicId: string;
+    workType?: string; // Work Type field
+    jiraPriority?: string; // JIRA Priority field
+    sprintId?: string; // Jira Sprint Details field
 }
 
 export interface SalesforceInitiative {
@@ -25,6 +28,11 @@ export interface SalesforceEpic {
     name: string;
     teamName: string;
     initiativeId: string;
+}
+
+export interface SalesforceSprint {
+    id: string;
+    name: string;
 }
 
 export interface SystemInfo {
@@ -325,6 +333,52 @@ export class FeedbackService {
     }
 
     /**
+     * Get Sprint Details from Salesforce (limited to 10 most recent)
+     */
+    public async getSprintDetails(): Promise<SalesforceSprint[]> {
+        try {
+            // Check AWS connection status first
+            const awsStatus = await this.awsService.getRealTimeConnectionStatus();
+            if (!awsStatus.connected) {
+                throw new Error('AWS connection is required to load sprint details. Please connect to AWS first.');
+            }
+
+            // Check if Salesforce credentials are available
+            const salesforceCredentials = this.awsService.getSalesforceCredentials();
+            if (!salesforceCredentials) {
+                throw new Error('Salesforce credentials not available. Please ensure AWS is connected and credentials are configured.');
+            }
+
+            const accessToken = await this.getAccessTokenWithRetryAndProtection();
+            
+            // Query Sprint_Jira_Details__c object, ordered by CreatedDate DESC, limited to 10
+            const query = `SELECT+Id%2CName+FROM+Sprint_Jira_Details__c+ORDER+BY+CreatedDate+DESC+LIMIT+10`;
+            
+            console.log(`Sprint query: ${query}`);
+            const response = await fetch(getSalesforceQueryUrl(query), {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch sprint details: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.records.map((record: any) => ({
+                id: record.Id,
+                name: record.Name
+            }));
+        } catch (error) {
+            console.error('Failed to fetch sprint details:', error);
+            throw new Error(`Failed to fetch sprint details: ${(error as Error).message}`);
+        }
+    }
+
+    /**
      * Submit feedback to the appropriate endpoint
      */
     public async submitFeedback(feedbackData: FeedbackData): Promise<FeedbackSubmissionResult> {
@@ -379,6 +433,19 @@ export class FeedbackService {
             // Add acceptance criteria if it's a Story type
             if (feedbackData.feedbackType === 'Story' && feedbackData.acceptanceCriteria) {
                 salesforcePayload.Jira_Acceptance_Criteria__c = feedbackData.acceptanceCriteria;
+            }
+
+            // Add optional fields if provided
+            if (feedbackData.workType) {
+                salesforcePayload.Work_Type__c = feedbackData.workType;
+            }
+
+            if (feedbackData.jiraPriority) {
+                salesforcePayload.Jira_Priority__c = feedbackData.jiraPriority;
+            }
+
+            if (feedbackData.sprintId) {
+                salesforcePayload.Jira_Sprint_Details__c = feedbackData.sprintId;
             }
 
             console.log('Submitting to Salesforce:', salesforcePayload);

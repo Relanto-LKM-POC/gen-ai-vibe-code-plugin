@@ -277,7 +277,10 @@
                 initiativeId: document.getElementById('initiative').value,
                 epicId: document.getElementById('epic').value,
                 description: document.getElementById('feedback-description').value,
-                acceptanceCriteria: document.getElementById('acceptance-criteria').value
+                acceptanceCriteria: document.getElementById('acceptance-criteria').value,
+                workType: document.getElementById('work-type').value,
+                jiraPriority: document.getElementById('jira-priority').value,
+                sprintId: document.getElementById('jira-sprint').value
             };
 
             // Basic validation
@@ -322,6 +325,16 @@
                 importTaskMasterBtn.textContent = '📥 Loading Tasks...';
                 
                 vscode.postMessage({ command: 'importTaskMaster' });
+                
+                // Fallback: Re-enable button after 5 seconds if no response received
+                // This ensures the button doesn't stay disabled indefinitely if there's an error
+                setTimeout(() => {
+                    if (importTaskMasterBtn.disabled && importTaskMasterBtn.textContent === '📥 Loading Tasks...') {
+                        importTaskMasterBtn.disabled = false;
+                        importTaskMasterBtn.textContent = '📥 Import from TaskMaster';
+                        console.warn('TaskMaster import timed out or failed - button re-enabled after 5 seconds');
+                    }
+                }, 5000); // 5 second timeout
             });
         }
 
@@ -383,12 +396,14 @@
             console.log('AWS not connected, skipping feedback dropdown loading');
             populateInitiativesDropdown([]);
             populateEpicsDropdown([]);
+            populateSprintDetailsDropdown([]);
             return;
         }
 
-        // Load both initiatives and epics
+        // Load initiatives, epics, and sprint details
         vscode.postMessage({ command: 'loadInitiatives' });
         vscode.postMessage({ command: 'loadEpics' });
+        vscode.postMessage({ command: 'loadSprintDetails' });
     }
 
     function canSubmitFeedback() {
@@ -426,6 +441,9 @@
         document.getElementById('epic').value = '';
         document.getElementById('feedback-description').value = '';
         document.getElementById('acceptance-criteria').value = '';
+        document.getElementById('work-type').value = '';
+        document.getElementById('jira-priority').value = '';
+        document.getElementById('jira-sprint').value = '';
         
         // Hide acceptance criteria group if visible
         const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
@@ -1042,6 +1060,34 @@
         }
     }
 
+    // Populate sprint details dropdown
+    function populateSprintDetailsDropdown(sprints) {
+        // Store sprints for reference
+        currentState.allSprints = sprints || [];
+        
+        const sprintSelect = document.getElementById('jira-sprint');
+        
+        if (!canSubmitFeedback()) {
+            sprintSelect.innerHTML = '<option value="">Connect to AWS to load sprints</option>';
+            sprintSelect.disabled = true;
+            return;
+        }
+        
+        sprintSelect.disabled = false;
+        sprintSelect.innerHTML = '<option value="">Select Sprint...</option>';
+        
+        if (sprints && sprints.length > 0) {
+            sprints.forEach(sprint => {
+                const option = document.createElement('option');
+                option.value = sprint.id;
+                option.textContent = sprint.name;
+                sprintSelect.appendChild(option);
+            });
+        } else {
+            sprintSelect.innerHTML = '<option value="">No sprints available</option>';
+        }
+    }
+
 
     // Task List Management Functions
     function setActiveTaskTab(tabType) {
@@ -1576,6 +1622,9 @@
             case 'epicsLoaded':
                 populateEpicsDropdown(message.data);
                 break;
+            case 'sprintDetailsLoaded':
+                populateSprintDetailsDropdown(message.data);
+                break;
             
             // Task List Messages
             case 'taskListLoaded':
@@ -1601,6 +1650,10 @@
             case 'populateFromTaskMaster':
                 console.log('TaskMaster data received:', message.data);
                 populateFromTaskMaster(message.data);
+                break;
+            case 'taskMasterError':
+                console.error('TaskMaster error received:', message.data);
+                handleTaskMasterError(message.data.error);
                 break;
             case 'duplicateTaskMasterCheck':
                 console.log('Duplicate check result:', message.data);
@@ -1742,6 +1795,7 @@ Do you want to submit it again?`);
             'edit-estimated-hours': taskData.Estimated_Effort_Hours__c || '',
             'edit-task-type': taskData.Type__c || 'Story',
             'edit-task-priority': taskData.Jira_Priority__c || 'Major-P3',
+            'edit-work-type': taskData.Work_Type__c || '',
             'edit-task-status': taskData.Status__c || 'Backlog',
             'edit-acceptance-criteria': taskData.Jira_Acceptance_Criteria__c || '',
             'edit-actual-hours': taskData.Actual_Effort_Hours__c || '',
@@ -1799,6 +1853,30 @@ Do you want to submit it again?`);
         // Extract JIRA ticket number from link
         const jiraTicket = extractTicketNumber(taskData.Jira_Link__c);
         
+        // Look up sprint name from ID if available
+        let sprintName = 'Not specified';
+        if (taskData.Jira_Sprint_Details__c && currentState.allSprints && currentState.allSprints.length > 0) {
+            const sprint = currentState.allSprints.find(s => s.id === taskData.Jira_Sprint_Details__c);
+            if (sprint) {
+                sprintName = sprint.name;
+            } else {
+                // If we can't find the sprint name, show the ID
+                sprintName = taskData.Jira_Sprint_Details__c;
+            }
+        }
+        
+        // Look up epic name from ID if available
+        let epicName = 'Not specified';
+        if (taskData.Epic__c && currentState.allEpics && currentState.allEpics.length > 0) {
+            const epic = currentState.allEpics.find(e => e.id === taskData.Epic__c);
+            if (epic) {
+                epicName = `${epic.name}${epic.teamName ? ' (' + epic.teamName + ')' : ''}`;
+            } else {
+                // If we can't find the epic name, show the ID
+                epicName = taskData.Epic__c;
+            }
+        }
+        
         // Populate view fields
         const fields = {
             'view-task-name': taskData.Name || 'N/A',
@@ -1807,11 +1885,13 @@ Do you want to submit it again?`);
             'view-task-status': taskData.Status__c || 'Unknown',
             'view-task-type': taskData.Type__c || 'Unknown',
             'view-task-priority': taskData.Jira_Priority__c || 'Not specified',
+            'view-work-type': taskData.Work_Type__c || 'Not specified',
+            'view-jira-sprint': sprintName,
             'view-estimated-hours': taskData.Estimated_Effort_Hours__c ? `${taskData.Estimated_Effort_Hours__c} hours` : 'Not specified',
             'view-actual-hours': taskData.Actual_Effort_Hours__c ? `${taskData.Actual_Effort_Hours__c} hours` : 'Not specified',
             'view-acceptance-criteria': taskData.Jira_Acceptance_Criteria__c || 'Not specified',
             'view-resolution': taskData.Resolution__c || 'Not specified',
-            'view-epic-id': taskData.Epic__c || 'Not specified',
+            'view-epic-id': epicName,
             'view-deployment-date': taskData.Deployment_Date__c ? new Date(taskData.Deployment_Date__c).toLocaleDateString() : 'Not specified',
             'view-ai-adopted': taskData.AI_Adopted__c !== undefined ? (taskData.AI_Adopted__c ? 'Yes' : 'No') : 'Yes'
         };
@@ -1868,6 +1948,7 @@ Do you want to submit it again?`);
             estimatedHours: estimatedHoursConverted,
             // type: document.getElementById('edit-task-type')?.value, // DO NOT SEND - Salesforce validation: "Jira Type Should Not Change"
             priority: document.getElementById('edit-task-priority')?.value,
+            workType: document.getElementById('edit-work-type')?.value,
             status: status,
             acceptanceCriteria: document.getElementById('edit-acceptance-criteria')?.value,
             actualHours: parseFloat(document.getElementById('edit-actual-hours')?.value) || undefined,
@@ -1892,6 +1973,29 @@ Do you want to submit it again?`);
         });
 
         hideTaskEditModal();
+    }
+
+    // Function to handle TaskMaster errors
+    function handleTaskMasterError(errorMessage) {
+        // Re-enable the import button
+        const importBtn = document.getElementById('import-taskmaster-btn');
+        if (importBtn) {
+            importBtn.disabled = false;
+            importBtn.textContent = '📥 Import from TaskMaster';
+        }
+        
+        // Hide task selection dropdown if visible
+        const taskSelectionSection = document.getElementById('task-selection-section');
+        if (taskSelectionSection) {
+            taskSelectionSection.style.display = 'none';
+        }
+        
+        // Show error message to user
+        showImportResult({
+            success: false,
+            message: 'Failed to import TaskMaster data',
+            error: errorMessage
+        });
     }
 
     // Function to populate form from TaskMaster data
@@ -1968,16 +2072,28 @@ Do you want to submit it again?`);
         // Store current imported task for duplicate checking
         currentState.currentImportedTask = taskData;
         
-        // Populate form fields
+        // Get all form fields
         const nameField = document.getElementById('feedback-name');
         const descriptionField = document.getElementById('feedback-description');
         const estimatedHoursField = document.getElementById('estimated-hours');
         const typeField = document.getElementById('feedback-type');
         const acceptanceCriteriaField = document.getElementById('acceptance-criteria');
+        const workTypeField = document.getElementById('work-type');
+        const jiraPriorityField = document.getElementById('jira-priority');
         
-        if (nameField) nameField.value = taskData.title || '';
-        if (descriptionField) descriptionField.value = taskData.description || '';
-        if (estimatedHoursField) estimatedHoursField.value = taskData.estimation || '';
+        // Clear all fields first to prevent stale data from previous imports
+        if (nameField) nameField.value = '';
+        if (descriptionField) descriptionField.value = '';
+        if (estimatedHoursField) estimatedHoursField.value = '';
+        if (typeField) typeField.value = '';
+        if (acceptanceCriteriaField) acceptanceCriteriaField.value = '';
+        if (workTypeField) workTypeField.value = '';
+        if (jiraPriorityField) jiraPriorityField.value = '';
+        
+        // Now populate with task data (only fields that have values)
+        if (nameField && taskData.title) nameField.value = taskData.title;
+        if (descriptionField && taskData.description) descriptionField.value = taskData.description;
+        if (estimatedHoursField && taskData.estimation) estimatedHoursField.value = taskData.estimation;
         
         // Handle type field - capitalize first letter to match dropdown options
         if (typeField && taskData.type) {
@@ -1990,7 +2106,49 @@ Do you want to submit it again?`);
         
         // Handle acceptance criteria for story type (case-insensitive check)
         if (acceptanceCriteriaField && taskData.type && taskData.type.toLowerCase() === 'story' && taskData.acceptanceCriteria) {
-            acceptanceCriteriaField.value = taskData.acceptanceCriteria;
+            // Handle both array and string formats
+            if (Array.isArray(taskData.acceptanceCriteria)) {
+                // Convert array to numbered list
+                acceptanceCriteriaField.value = taskData.acceptanceCriteria.map((criteria, index) => `${index + 1}. ${criteria}`).join('\n');
+            } else {
+                acceptanceCriteriaField.value = taskData.acceptanceCriteria;
+            }
+        }
+
+        // Handle work type if available - only populate if field exists in task data
+        if (workTypeField && taskData.workType !== undefined && taskData.workType !== null && taskData.workType !== '') {
+            // Normalize the work type value to match dropdown options
+            const workTypeMapping = {
+                'new functionality/ feature': 'New Functionality / Feature',
+                'new functionality / feature': 'New Functionality / Feature',
+                'rtb': 'RTB',
+                'enabler/ innovation': 'Enabler / Innovation',
+                'enabler / innovation': 'Enabler / Innovation',
+                'quality': 'Quality'
+            };
+            const normalizedWorkType = workTypeMapping[taskData.workType.toLowerCase()] || taskData.workType;
+            workTypeField.value = normalizedWorkType;
+        }
+
+        // Handle JIRA priority if available - only populate if field exists in task data
+        if (jiraPriorityField && taskData.priority !== undefined && taskData.priority !== null && taskData.priority !== '') {
+            // Priority values in JSON should match exactly: Severe-P1, Critical-P2, Major-P3, Minor-P4
+            // But also handle legacy formats for backward compatibility
+            const priorityMapping = {
+                'severe-p1': 'Severe-P1',
+                'critical-p2': 'Critical-P2',
+                'major-p3': 'Major-P3',
+                'minor-p4': 'Minor-P4',
+                'severe': 'Severe-P1',
+                'critical': 'Critical-P2',
+                'major': 'Major-P3',
+                'minor': 'Minor-P4',
+                'high': 'Critical-P2',
+                'medium': 'Major-P3',
+                'low': 'Minor-P4'
+            };
+            const mappedPriority = priorityMapping[taskData.priority.toLowerCase()] || taskData.priority;
+            jiraPriorityField.value = mappedPriority;
         }
     }
 

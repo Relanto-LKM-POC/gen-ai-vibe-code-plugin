@@ -53,6 +53,10 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('specDrivenDevelopment.loadEpics', message.initiativeId);
                         break;
 
+                    case 'loadSprintDetails':
+                        vscode.commands.executeCommand('specDrivenDevelopment.loadSprintDetails');
+                        break;
+
                     case 'getEstimationData':
                         this.handleGetEstimationData();
                         break;
@@ -173,6 +177,15 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
         }
     }
 
+    public sendSprintDetails(sprints: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'sprintDetailsLoaded',
+                data: sprints
+            });
+        }
+    }
+
     public sendFeedbackResult(result: any) {
         if (this._view) {
             this._view.webview.postMessage({
@@ -230,6 +243,15 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'populateFromTaskMaster',
                 data: taskData
+            });
+        }
+    }
+
+    public sendTaskMasterError(errorMessage: string) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'taskMasterError',
+                data: { error: errorMessage }
             });
         }
     }
@@ -461,6 +483,35 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 </div>
                                 
                                 <div class="input-group">
+                                    <label for="work-type">Work Type:</label>
+                                    <select id="work-type">
+                                        <option value="">Select Work Type...</option>
+                                        <option value="New Functionality / Feature">New Functionality / Feature</option>
+                                        <option value="RTB">RTB</option>
+                                        <option value="Enabler / Innovation">Enabler / Innovation</option>
+                                        <option value="Quality">Quality</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="jira-priority">JIRA Priority:</label>
+                                    <select id="jira-priority">
+                                        <option value="">Select Priority...</option>
+                                        <option value="Severe-P1">Severe-P1</option>
+                                        <option value="Critical-P2">Critical-P2</option>
+                                        <option value="Major-P3">Major-P3</option>
+                                        <option value="Minor-P4">Minor-P4</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="jira-sprint">JIRA Sprint:</label>
+                                    <select id="jira-sprint">
+                                        <option value="">Loading sprints...</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="input-group">
                                     <label for="feedback-description">Description: <span class="required">*</span></label>
                                     <textarea id="feedback-description" rows="6" placeholder="Please describe the feature in detail..." required></textarea>
                                 </div>
@@ -608,11 +659,21 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                                 <div class="input-group">
                                                     <label for="edit-task-priority">Priority:</label>
                                                     <select id="edit-task-priority">
-                                                        <option value="High-P1">High-P1</option>
-                                                        <option value="High-P2">High-P2</option>
+                                                        <option value="Severe-P1">Severe-P1</option>
+                                                        <option value="Critical-P2">Critical-P2</option>
                                                         <option value="Major-P3">Major-P3</option>
-                                                        <option value="Medium-P3">Medium-P3</option>
-                                                        <option value="Low-P4">Low-P4</option>
+                                                        <option value="Minor-P4">Minor-P4</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="input-group">
+                                                    <label for="edit-work-type">Work Type:</label>
+                                                    <select id="edit-work-type">
+                                                        <option value="">Select Work Type...</option>
+                                                        <option value="New Functionality / Feature">New Functionality / Feature</option>
+                                                        <option value="RTB">RTB</option>
+                                                        <option value="Enabler / Innovation">Enabler / Innovation</option>
+                                                        <option value="Quality">Quality</option>
                                                     </select>
                                                 </div>
                                                 
@@ -703,6 +764,16 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                             <div class="view-group">
                                                 <label>Priority:</label>
                                                 <div class="view-value" id="view-task-priority"></div>
+                                            </div>
+                                            
+                                            <div class="view-group">
+                                                <label>Work Type:</label>
+                                                <div class="view-value" id="view-work-type"></div>
+                                            </div>
+                                            
+                                            <div class="view-group">
+                                                <label>JIRA Sprint:</label>
+                                                <div class="view-value" id="view-jira-sprint"></div>
                                             </div>
                                             
                                             <div class="view-group">

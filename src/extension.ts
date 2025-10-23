@@ -765,6 +765,20 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    const loadSprintDetailsCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadSprintDetails', async () => {
+        try {
+            const sprints = await feedbackService.getSprintDetails();
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendSprintDetails(sprints);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load sprint details: ${(error as Error).message}`);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendSprintDetails([]);
+            }
+        }
+    });
+
     const submitFeedbackCommand = vscode.commands.registerCommand('specDrivenDevelopment.submitFeedback', async (data: any) => {
         try {
             const result = await feedbackService.submitFeedback(data);
@@ -847,6 +861,11 @@ function registerCommands(context: vscode.ExtensionContext) {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             vscode.window.showErrorMessage(`Failed to import TaskMaster data: ${errorMessage}`);
+            
+            // Send error to webview so it can re-enable the button
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendTaskMasterError(errorMessage);
+            }
         }
     });
 
@@ -1650,6 +1669,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         updateJiraIssueCommand,
         loadInitiativesCommand,
         loadEpicsCommand,
+        loadSprintDetailsCommand,
         submitFeedbackCommand,
         importTaskMasterCommand,
         checkDuplicateTaskMasterCommand,
