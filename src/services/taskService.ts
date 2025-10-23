@@ -15,6 +15,7 @@ export interface Task {
     Resolution__c?: string;
     Deployment_Date__c?: string;
     Jira_Priority__c?: string;
+    CreatedDate?: string;
 }
 
 export class TaskService {
@@ -188,7 +189,7 @@ export class TaskService {
 
             // Use the provided WIP query structure with pagination
             const query = encodeURIComponent(
-                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Status__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
+                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,CreatedDate,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Status__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
             console.log('WIP tickets Query:', query);
@@ -274,7 +275,7 @@ export class TaskService {
 
             // Use the existing query structure with pagination
             const query = encodeURIComponent(
-                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
+                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,CreatedDate,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
             const response = await fetch(getSalesforceQueryUrl(query), {
@@ -365,7 +366,7 @@ export class TaskService {
 
             // Use the same query structure as other tasks
             const query = encodeURIComponent(
-                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
+                `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,CreatedDate,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
             const response = await fetch(getSalesforceQueryUrl(query), {
@@ -577,5 +578,68 @@ export class TaskService {
         }
         const match = jiraLink.match(/DEVSECOPS-(\d+)/);
         return match ? `DEVSECOPS-${match[1]}` : 'N/A';
+    }
+
+    /**
+     * Calculate actual working hours from task creation to now
+     * Assuming 8 working hours per day (excluding weekends)
+     * @param createdDate ISO 8601 date string from Salesforce
+     * @returns Number of working hours rounded to nearest 0.5
+     */
+    calculateActualHours(createdDate: string): number {
+        const created = new Date(createdDate);
+        const now = new Date();
+        
+        let businessHours = 0;
+        let currentDate = new Date(created);
+        
+        // Define business hours: 8 hours per working day
+        const HOURS_PER_DAY = 8;
+        const WORK_START_HOUR = 9;  // 9 AM
+        const WORK_END_HOUR = 17;   // 5 PM
+        
+        while (currentDate < now) {
+            const dayOfWeek = currentDate.getDay();
+            
+            // Skip weekends (0 = Sunday, 6 = Saturday)
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                const isFirstDay = currentDate.toDateString() === created.toDateString();
+                const isLastDay = currentDate.toDateString() === now.toDateString();
+                
+                if (isFirstDay || isLastDay) {
+                    // Partial day calculation
+                    let startHour = WORK_START_HOUR;
+                    let endHour = WORK_END_HOUR;
+                    
+                    if (isFirstDay) {
+                        // If created during work hours, use created time, otherwise use work start
+                        const createdHour = created.getHours() + (created.getMinutes() / 60);
+                        startHour = Math.max(createdHour, WORK_START_HOUR);
+                        startHour = Math.min(startHour, WORK_END_HOUR); // Cap at end of work day
+                    }
+                    
+                    if (isLastDay) {
+                        // Use current time, but cap at end of work day
+                        const nowHour = now.getHours() + (now.getMinutes() / 60);
+                        endHour = Math.min(nowHour, WORK_END_HOUR);
+                        endHour = Math.max(endHour, WORK_START_HOUR); // Don't go below work start
+                    }
+                    
+                    // Add hours for this partial day
+                    const hoursWorked = Math.max(0, endHour - startHour);
+                    businessHours += hoursWorked;
+                } else {
+                    // Full working day
+                    businessHours += HOURS_PER_DAY;
+                }
+            }
+            
+            // Move to next day
+            currentDate.setDate(currentDate.getDate() + 1);
+            currentDate.setHours(0, 0, 0, 0);
+        }
+        
+        // Round to nearest 0.5 hour
+        return Math.round(businessHours * 2) / 2;
     }
 }

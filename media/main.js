@@ -1757,7 +1757,153 @@ Do you want to submit it again?`);
         if (actualHoursField) actualHoursField.required = isDone;
         if (resolutionField) resolutionField.required = isDone;
         
+        // Debug logging for auto-calculation
+        console.log('toggleDoneFields - Debug Info:', {
+            status: status,
+            isDone: isDone,
+            hasEditingTask: !!currentState.editingTask,
+            hasCreatedDate: currentState.editingTask?.CreatedDate,
+            createdDateValue: currentState.editingTask?.CreatedDate,
+            hasActualHoursField: !!actualHoursField,
+            actualHoursFieldValue: actualHoursField?.value,
+            fieldIsEmpty: !actualHoursField?.value
+        });
+        
+        // Auto-calculate actual hours when status changes to Done (only if field is empty)
+        if (isDone && 
+            currentState.editingTask && 
+            currentState.editingTask.CreatedDate &&
+            actualHoursField &&
+            !actualHoursField.value) {
+            
+            console.log('✅ All conditions met - calling calculateAndPopulateActualHours');
+            calculateAndPopulateActualHours(currentState.editingTask.CreatedDate);
+        } else if (isDone) {
+            console.warn('⚠️ Auto-calculation skipped. Reason:', {
+                noEditingTask: !currentState.editingTask,
+                noCreatedDate: !currentState.editingTask?.CreatedDate,
+                noActualHoursField: !actualHoursField,
+                fieldNotEmpty: !!actualHoursField?.value
+            });
+        }
+        
         console.log(`Status changed to: ${status}, Done fields ${isDone ? 'shown' : 'hidden'}`);
+    }
+
+    /**
+     * Calculate actual working hours from task creation to now
+     * Assuming 8 working hours per day (excluding weekends)
+     * @param {string} createdDate - ISO 8601 date string from Salesforce
+     */
+    function calculateAndPopulateActualHours(createdDate) {
+        const actualHoursField = document.getElementById('edit-actual-hours');
+        
+        // Safety check 1: Required elements exist
+        if (!createdDate || !actualHoursField) {
+            console.warn('Cannot calculate actual hours - missing data');
+            return;
+        }
+        
+        // Safety check 2: Don't overwrite existing manual values
+        if (actualHoursField.value && actualHoursField.value.trim() !== '') {
+            console.log('Actual hours already set, skipping auto-calculation');
+            return;
+        }
+        
+        try {
+            const created = new Date(createdDate);
+            const now = new Date();
+            
+            // Safety check 3: Valid date
+            if (isNaN(created.getTime())) {
+                throw new Error('Invalid CreatedDate format');
+            }
+            
+            // Safety check 4: CreatedDate not in future
+            if (created > now) {
+                console.warn('CreatedDate is in the future, cannot calculate');
+                return;
+            }
+            
+            let businessHours = 0;
+            let currentDate = new Date(created);
+            
+            const HOURS_PER_DAY = 8;
+            const WORK_START_HOUR = 9;
+            const WORK_END_HOUR = 17;
+            
+            // Safety check 5: Limit calculation to reasonable timeframe (e.g., 2 years)
+            const MAX_DAYS = 730; // 2 years
+            let daysProcessed = 0;
+            
+            while (currentDate < now && daysProcessed < MAX_DAYS) {
+                const dayOfWeek = currentDate.getDay();
+                
+                // Skip weekends (0 = Sunday, 6 = Saturday)
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    const isFirstDay = currentDate.toDateString() === created.toDateString();
+                    const isLastDay = currentDate.toDateString() === now.toDateString();
+                    
+                    if (isFirstDay || isLastDay) {
+                        let startHour = WORK_START_HOUR;
+                        let endHour = WORK_END_HOUR;
+                        
+                        if (isFirstDay) {
+                            const createdHour = created.getHours() + (created.getMinutes() / 60);
+                            startHour = Math.max(createdHour, WORK_START_HOUR);
+                            startHour = Math.min(startHour, WORK_END_HOUR);
+                        }
+                        
+                        if (isLastDay) {
+                            const nowHour = now.getHours() + (now.getMinutes() / 60);
+                            endHour = Math.min(nowHour, WORK_END_HOUR);
+                            endHour = Math.max(endHour, WORK_START_HOUR);
+                        }
+                        
+                        const hoursWorked = Math.max(0, endHour - startHour);
+                        businessHours += hoursWorked;
+                    } else {
+                        businessHours += HOURS_PER_DAY;
+                    }
+                }
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+                currentDate.setHours(0, 0, 0, 0);
+                daysProcessed++;
+            }
+            
+            const actualHours = Math.round(businessHours * 2) / 2;
+            actualHoursField.value = actualHours.toString();
+            
+            // Add helper text
+            const existingHelper = document.getElementById('actual-hours-helper');
+            if (existingHelper) {
+                existingHelper.remove();
+            }
+            
+            const helperText = document.createElement('small');
+            helperText.id = 'actual-hours-helper';
+            helperText.style.display = 'block';
+            helperText.style.color = '#888';
+            helperText.style.marginTop = '4px';
+            helperText.style.fontSize = '11px';
+            
+            const workingDays = Math.ceil(businessHours / HOURS_PER_DAY);
+            helperText.textContent = `Auto-calculated: ${actualHours} hours (${workingDays} working days) from ${created.toLocaleDateString()} to ${now.toLocaleDateString()}. Business hours: 9 AM - 5 PM, Mon-Fri. You can override this value.`;
+            
+            actualHoursField.parentElement.appendChild(helperText);
+            
+            console.log(`Auto-calculated actual hours: ${actualHours} hours (${workingDays} working days)`);
+            console.log(`Created: ${created.toLocaleString()}`);
+            console.log(`Now: ${now.toLocaleString()}`);
+            
+        } catch (error) {
+            console.error('Error calculating actual hours:', error);
+            // Fail gracefully - user can still enter manually
+            if (actualHoursField) {
+                actualHoursField.placeholder = 'Enter hours manually';
+            }
+        }
     }
 
     function setupTaskViewModal() {
@@ -1778,6 +1924,11 @@ Do you want to submit it again?`);
 
     function showTaskEditModal(taskData) {
         console.log('Showing edit modal for task:', taskData);
+        console.log('🔍 Task CreatedDate check:', {
+            hasCreatedDate: !!taskData.CreatedDate,
+            createdDateValue: taskData.CreatedDate,
+            taskDataKeys: Object.keys(taskData)
+        });
         
         // Safeguard: Don't show modal if no valid task data
         if (!taskData || (!taskData.taskId && !taskData.Id)) {
@@ -1786,6 +1937,14 @@ Do you want to submit it again?`);
         }
         
         currentState.editingTask = taskData;
+        
+        // Store CreatedDate for actual hours calculation (IMPORTANT for auto-calculation)
+        if (taskData.CreatedDate) {
+            currentState.editingTask.CreatedDate = taskData.CreatedDate;
+            console.log('✅ Task CreatedDate stored:', taskData.CreatedDate);
+        } else {
+            console.warn('❌ No CreatedDate found in task data - auto-calculation will not work');
+        }
         
         // Populate form fields
         const fields = {
