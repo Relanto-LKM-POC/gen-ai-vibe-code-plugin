@@ -744,9 +744,17 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.sendInitiatives(initiatives);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load initiatives: ${(error as Error).message}`);
+            const errorMessage = (error as Error).message;
+            console.error('Failed to load initiatives:', errorMessage);
+            
+            // Send user-friendly error message to UI instead of showing intrusive popup
             if (specDrivenDevelopmentPanel) {
-                specDrivenDevelopmentPanel.sendInitiatives([]);
+                specDrivenDevelopmentPanel.sendInitiativesError(errorMessage);
+            }
+            
+            // Only show VS Code notification for critical errors
+            if (errorMessage.includes('AWS connection') || errorMessage.includes('credentials')) {
+                vscode.window.showWarningMessage(`Initiatives unavailable: ${errorMessage}`);
             }
         }
     });

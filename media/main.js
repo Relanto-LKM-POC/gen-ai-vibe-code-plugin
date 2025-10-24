@@ -1031,6 +1031,54 @@
         }
     }
 
+    function handleInitiativesError(error) {
+        const initiativeSelect = document.getElementById('initiative');
+        
+        // Show user-friendly error message in dropdown
+        let errorMessage = 'Failed to load initiatives';
+        if (error && error.message) {
+            if (error.message.includes('timeout')) {
+                errorMessage = 'Network timeout - please try again';
+            } else if (error.message.includes('connection')) {
+                errorMessage = 'Connection failed - check network';
+            } else if (error.message.includes('authentication')) {
+                errorMessage = 'Authentication failed - reconnect AWS';
+            }
+        }
+        
+        initiativeSelect.innerHTML = `<option value="">${errorMessage}</option>`;
+        initiativeSelect.disabled = false;
+        
+        console.warn('Failed to load initiatives:', error);
+        
+        // Show a non-intrusive notification to the user
+        const notification = document.createElement('div');
+        notification.className = 'error-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--vscode-errorBackground);
+            color: var(--vscode-errorForeground);
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-errorBorder);
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 300px;
+        `;
+        notification.textContent = `Initiative loading failed: ${errorMessage}. TaskMaster import will still work.`;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove notification after 8 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                document.body.removeChild(notification);
+            }
+        }, 8000);
+    }
+
     // Populate epics dropdown
     function populateEpicsDropdown(epics) {
         // Store epics for reference
@@ -1618,6 +1666,9 @@
                 break;
             case 'initiativesLoaded':
                 populateInitiativesDropdown(message.data);
+                break;
+            case 'initiativesError':
+                handleInitiativesError(message.data);
                 break;
             case 'epicsLoaded':
                 populateEpicsDropdown(message.data);
@@ -2239,6 +2290,8 @@ Do you want to submit it again?`);
         const acceptanceCriteriaField = document.getElementById('acceptance-criteria');
         const workTypeField = document.getElementById('work-type');
         const jiraPriorityField = document.getElementById('jira-priority');
+        const initiativeField = document.getElementById('initiative');
+        const epicField = document.getElementById('epic');
         
         // Clear all fields first to prevent stale data from previous imports
         if (nameField) nameField.value = '';
@@ -2248,6 +2301,10 @@ Do you want to submit it again?`);
         if (acceptanceCriteriaField) acceptanceCriteriaField.value = '';
         if (workTypeField) workTypeField.value = '';
         if (jiraPriorityField) jiraPriorityField.value = '';
+        
+        // Reset initiative and epic dropdowns to default state
+        if (initiativeField) initiativeField.selectedIndex = 0;
+        if (epicField) epicField.selectedIndex = 0;
         
         // Now populate with task data (only fields that have values)
         if (nameField && taskData.title) nameField.value = taskData.title;
@@ -2308,6 +2365,88 @@ Do you want to submit it again?`);
             };
             const mappedPriority = priorityMapping[taskData.priority.toLowerCase()] || taskData.priority;
             jiraPriorityField.value = mappedPriority;
+        }
+
+        // Handle Initiative dropdown auto-population if available
+        if (initiativeField && taskData.initiative !== undefined && taskData.initiative !== null && taskData.initiative !== '') {
+            let matchFound = false;
+            const jsonInitiative = taskData.initiative.trim();
+            
+            console.log(`Looking for initiative match for: "${jsonInitiative}"`);
+            
+            // First pass: Try exact match (case-insensitive, whitespace normalized)
+            for (let i = 0; i < initiativeField.options.length; i++) {
+                const option = initiativeField.options[i];
+                const optionText = option.text.trim();
+                const optionValue = option.value.trim();
+                
+                // Normalize both strings for comparison (case-insensitive, normalized whitespace)
+                const normalizedOption = optionText.toLowerCase().replace(/\s+/g, ' ');
+                const normalizedJsonValue = jsonInitiative.toLowerCase().replace(/\s+/g, ' ');
+                const normalizedOptionValue = optionValue.toLowerCase().replace(/\s+/g, ' ');
+                
+                console.log(`Checking option ${i}: "${optionText}" (normalized: "${normalizedOption}")`);
+                
+                if (normalizedOption === normalizedJsonValue || normalizedOptionValue === normalizedJsonValue) {
+                    initiativeField.selectedIndex = i;
+                    initiativeField.dispatchEvent(new Event('change'));
+                    matchFound = true;
+                    console.log(`✅ Initiative exact match: "${jsonInitiative}" → "${optionText}"`);
+                    break;
+                }
+            }
+            
+            // Second pass: ONLY if no exact match found, try very conservative partial matching
+            if (!matchFound) {
+                console.log(`No exact match found, trying conservative partial matching...`);
+                let bestMatch = { index: -1, score: 0, optionText: '' };
+                
+                for (let i = 0; i < initiativeField.options.length; i++) {
+                    const option = initiativeField.options[i];
+                    const optionText = option.text.toLowerCase().trim();
+                    const initiativeText = jsonInitiative.toLowerCase().trim();
+                    
+                    // Skip empty options and default options
+                    if (!optionText || 
+                        optionText === 'select initiative...' || 
+                        optionText === 'loading initiatives...' ||
+                        optionText === 'no initiatives available' ||
+                        optionText === 'connect to aws to load initiatives') {
+                        continue;
+                    }
+                    
+                    let score = 0;
+                    
+                    // VERY conservative partial matching - only if JSON is much longer than option
+                    if (initiativeText.includes(optionText) && optionText.length >= 6) {
+                        // Only match if the option is reasonably long and takes up less than 60% of the JSON text
+                        const ratio = optionText.length / initiativeText.length;
+                        if (ratio < 0.6) {
+                            score = optionText.length * ratio; // Much lower score than before
+                            console.log(`Potential partial match: "${optionText}" in "${initiativeText}" (ratio: ${ratio}, score: ${score})`);
+                        }
+                    }
+                    
+                    // Update best match if this score is higher
+                    if (score > bestMatch.score) {
+                        bestMatch = { index: i, score: score, optionText: option.text };
+                    }
+                }
+                
+                // Only apply partial match if score is very high (much more conservative)
+                if (bestMatch.score > 10) {
+                    initiativeField.selectedIndex = bestMatch.index;
+                    initiativeField.dispatchEvent(new Event('change'));
+                    matchFound = true;
+                    console.log(`⚠️ Initiative partial match: "${jsonInitiative}" → "${bestMatch.optionText}" (score: ${bestMatch.score})`);
+                }
+            }
+            
+            // Log result for debugging
+            if (!matchFound) {
+                console.log(`❌ No matching initiative found for: "${jsonInitiative}"`);
+                console.log(`Available options:`, Array.from(initiativeField.options).map((opt, i) => `${i}: "${opt.text}"`));
+            }
         }
     }
 

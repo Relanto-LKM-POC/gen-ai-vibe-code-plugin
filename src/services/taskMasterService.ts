@@ -11,6 +11,7 @@ export interface TaskMasterTask {
     type: "story" | "bug" | "defect";
     estimation: string;
     acceptanceCriteria?: string;
+    initiative?: string;
 }
 
 export class TaskMasterService {

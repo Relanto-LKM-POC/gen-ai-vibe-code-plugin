@@ -5,6 +5,27 @@ import { JiraService } from './jiraService';
 import { AWSService } from './awsService';
 import { CONFIG, getSalesforceApiUrl, getSalesforceDescribeUrl, getSalesforceQueryUrl } from '../config/config';
 
+// Helper function for fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 15000): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeoutMs}ms`);
+        }
+        throw error;
+    }
+};
+
 export interface FeedbackData {
     name: string; // Component name for Salesforce
     description: string;
@@ -201,16 +222,16 @@ export class FeedbackService {
             const accessToken = await this.getAccessTokenWithRetryAndProtection();
             
             // Try querying the describe API to understand the Initiative__c field relationship
-            const describeResponse = await fetch(getSalesforceDescribeUrl('feedback'), {
+            const describeResponse = await fetchWithTimeout(getSalesforceDescribeUrl('feedback'), {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
-            });
+            }, 10000); // 10 second timeout
 
             if (!describeResponse.ok) {
-                throw new Error(`Failed to describe Feedback object: ${describeResponse.status}`);
+                throw new Error(`Failed to describe Feedback object: ${describeResponse.status} ${describeResponse.statusText}`);
             }
 
             const describeData = await describeResponse.json();
@@ -221,13 +242,13 @@ export class FeedbackService {
                 console.log(`Initiative__c field references: ${referencedObject}`);
                 
                 // Now query the correct object
-                const response = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+${referencedObject}`), {
+                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+${referencedObject}`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     }
-                });
+                }, 10000); // 10 second timeout
 
                 if (!response.ok) {
                     throw new Error(`Failed to fetch initiatives: ${response.status} ${response.statusText}`);
@@ -240,13 +261,13 @@ export class FeedbackService {
                 }));
             } else {
                 // Fallback to CX_Initiative__c based on discovered field relationship
-                const response = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+CX_Initiative__c`), {
+                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+CX_Initiative__c`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     }
-                });
+                }, 10000); // 10 second timeout
 
                 if (!response.ok) {
                     throw new Error(`Failed to fetch initiatives: ${response.status} ${response.statusText}`);
@@ -260,6 +281,20 @@ export class FeedbackService {
             }
         } catch (error) {
             console.error('Failed to fetch initiatives:', error);
+            
+            // Handle different types of errors with user-friendly messages
+            if (error instanceof Error) {
+                if (error.message.includes('timeout')) {
+                    throw new Error('Network timeout while loading initiatives. Please check your connection and try again.');
+                }
+                if (error.message.includes('fetch failed')) {
+                    throw new Error('Unable to connect to Salesforce. Please check your network connection and try again.');
+                }
+                if (error.message.includes('401') || error.message.includes('403')) {
+                    throw new Error('Authentication failed. Please reconnect to AWS and try again.');
+                }
+            }
+            
             throw new Error(`Failed to fetch initiatives: ${(error as Error).message}`);
         }
     }

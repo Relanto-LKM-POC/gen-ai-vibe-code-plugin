@@ -168,6 +168,15 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
         }
     }
 
+    public sendInitiativesError(error: string) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'initiativesError',
+                data: { message: error }
+            });
+        }
+    }
+
     public sendEpics(epics: any) {
         if (this._view) {
             this._view.webview.postMessage({
