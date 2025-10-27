@@ -1507,8 +1507,8 @@
 
     function extractTicketNumber(jiraLink) {
         if (!jiraLink) return 'N/A';
-        const match = jiraLink.match(/DEVSECOPS-(\d+)/);
-        return match ? `DEVSECOPS-${match[1]}` : 'N/A';
+        const match = jiraLink.match(/\/browse\/([A-Z]+-\d+)/);
+        return match ? match[1] : 'N/A';
     }
 
     function getStatusClass(status) {

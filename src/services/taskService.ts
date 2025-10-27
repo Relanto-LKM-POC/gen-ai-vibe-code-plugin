@@ -613,8 +613,9 @@ export class TaskService {
         if (!jiraLink) {
             return 'N/A';
         }
-        const match = jiraLink.match(/DEVSECOPS-(\d+)/);
-        return match ? `DEVSECOPS-${match[1]}` : 'N/A';
+        // Extract JIRA ticket ID from URL (e.g., "https://cisco-learning.atlassian.net/browse/GAI-558" -> "GAI-558")
+        const match = jiraLink.match(/\/browse\/([A-Z]+-\d+)/);
+        return match ? match[1] : 'N/A';
     }
 
     /**
