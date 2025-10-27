@@ -415,6 +415,98 @@ export class FeedbackService {
     }
 
     /**
+     * Get sprint details filtered by team name
+     * Extracts team prefix and filters sprints by matching prefix
+     */
+    public async getSprintsForTeam(teamName: string): Promise<Array<{ id: string; name: string; recommended?: boolean }>> {
+        try {
+            console.log(`Getting sprints for team: ${teamName}`);
+            
+            // Extract team prefix from team name
+            // "GenAI - LCEA" → "GENAI"
+            // "DevOps - LCEA" → "DEVOPS"
+            // "DevSecOps - LCEA" → "DEVSECOPS"
+            const teamPrefix = this.extractTeamPrefix(teamName);
+            console.log(`Extracted team prefix: ${teamPrefix}`);
+
+            // Get all sprints (API 12) - already sorted by CreatedDate DESC, limited to 10
+            const allSprints = await this.getSprintDetails();
+            
+            if (!allSprints || allSprints.length === 0) {
+                console.log('No sprints found');
+                return [];
+            }
+
+            // Filter sprints by team prefix to find the recommended one
+            const matchingSprints = allSprints.filter(sprint => {
+                const sprintPrefix = this.extractSprintPrefix(sprint.name);
+                return sprintPrefix === teamPrefix;
+            });
+
+            console.log(`Found ${matchingSprints.length} sprints matching team prefix "${teamPrefix}"`);
+
+            // Get the recommended sprint (first matching sprint, which is the latest)
+            const recommendedSprint = matchingSprints.length > 0 ? matchingSprints[0] : null;
+
+            // Return all sprints (top 10 from all teams), but mark the recommended one
+            return allSprints.map(sprint => ({
+                id: sprint.id,
+                name: sprint.name,
+                recommended: recommendedSprint ? sprint.id === recommendedSprint.id : false
+            }));
+
+        } catch (error) {
+            console.error('Error getting sprints for team:', error);
+            // Fallback to all sprints
+            try {
+                const allSprints = await this.getSprintDetails();
+                return allSprints.map(s => ({ id: s.id, name: s.name }));
+            } catch (fallbackError) {
+                console.error('Fallback sprint loading also failed:', fallbackError);
+                return [];
+            }
+        }
+    }
+
+    /**
+     * Extract team prefix from team name
+     * "GenAI - LCEA" → "GENAI"
+     * "DevOps - LCEA" → "DEVOPS"
+     * "DevSecOps - LCEA" → "DEVSEC"
+     */
+    private extractTeamPrefix(teamName: string): string {
+        // Split by " - " separator
+        const parts = teamName.split(' - ');
+        if (parts.length > 0) {
+            // Take first part, convert to uppercase, remove spaces
+            let prefix = parts[0].toUpperCase().replace(/\s+/g, '');
+            
+            // Special case: "DevSecOps" team uses "DEVSEC" sprint prefix
+            if (prefix === 'DEVSECOPS') {
+                return 'DEVSEC';
+            }
+            
+            return prefix;
+        }
+        // Fallback: just uppercase and remove spaces
+        return teamName.toUpperCase().replace(/\s+/g, '');
+    }
+
+    /**
+     * Extract sprint prefix from sprint name
+     * "GENAI:FY26Q1_S7: 10/22-11/04" → "GENAI"
+     * "DEVSEC:FY26Q1_S6: 10/08-10/21" → "DEVSEC"
+     */
+    private extractSprintPrefix(sprintName: string): string {
+        // Sprint format: "PREFIX:FY26Q1_S7: 10/22-11/04"
+        const parts = sprintName.split(':');
+        if (parts.length > 0) {
+            return parts[0].toUpperCase().trim();
+        }
+        return '';
+    }
+
+    /**
      * Submit feedback to the appropriate endpoint
      */
     public async submitFeedback(feedbackData: FeedbackData): Promise<FeedbackSubmissionResult> {
@@ -925,6 +1017,9 @@ export class FeedbackService {
         recommendedInitiativeName?: string;
         jiraTeam?: string;
         epics: Array<{ id: string; name: string; teamName: string; status: string }>;
+        sprints: Array<{ id: string; name: string; recommended?: boolean }>;
+        recommendedSprintId?: string;
+        recommendedSprintName?: string;
         autoPopulated: boolean;
         fallbackReason?: string;
     }> {
@@ -940,6 +1035,7 @@ export class FeedbackService {
                     success: false,
                     initiatives: [],
                     epics: [],
+                    sprints: [],
                     autoPopulated: false,
                     fallbackReason: 'No Git repository detected in workspace'
                 };
@@ -963,6 +1059,7 @@ export class FeedbackService {
                     repoName,
                     initiatives: [],
                     epics: [],
+                    sprints: [],
                     autoPopulated: false,
                     fallbackReason: `Repository "${repoName}" not registered in Salesforce`
                 };
@@ -981,6 +1078,7 @@ export class FeedbackService {
                     applicationName: application.name,
                     initiatives: [],
                     epics: [],
+                    sprints: [],
                     autoPopulated: false,
                     fallbackReason: `No initiatives found for application "${application.name}"`
                 };
@@ -1002,6 +1100,7 @@ export class FeedbackService {
                     recommendedInitiativeId: recommendedInitiative.id,
                     recommendedInitiativeName: recommendedInitiative.name,
                     epics: [],
+                    sprints: [],
                     autoPopulated: true,
                     fallbackReason: 'No Jira team associated with initiative'
                 };
@@ -1014,7 +1113,16 @@ export class FeedbackService {
             
             console.log(`Found ${epics.length} epic(s) for team`);
 
-            // Step 6: Return complete result
+            // Step 6: Get Sprints for Jira Team
+            const sprints = await this.getSprintsForTeam(jiraTeam);
+            const recommendedSprint = sprints.find(s => s.recommended);
+            
+            console.log(`Found ${sprints.length} sprint(s) for team`);
+            if (recommendedSprint) {
+                console.log(`Recommended sprint: ${recommendedSprint.name}`);
+            }
+
+            // Step 7: Return complete result
             return {
                 success: true,
                 repoName,
@@ -1024,6 +1132,9 @@ export class FeedbackService {
                 recommendedInitiativeName: recommendedInitiative.name,
                 jiraTeam,
                 epics,
+                sprints,
+                recommendedSprintId: recommendedSprint?.id,
+                recommendedSprintName: recommendedSprint?.name,
                 autoPopulated: true
             };
 
@@ -1033,6 +1144,7 @@ export class FeedbackService {
                 success: false,
                 initiatives: [],
                 epics: [],
+                sprints: [],
                 autoPopulated: false,
                 fallbackReason: `Error: ${(error as Error).message}`
             };

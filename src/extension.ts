@@ -802,6 +802,21 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    const loadSprintsForTeamCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadSprintsForTeam', async (teamName: string) => {
+        try {
+            console.log(`Loading sprints for team: ${teamName}`);
+            const sprints = await feedbackService.getSprintsForTeam(teamName);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendSprintDetails(sprints);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load sprints for team: ${(error as Error).message}`);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendSprintDetails([]);
+            }
+        }
+    });
+
     const autoPopulateFromGitCommand = vscode.commands.registerCommand('specDrivenDevelopment.autoPopulateFromGit', async () => {
         try {
             console.log('Auto-populate from Git command triggered');
@@ -1753,6 +1768,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         loadEpicsCommand,
         loadEpicsForInitiativeCommand,
         loadSprintDetailsCommand,
+        loadSprintsForTeamCommand,
         autoPopulateFromGitCommand,
         submitFeedbackCommand,
         importTaskMasterCommand,

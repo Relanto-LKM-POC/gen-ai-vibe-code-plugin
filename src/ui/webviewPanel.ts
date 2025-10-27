@@ -61,6 +61,10 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('specDrivenDevelopment.loadSprintDetails');
                         break;
 
+                    case 'loadSprintsForTeam':
+                        vscode.commands.executeCommand('specDrivenDevelopment.loadSprintsForTeam', message.teamName);
+                        break;
+
                     case 'autoPopulateFromGit':
                         vscode.commands.executeCommand('specDrivenDevelopment.autoPopulateFromGit');
                         break;

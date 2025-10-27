@@ -283,6 +283,36 @@
             }
         });
 
+        // Handle epic change - load sprints for selected epic's team
+        const epicSelect = document.getElementById('epic');
+        epicSelect.addEventListener('change', () => {
+            const sprintSelect = document.getElementById('jira-sprint');
+            const selectedEpicId = epicSelect.value;
+            
+            if (!selectedEpicId) {
+                // No epic selected, clear sprints or load all
+                vscode.postMessage({ command: 'loadSprintDetails' });
+                return;
+            }
+            
+            // Find the team name from the epic's data
+            // Epics are stored in currentState.allEpics with teamName property
+            const selectedEpic = currentState.allEpics.find(epic => epic.id === selectedEpicId);
+            
+            if (selectedEpic && selectedEpic.teamName) {
+                // Request sprints for this team from backend
+                console.log(`Loading sprints for team: ${selectedEpic.teamName}`);
+                vscode.postMessage({ 
+                    command: 'loadSprintsForTeam', 
+                    teamName: selectedEpic.teamName 
+                });
+            } else {
+                // Fallback: load all sprints
+                console.log('No team name found for epic, loading all sprints');
+                vscode.postMessage({ command: 'loadSprintDetails' });
+            }
+        });
+
         // Handle form submission
         submitFeedbackBtn.addEventListener('click', () => {
             // Check AWS connection first
@@ -1656,6 +1686,15 @@
                 break;
             case 'sprintDetailsLoaded':
                 populateSprintDetailsDropdown(message.data);
+                // Auto-select recommended sprint if present
+                const recommendedSprint = message.data.find(s => s.recommended);
+                if (recommendedSprint) {
+                    const sprintField = document.getElementById('jira-sprint');
+                    if (sprintField) {
+                        sprintField.value = recommendedSprint.id;
+                        console.log(`Auto-selected recommended sprint: ${recommendedSprint.name}`);
+                    }
+                }
                 break;
             case 'autoPopulationResult':
                 console.log('Auto-population result received:', message.data);
@@ -2447,6 +2486,7 @@ Do you want to submit it again?`);
         
         const initiativeField = document.getElementById('initiative');
         const epicField = document.getElementById('epic');
+        const sprintField = document.getElementById('jira-sprint');
         const autoPopulateBadge = document.getElementById('auto-populate-badge');
         
         if (!data.success) {
@@ -2455,6 +2495,7 @@ Do you want to submit it again?`);
             if (currentState.awsStatus && currentState.awsStatus.status === 'connected') {
                 vscode.postMessage({ command: 'loadInitiatives' });
                 vscode.postMessage({ command: 'loadEpics' });
+                vscode.postMessage({ command: 'loadSprintDetails' });
             }
             return;
         }
@@ -2477,6 +2518,18 @@ Do you want to submit it again?`);
         if (data.epics && data.epics.length > 0) {
             populateEpicsDropdown(data.epics);
             console.log(`Populated ${data.epics.length} epics`);
+        }
+        
+        // Populate sprint dropdown
+        if (data.sprints && data.sprints.length > 0) {
+            populateSprintDetailsDropdown(data.sprints);
+            console.log(`Populated ${data.sprints.length} sprints`);
+            
+            // Auto-select recommended sprint
+            if (data.recommendedSprintId && sprintField) {
+                sprintField.value = data.recommendedSprintId;
+                console.log(`Auto-selected sprint: ${data.recommendedSprintName}`);
+            }
         }
         
         // Show success badge
