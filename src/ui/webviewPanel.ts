@@ -53,8 +53,16 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('specDrivenDevelopment.loadEpics', message.initiativeId);
                         break;
 
+                    case 'loadEpicsForInitiative':
+                        vscode.commands.executeCommand('specDrivenDevelopment.loadEpicsForInitiative', message.jiraTeam);
+                        break;
+
                     case 'loadSprintDetails':
                         vscode.commands.executeCommand('specDrivenDevelopment.loadSprintDetails');
+                        break;
+
+                    case 'autoPopulateFromGit':
+                        vscode.commands.executeCommand('specDrivenDevelopment.autoPopulateFromGit');
                         break;
 
                     case 'getEstimationData':
@@ -191,6 +199,15 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: 'sprintDetailsLoaded',
                 data: sprints
+            });
+        }
+    }
+
+    public sendAutoPopulationResult(result: any) {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'autoPopulationResult',
+                data: result
             });
         }
     }
@@ -478,7 +495,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 </div>
                                 
                                 <div class="input-group">
-                                    <label for="initiative">Initiative: <span class="required">*</span></label>
+                                    <label for="initiative">Initiative: <span class="required">*</span><span id="auto-populate-badge" style="display: none;"></span></label>
                                     <select id="initiative" required>
                                         <option value="">Loading initiatives...</option>
                                     </select>

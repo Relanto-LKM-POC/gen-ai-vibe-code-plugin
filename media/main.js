@@ -10,6 +10,7 @@
         settings: {},
         parsedEstimation: null,
         allEpics: [], // Store all epics for filtering
+        allInitiatives: [], // Store all initiatives with jiraTeam data
         pagination: null, // Store pagination state
         currentTaskList: [], // Store current task list
         editingTask: null, // Store currently editing task data
@@ -251,11 +252,35 @@
             }
         });
 
-        // Handle initiative change - just reset epic selection since all epics are already loaded
+        // Handle initiative change - load epics for selected initiative's jira team
         const initiativeSelect = document.getElementById('initiative');
         initiativeSelect.addEventListener('change', () => {
             const epicSelect = document.getElementById('epic');
-            epicSelect.value = ''; // Reset epic selection when initiative changes
+            const selectedInitiativeId = initiativeSelect.value;
+            
+            if (!selectedInitiativeId) {
+                // No initiative selected, clear epics
+                epicSelect.innerHTML = '<option value="">Select Epic...</option>';
+                epicSelect.value = '';
+                return;
+            }
+            
+            // Find the selected initiative's jiraTeam
+            const selectedOption = initiativeSelect.options[initiativeSelect.selectedIndex];
+            const jiraTeam = selectedOption.getAttribute('data-jira-team');
+            
+            if (jiraTeam) {
+                // Request epics for this jira team from backend
+                console.log(`Loading epics for Jira team: ${jiraTeam}`);
+                vscode.postMessage({ 
+                    command: 'loadEpicsForInitiative', 
+                    jiraTeam: jiraTeam 
+                });
+            } else {
+                // Fallback: load all epics
+                console.log('No jiraTeam found for initiative, loading all epics');
+                vscode.postMessage({ command: 'loadEpics' });
+            }
         });
 
         // Handle form submission
@@ -400,9 +425,10 @@
             return;
         }
 
-        // Load initiatives, epics, and sprint details
-        vscode.postMessage({ command: 'loadInitiatives' });
-        vscode.postMessage({ command: 'loadEpics' });
+        // Trigger auto-population from Git repository
+        autoPopulateFromGit();
+        
+        // Also load sprint details (not auto-populated)
         vscode.postMessage({ command: 'loadSprintDetails' });
     }
 
@@ -1008,6 +1034,9 @@
 
     // Populate initiatives dropdown
     function populateInitiativesDropdown(initiatives) {
+        // Store initiatives with jiraTeam data
+        currentState.allInitiatives = initiatives || [];
+        
         const initiativeSelect = document.getElementById('initiative');
         
         if (!canSubmitFeedback()) {
@@ -1024,6 +1053,10 @@
                 const option = document.createElement('option');
                 option.value = initiative.id;
                 option.textContent = initiative.name;
+                // Store jiraTeam as a data attribute
+                if (initiative.jiraTeam) {
+                    option.setAttribute('data-jira-team', initiative.jiraTeam);
+                }
                 initiativeSelect.appendChild(option);
             });
         } else {
@@ -1623,6 +1656,10 @@
                 break;
             case 'sprintDetailsLoaded':
                 populateSprintDetailsDropdown(message.data);
+                break;
+            case 'autoPopulationResult':
+                console.log('Auto-population result received:', message.data);
+                handleAutoPopulationResult(message.data);
                 break;
             
             // Task List Messages
@@ -2391,6 +2428,64 @@ Do you want to submit it again?`);
                 console.log(`❌ No matching initiative found for: "${jsonInitiative}"`);
                 console.log(`Available options:`, Array.from(initiativeField.options).map((opt, i) => `${i}: "${opt.text}"`));
             }
+        }
+        
+        // Trigger auto-population from Git after populating task data
+        console.log('Task populated, triggering auto-population from Git...');
+        autoPopulateFromGit();
+    }
+
+    // Auto-populate Initiative and Epic from Git repository
+    function autoPopulateFromGit() {
+        console.log('Triggering auto-population from Git repository...');
+        vscode.postMessage({ command: 'autoPopulateFromGit' });
+    }
+
+    // Handle auto-population result
+    function handleAutoPopulationResult(data) {
+        console.log('Auto-population result received:', data);
+        
+        const initiativeField = document.getElementById('initiative');
+        const epicField = document.getElementById('epic');
+        const autoPopulateBadge = document.getElementById('auto-populate-badge');
+        
+        if (!data.success) {
+            console.log('Auto-population failed:', data.fallbackReason);
+            // Fall back to manual selection - load dropdowns normally
+            if (currentState.awsStatus && currentState.awsStatus.status === 'connected') {
+                vscode.postMessage({ command: 'loadInitiatives' });
+                vscode.postMessage({ command: 'loadEpics' });
+            }
+            return;
+        }
+        
+        console.log(`Auto-population successful: ${data.repoName} → ${data.applicationName}`);
+        
+        // Populate initiative dropdown
+        if (data.initiatives && data.initiatives.length > 0) {
+            populateInitiativesDropdown(data.initiatives);
+            
+            // Auto-select recommended initiative
+            if (data.recommendedInitiativeId && initiativeField) {
+                initiativeField.value = data.recommendedInitiativeId;
+                initiativeField.dispatchEvent(new Event('change'));
+                console.log(`Auto-selected initiative: ${data.recommendedInitiativeName}`);
+            }
+        }
+        
+        // Populate epic dropdown
+        if (data.epics && data.epics.length > 0) {
+            populateEpicsDropdown(data.epics);
+            console.log(`Populated ${data.epics.length} epics`);
+        }
+        
+        // Show success badge
+        if (autoPopulateBadge) {
+            autoPopulateBadge.textContent = `✓ Auto-populated from repository: ${data.repoName}`;
+            autoPopulateBadge.style.display = 'inline-block';
+            autoPopulateBadge.style.color = '#4caf50';
+            autoPopulateBadge.style.fontSize = '12px';
+            autoPopulateBadge.style.marginLeft = '8px';
         }
     }
 

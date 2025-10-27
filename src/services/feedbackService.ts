@@ -3,6 +3,7 @@ import * as os from 'os';
 import { NotificationManager } from './notificationManager';
 import { JiraService } from './jiraService';
 import { AWSService } from './awsService';
+import { GitService } from './gitService';
 import { CONFIG, getSalesforceApiUrl, getSalesforceDescribeUrl, getSalesforceQueryUrl } from '../config/config';
 
 // Helper function for fetch with timeout
@@ -755,6 +756,287 @@ export class FeedbackService {
             timestamp: new Date().toISOString(),
             error: 'Feature requires initiative and epic selection'
         };
+    }
+
+    /**
+     * API 14: Get Application from Repository Name
+     * Queries Git_Details__c to find the application linked to the repository
+     */
+    public async getApplicationFromRepo(repoName: string): Promise<{ id: string; name: string; gitUrl: string } | null> {
+        try {
+            console.log('Getting application for repo:', repoName);
+            const token = await this.getAccessTokenWithRetryAndProtection();
+
+            // API 14: Query Git_Details__c
+            const query = encodeURIComponent(
+                `SELECT id, Name, Git_URL__c, CX_Application_Name__r.Id, CX_Application_Name__r.Name ` +
+                `FROM Git_Details__c ` +
+                `WHERE CX_Application_Name__r.Application_Lifecycle__c != 'EOL' ` +
+                `AND Name = '${repoName.replace(/'/g, "\\'")}'`
+            );
+
+            const response = await fetchWithTimeout(getSalesforceQueryUrl(query), {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.records && data.records.length > 0) {
+                const record = data.records[0];
+                const result = {
+                    id: record.CX_Application_Name__r?.Id || '',
+                    name: record.CX_Application_Name__r?.Name || '',
+                    gitUrl: record.Git_URL__c || ''
+                };
+                console.log('Found application:', result);
+                return result;
+            }
+
+            console.log('No application found for repo:', repoName);
+            return null;
+
+        } catch (error) {
+            console.error('Error getting application from repo:', error);
+            return null;
+        }
+    }
+
+    /**
+     * API 15: Get Initiatives from Application Name
+     * Queries App_Items__c to find initiatives linked to the application
+     */
+    public async getInitiativesFromApplication(applicationName: string): Promise<Array<{ id: string; name: string; jiraTeam: string }>> {
+        try {
+            console.log('Getting initiatives for application:', applicationName);
+            const token = await this.getAccessTokenWithRetryAndProtection();
+
+            // API 15: Query App_Items__c
+            const query = encodeURIComponent(
+                `SELECT id, name, Initiative__c, App__r.Name, Initiative__r.Id, Initiative__r.Name, Initiative__r.Jira_Team__c ` +
+                `FROM App_Items__c ` +
+                `WHERE App__r.Name = '${applicationName.replace(/'/g, "\\'")}'`
+            );
+
+            const response = await fetchWithTimeout(getSalesforceQueryUrl(query), {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.records && data.records.length > 0) {
+                const initiatives = data.records.map((record: any) => ({
+                    id: record.Initiative__r?.Id || record.Initiative__c || '',
+                    name: record.Initiative__r?.Name || '',
+                    jiraTeam: record.Initiative__r?.Jira_Team__c || ''
+                })).filter((init: any) => init.id && init.name); // Filter out invalid records
+
+                console.log(`Found ${initiatives.length} initiatives for application`);
+                return initiatives;
+            }
+
+            console.log('No initiatives found for application:', applicationName);
+            return [];
+
+        } catch (error) {
+            console.error('Error getting initiatives from application:', error);
+            return [];
+        }
+    }
+
+    /**
+     * API 16: Get Epics from Jira Team
+     * Queries Epic__c to find active epics for the specified team
+     */
+    public async getEpicsFromInitiative(jiraTeam: string): Promise<Array<{ id: string; name: string; teamName: string; status: string }>> {
+        try {
+            console.log('Getting epics for Jira team:', jiraTeam);
+            const token = await this.getAccessTokenWithRetryAndProtection();
+
+            // API 16: Query Epic__c
+            const query = encodeURIComponent(
+                `SELECT id, name, Team_Name__c, Status__c ` +
+                `FROM Epic__c ` +
+                `WHERE Team_Name__c LIKE '%${jiraTeam.replace(/'/g, "\\'")}%' ` +
+                `AND Status__c != 'done' ` +
+                `ORDER BY CreatedDate DESC`
+            );
+
+            const response = await fetchWithTimeout(getSalesforceQueryUrl(query), {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.records && data.records.length > 0) {
+                const epics = data.records.map((record: any) => ({
+                    id: record.Id,
+                    name: record.Name,
+                    teamName: record.Team_Name__c || '',
+                    status: record.Status__c || ''
+                }));
+
+                console.log(`Found ${epics.length} epics for Jira team`);
+                return epics;
+            }
+
+            console.log('No epics found for Jira team:', jiraTeam);
+            return [];
+
+        } catch (error) {
+            console.error('Error getting epics from initiative:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Auto-populate Initiative and Epic from Git Repository
+     * Chains API 14 → 15 → 16 to auto-detect based on workspace repo
+     */
+    public async autoPopulateFromGit(): Promise<{
+        success: boolean;
+        repoName?: string;
+        applicationName?: string;
+        initiatives: Array<{ id: string; name: string; jiraTeam: string }>;
+        recommendedInitiativeId?: string;
+        recommendedInitiativeName?: string;
+        jiraTeam?: string;
+        epics: Array<{ id: string; name: string; teamName: string; status: string }>;
+        autoPopulated: boolean;
+        fallbackReason?: string;
+    }> {
+        try {
+            console.log('Starting auto-population from Git repository...');
+
+            // Step 1: Get repository name from workspace
+            const repoName = await GitService.getRepositoryName();
+            
+            if (!repoName) {
+                console.log('Could not detect Git repository in workspace');
+                return {
+                    success: false,
+                    initiatives: [],
+                    epics: [],
+                    autoPopulated: false,
+                    fallbackReason: 'No Git repository detected in workspace'
+                };
+            }
+
+            console.log(`Detected repository: ${repoName}`);
+
+            // Step 2: Get Application from Repository (API 14)
+            const application = await this.getApplicationFromRepo(repoName);
+            
+            if (!application || !application.name) {
+                console.log('Repository not found in Salesforce');
+                
+                // Show notification to user
+                vscode.window.showWarningMessage(
+                    `Repository "${repoName}" is not present in Hub. Using manual dropdowns.`
+                );
+                
+                return {
+                    success: false,
+                    repoName,
+                    initiatives: [],
+                    epics: [],
+                    autoPopulated: false,
+                    fallbackReason: `Repository "${repoName}" not registered in Salesforce`
+                };
+            }
+
+            console.log(`Found application: ${application.name}`);
+
+            // Step 3: Get Initiatives from Application (API 15)
+            const initiatives = await this.getInitiativesFromApplication(application.name);
+            
+            if (initiatives.length === 0) {
+                console.log('No initiatives found for application');
+                return {
+                    success: false,
+                    repoName,
+                    applicationName: application.name,
+                    initiatives: [],
+                    epics: [],
+                    autoPopulated: false,
+                    fallbackReason: `No initiatives found for application "${application.name}"`
+                };
+            }
+
+            console.log(`Found ${initiatives.length} initiative(s)`);
+
+            // Step 4: Select recommended initiative (first one or apply business logic)
+            const recommendedInitiative = initiatives[0];
+            const jiraTeam = recommendedInitiative.jiraTeam;
+
+            if (!jiraTeam) {
+                console.log('No Jira team found for initiative');
+                return {
+                    success: true,
+                    repoName,
+                    applicationName: application.name,
+                    initiatives,
+                    recommendedInitiativeId: recommendedInitiative.id,
+                    recommendedInitiativeName: recommendedInitiative.name,
+                    epics: [],
+                    autoPopulated: true,
+                    fallbackReason: 'No Jira team associated with initiative'
+                };
+            }
+
+            console.log(`Recommended initiative: ${recommendedInitiative.name} (Team: ${jiraTeam})`);
+
+            // Step 5: Get Epics from Jira Team (API 16)
+            const epics = await this.getEpicsFromInitiative(jiraTeam);
+            
+            console.log(`Found ${epics.length} epic(s) for team`);
+
+            // Step 6: Return complete result
+            return {
+                success: true,
+                repoName,
+                applicationName: application.name,
+                initiatives,
+                recommendedInitiativeId: recommendedInitiative.id,
+                recommendedInitiativeName: recommendedInitiative.name,
+                jiraTeam,
+                epics,
+                autoPopulated: true
+            };
+
+        } catch (error) {
+            console.error('Error in auto-population from Git:', error);
+            return {
+                success: false,
+                initiatives: [],
+                epics: [],
+                autoPopulated: false,
+                fallbackReason: `Error: ${(error as Error).message}`
+            };
+        }
     }
 
     public dispose(): void {

@@ -773,6 +773,21 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    const loadEpicsForInitiativeCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadEpicsForInitiative', async (jiraTeam: string) => {
+        try {
+            console.log(`Loading epics for Jira team: ${jiraTeam}`);
+            const epics = await feedbackService.getEpicsFromInitiative(jiraTeam);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendEpics(epics);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to load epics for initiative: ${(error as Error).message}`);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendEpics([]);
+            }
+        }
+    });
+
     const loadSprintDetailsCommand = vscode.commands.registerCommand('specDrivenDevelopment.loadSprintDetails', async () => {
         try {
             const sprints = await feedbackService.getSprintDetails();
@@ -783,6 +798,35 @@ function registerCommands(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage(`Failed to load sprint details: ${(error as Error).message}`);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendSprintDetails([]);
+            }
+        }
+    });
+
+    const autoPopulateFromGitCommand = vscode.commands.registerCommand('specDrivenDevelopment.autoPopulateFromGit', async () => {
+        try {
+            console.log('Auto-populate from Git command triggered');
+            const result = await feedbackService.autoPopulateFromGit();
+            
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendAutoPopulationResult(result);
+            }
+            
+            // Log result for debugging
+            if (result.success) {
+                console.log(`Auto-population successful: ${result.repoName} → ${result.applicationName} → ${result.recommendedInitiativeName}`);
+            } else {
+                console.log(`Auto-population failed: ${result.fallbackReason}`);
+            }
+        } catch (error) {
+            console.error('Error in autoPopulateFromGitCommand:', error);
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.sendAutoPopulationResult({
+                    success: false,
+                    initiatives: [],
+                    epics: [],
+                    autoPopulated: false,
+                    fallbackReason: `Error: ${(error as Error).message}`
+                });
             }
         }
     });
@@ -1707,7 +1751,9 @@ function registerCommands(context: vscode.ExtensionContext) {
         updateJiraIssueCommand,
         loadInitiativesCommand,
         loadEpicsCommand,
+        loadEpicsForInitiativeCommand,
         loadSprintDetailsCommand,
+        autoPopulateFromGitCommand,
         submitFeedbackCommand,
         importTaskMasterCommand,
         checkDuplicateTaskMasterCommand,
