@@ -327,28 +327,16 @@ export class TaskService {
     }
 
     /**
-     * Retrieve Done tickets (locally cleaned up) with pagination and search
+     * Retrieve Done tickets (Status = 'Done' in Salesforce) with pagination and search
      */
     async retrieveArchivedTasks(options: { limit?: number; offset?: number; searchTerm?: string } = {}): Promise<{ tasks: Task[]; totalCount: number; hasMore: boolean }> {
         try {
-            // Get the list of locally cleaned up task IDs
-            const cleanedUpTasks = this.context.workspaceState.get<string[]>('cleanedUpTaskIds', []);
-            
-            if (cleanedUpTasks.length === 0) {
-                return {
-                    tasks: [],
-                    totalCount: 0,
-                    hasMore: false
-                };
-            }
-
             const token = await this.getAccessToken();
             const limit = options.limit || 20;
             const offset = options.offset || 0;
 
-            // Build query to get all the cleaned up tasks by their IDs
-            const taskIdsString = cleanedUpTasks.map(id => `'${id}'`).join(',');
-            let whereClause = `WHERE Id IN (${taskIdsString})`;
+            // Build the WHERE clause for Done tickets
+            let whereClause = "WHERE Status__c = 'Done'";
             
             if (options.searchTerm) {
                 const searchTerm = options.searchTerm.trim().replace(/'/g, "\\'");
@@ -364,7 +352,7 @@ export class TaskService {
                 }
             }
 
-            // Use the same query structure as other tasks
+            // Query for Done tickets from Salesforce (API 13 pattern)
             const query = encodeURIComponent(
                 `SELECT Id,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,CreatedDate,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
@@ -383,16 +371,38 @@ export class TaskService {
 
             const data = await response.json();
             
-            // Total count is based on the locally cleaned up tasks
-            const totalCount = cleanedUpTasks.length;
+            // Get total count for pagination
+            const countQuery = encodeURIComponent(
+                `SELECT COUNT() FROM Feedback__c ${whereClause}`
+            );
+            
+            let totalCount = data.records?.length || 0;
+            try {
+                const countResponse = await fetch(getSalesforceQueryUrl(countQuery), {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (countResponse.ok) {
+                    const countData = await countResponse.json();
+                    totalCount = countData.totalSize || 0;
+                }
+            } catch (error) {
+                console.warn('Failed to get Done tickets total count, using records length');
+            }
+
+            console.log(`Retrieved ${data.records?.length || 0} Done tickets from Salesforce (total count: ${totalCount})`);
 
             return {
                 tasks: data.records || [],
-                totalCount,
+                totalCount: totalCount,
                 hasMore: (offset + limit) < totalCount
             };
         } catch (error) {
-            console.error('Error retrieving done tickets:', error);
+            console.error('Error retrieving Done tickets:', error);
             throw error;
         }
     }
@@ -530,39 +540,66 @@ export class TaskService {
     }
 
     /**
-     * Cleanup (Delete) a task - stores locally as done without modifying Salesforce
+     * Cleanup (Mark as Done) a task - Updates Salesforce with Done status and moves to archived
      */
-    async cleanupTask(taskId: string): Promise<any> {
+    async cleanupTask(task: Task): Promise<any> {
         try {
-            // Store the cleaned up task ID in VS Code workspace state
-            const cleanedUpTasks = this.context.workspaceState.get<string[]>('cleanedUpTaskIds', []);
+            // 1. Calculate actual hours from task creation to now
+            const actualHours = this.calculateActualHours(task.CreatedDate || new Date().toISOString());
             
-            if (!cleanedUpTasks.includes(taskId)) {
-                cleanedUpTasks.push(taskId);
+            // 2. Get current date in Salesforce format (YYYY-MM-DD)
+            const deploymentDate = new Date().toISOString().split('T')[0];
+            
+            // 3. Prepare update payload to mark task as Done
+            const updates = {
+                status: 'Done',
+                deploymentDate: deploymentDate,
+                actualHours: actualHours,
+                resolution: 'Done'
+            };
+            
+            console.log('Marking task as Done in Salesforce:', task.Id, updates);
+            
+            // 4. Update task in Salesforce
+            await this.updateTask(task.Id, updates);
+            
+            // 5. Store locally to hide from WIP list immediately (for UI responsiveness)
+            const cleanedUpTasks = this.context.workspaceState.get<string[]>('cleanedUpTaskIds', []);
+            if (!cleanedUpTasks.includes(task.Id)) {
+                cleanedUpTasks.push(task.Id);
                 await this.context.workspaceState.update('cleanedUpTaskIds', cleanedUpTasks);
             }
             
-            console.log('Task marked as cleaned up locally:', taskId);
-            return { success: true };
+            console.log('Task successfully marked as Done:', task.Id);
+            return { success: true, message: 'Task marked as Done successfully' };
         } catch (error) {
-            console.error('Error cleaning up task:', error);
+            console.error('Error marking task as done:', error);
             throw error;
         }
     }
 
     /**
-     * Restore a task from done back to active status
+     * Restore a task from done back to active status (changes Status back to previous state in Salesforce)
      */
     async restoreTask(taskId: string): Promise<any> {
         try {
-            // Remove the task ID from the cleaned up list in VS Code workspace state
+            // Update task status back to 'Backlog' or 'In Progress' in Salesforce
+            const updates = {
+                status: 'Backlog', // Or use previous status if tracked
+                // Note: We don't clear deployment date, actual hours, or resolution
+                // as they represent historical data
+            };
+            
+            console.log('Restoring task in Salesforce:', taskId, updates);
+            await this.updateTask(taskId, updates);
+            
+            // Also remove from local state if it was there
             const cleanedUpTasks = this.context.workspaceState.get<string[]>('cleanedUpTaskIds', []);
             const updatedCleanedUpTasks = cleanedUpTasks.filter(id => id !== taskId);
-            
             await this.context.workspaceState.update('cleanedUpTaskIds', updatedCleanedUpTasks);
             
-            console.log('Task restored from cleaned up list:', taskId);
-            return { success: true };
+            console.log('Task successfully restored:', taskId);
+            return { success: true, message: 'Task restored successfully' };
         } catch (error) {
             console.error('Error restoring task:', error);
             throw error;

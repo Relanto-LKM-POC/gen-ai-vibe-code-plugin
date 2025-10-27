@@ -1406,14 +1406,11 @@
                     </button>
                 </div>`;
         } else if (taskType === 'archived') {
-            // Done tasks: View and Restore buttons
+            // Done tasks: View button only (read-only, no restore)
             actionButtonsHTML = `
                 <div class="task-actions">
                     <button class="task-action-btn view" data-action="view" data-task-id="${task.Id}" data-task-data='${JSON.stringify(task).replace(/'/g, "&apos;")}'>
                         View
-                    </button>
-                    <button class="task-action-btn restore" data-action="restore" data-task-id="${task.Id}" data-task-name="${task.Name}">
-                        Restore
                     </button>
                 </div>`;
         } else {
@@ -1530,12 +1527,6 @@
                             console.warn('No task data attribute found for view button');
                         }
                         break;
-                    case 'restore':
-                        vscode.postMessage({ 
-                            command: 'restoreTask', 
-                            data: taskData 
-                        });
-                        break;
                 }
             });
         });
@@ -1577,49 +1568,6 @@
                     activeTab.click();
                 }
             }
-        }
-    }
-
-    function handleTaskRestored(taskId) {
-        console.log('Handling task restored for taskId:', taskId);
-        
-        // Remove the task from the archived list immediately
-        const currentTaskItems = document.querySelectorAll('.task-item');
-        console.log(`Found ${currentTaskItems.length} task items on page`);
-        
-        let taskFound = false;
-        currentTaskItems.forEach(item => {
-            const itemTaskId = item.getAttribute('data-task-id');
-            console.log(`Comparing taskIds: item="${itemTaskId}" vs restored="${taskId}"`);
-            if (itemTaskId === taskId) {
-                console.log('Found matching task, removing from UI');
-                taskFound = true;
-                item.remove();
-                
-                // Update task count
-                const taskCount = document.getElementById('task-count');
-                const remainingTasks = document.querySelectorAll('.task-item').length;
-                if (taskCount) {
-                    taskCount.textContent = `${remainingTasks} task${remainingTasks !== 1 ? 's' : ''}`;
-                }
-                
-                // Show empty state if no tasks remain
-                if (remainingTasks === 0) {
-                    const taskEmptyState = document.getElementById('task-empty-state');
-                    const taskList = document.getElementById('task-list');
-                    if (taskEmptyState) {
-                        taskEmptyState.innerHTML = '<p>No done tickets remaining.</p>';
-                        taskEmptyState.style.display = 'block';
-                    }
-                    if (taskList) taskList.style.display = 'none';
-                }
-            }
-        });
-        
-        if (!taskFound) {
-            console.warn('Task with ID', taskId, 'not found in current archived list');
-        } else {
-            console.log('Task successfully removed from archived list UI');
         }
     }
 
@@ -1693,10 +1641,6 @@
                 } else {
                     console.warn('Invalid task data received for edit form:', message.data);
                 }
-                break;
-            case 'taskRestored':
-                console.log('Task restored notification received:', message.data);
-                handleTaskRestored(message.data.taskId);
                 break;
             case 'populateFromTaskMaster':
                 console.log('TaskMaster data received:', message.data);

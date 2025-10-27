@@ -465,7 +465,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 <div class="input-group">
                                     <label for="feedback-type">Type: <span class="required">*</span></label>
                                     <select id="feedback-type" required>
-                                        <option value="">Select Type...</option>
+                                        <option value="">Select Jira Type...</option>
                                         <option value="Story">Story</option>
                                         <option value="Bug">Bug</option>
                                         <option value="Defect">Defect</option>
@@ -474,7 +474,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 
                                 <div class="input-group">
                                     <label for="estimated-hours">Estimated Hours: <span class="required">*</span></label>
-                                    <input type="number" id="estimated-hours" min="0.5" step="0.5" placeholder="e.g. 8" required />
+                                    <input type="number" id="estimated-hours" min="0.5" step="0.5" placeholder="e.g. 8 or 8.5 hours" required />
                                 </div>
                                 
                                 <div class="input-group">
@@ -645,7 +645,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                                 <div class="input-group">
                                                     <label for="edit-estimated-hours">Estimated Hours:</label>
                                                     <div class="estimation-input-group">
-                                                        <input type="number" id="edit-estimated-hours" step="0.5" min="0" placeholder="e.g., 15" />
+                                                        <input type="number" id="edit-estimated-hours" step="0.5" min="0" placeholder="e.g. 8 or 8.5 hours" />
                                                         <select id="edit-estimation-unit">
                                                             <option value="hours">Hours</option>
                                                             <option value="days">Days</option>

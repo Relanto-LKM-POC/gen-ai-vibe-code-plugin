@@ -1634,9 +1634,39 @@ function registerCommands(context: vscode.ExtensionContext) {
     const cleanupTaskCommand = vscode.commands.registerCommand('specDrivenDevelopment.cleanupTask', async (taskData: any) => {
         try {
             const { taskId, taskName } = taskData;
-            console.log('Cleanup task command triggered for:', taskId, taskName);
+            console.log('Marking task as Done in Salesforce:', taskId, taskName);
             
-            const result = await taskService.cleanupTask(taskId);
+            // Retrieve full task object to get CreatedDate and other fields
+            const wipResult = await taskService.retrieveWipTasks({ limit: 1000 });
+            const fullTask = wipResult.tasks.find((t: any) => t.Id === taskId);
+            
+            if (!fullTask) {
+                throw new Error('Task not found in WIP list');
+            }
+            
+            // Extract ticket number from Jira link
+            const ticketNumber = taskService.extractTicketNumber(fullTask.Jira_Link__c);
+            
+            // Calculate actual hours and deployment date for confirmation dialog
+            const actualHours = taskService.calculateActualHours(fullTask.CreatedDate || new Date().toISOString());
+            const deploymentDate = new Date().toISOString().split('T')[0];
+            
+            // Show confirmation dialog with ticket details
+            const confirmMessage = `Are you sure you want to submit ticket ${ticketNumber}?\n\nActual Hours: ${actualHours}\nDeployment Date: ${deploymentDate}`;
+            const confirmation = await vscode.window.showWarningMessage(
+                confirmMessage,
+                { modal: true },
+                'Yes, Submit'
+            );
+            
+            // If user cancels, exit early
+            if (confirmation !== 'Yes, Submit') {
+                console.log('User cancelled ticket submission');
+                return;
+            }
+            
+            // Call cleanupTask with full task object
+            const result = await taskService.cleanupTask(fullTask);
             
             if (specDrivenDevelopmentPanel) {
                 // Send result with task ID for UI removal
@@ -1644,13 +1674,13 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
             
             if (result.success) {
-                vscode.window.showInformationMessage(`✅ Task "${taskName}" removed from list`);
+                vscode.window.showInformationMessage(`✅ Ticket ${ticketNumber} marked as done successfully!`);
             } else {
-                vscode.window.showErrorMessage(`❌ Failed to cleanup task: ${result.message}`);
+                vscode.window.showErrorMessage(`❌ Failed to mark ticket as Done: ${result.message}`);
             }
         } catch (error) {
             console.error('Error in cleanupTaskCommand:', error);
-            vscode.window.showErrorMessage(`Failed to cleanup task: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to mark ticket as Done: ${(error as Error).message}`);
         }
     });
 
