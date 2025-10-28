@@ -981,12 +981,12 @@
         }
         
         if (result.success) {
-            // Extract Jira ticket ID from Jira URL if available
+            // Extract Jira ticket ID from Jira URL if available - supports any project format
             let displayTicketId = result.ticketId || 'N/A';
             if (result.jiraUrl) {
-                const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+                const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z0-9]+-\d+)/i);
                 if (jiraTicketMatch) {
-                    displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+                    displayTicketId = jiraTicketMatch[1]; // Extract GAI-572, DEVSECOPS-12208, etc. from URL
                 }
             }
             
@@ -1567,7 +1567,8 @@
 
     function extractTicketNumber(jiraLink) {
         if (!jiraLink) return 'N/A';
-        const match = jiraLink.match(/\/browse\/([A-Z]+-\d+)/);
+        // Future-proof pattern supporting GAI-572, DEVSECOPS-12208, ABC123-999, etc.
+        const match = jiraLink.match(/\/browse\/([A-Z0-9]+-\d+)/i);
         return match ? match[1] : 'N/A';
     }
 
@@ -1805,12 +1806,12 @@
 
     // Show duplicate submission confirmation dialog
     function showDuplicateSubmissionDialog(result) {
-        // Extract Jira ticket ID from the previous submission if available
+        // Extract Jira ticket ID from the previous submission - supports any project format
         let displayTicketId = result.previousSubmission.ticketId;
         if (result.previousSubmission.jiraUrl) {
-            const jiraTicketMatch = result.previousSubmission.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
+            const jiraTicketMatch = result.previousSubmission.jiraUrl.match(/\/browse\/([A-Z0-9]+-\d+)/i);
             if (jiraTicketMatch) {
-                displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+                displayTicketId = jiraTicketMatch[1]; // Extract GAI-572, DEVSECOPS-12208, etc. from URL
             }
         }
 

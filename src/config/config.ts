@@ -29,6 +29,15 @@ export const CONFIG = {
     
     cache: {
         tokenTTL: 30 * 60 * 1000 // 30 minutes in milliseconds
+    },
+    
+    jira: {
+        // Pattern to extract JIRA ticket ID from URL like /browse/GAI-572 or /browse/DEVSECOPS-12208
+        // Supports any project key format: [A-Z0-9]+ followed by dash and numbers
+        ticketPattern: /\/browse\/([A-Z0-9]+-\d+)/i,
+        
+        // Pattern to validate standalone JIRA ticket IDs like GAI-572, DEVSECOPS-12208, ABC123-999
+        ticketIdPattern: /^[A-Z0-9]+-\d+$/i
     }
 } as const;
 

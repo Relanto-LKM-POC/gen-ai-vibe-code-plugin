@@ -607,15 +607,50 @@ export class TaskService {
     }
 
     /**
-     * Extract JIRA ticket number from Jira link
+     * Extract JIRA ticket ID from various input formats
+     * Supports: URLs like /browse/GAI-572, full URLs, or plain ticket IDs like DEVSECOPS-12208
+     * @param input JIRA link URL or ticket ID
+     * @returns JIRA ticket ID (e.g., "GAI-572") or null if not found
+     */
+    extractJiraTicketId(input?: string): string | null {
+        if (!input) {
+            return null;
+        }
+
+        // First try to extract from URL pattern /browse/TICKET-ID
+        const urlMatch = input.match(CONFIG.jira.ticketPattern);
+        if (urlMatch && urlMatch[1]) {
+            return urlMatch[1];
+        }
+
+        // If input is already a plain ticket ID (e.g., "GAI-572"), validate and return it
+        const trimmed = input.trim();
+        if (CONFIG.jira.ticketIdPattern.test(trimmed)) {
+            return trimmed;
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate if a string is a valid JIRA ticket ID
+     * @param ticketId String to validate (e.g., "GAI-572", "DEVSECOPS-12208")
+     * @returns true if valid JIRA ticket ID format
+     */
+    isValidJiraTicketId(ticketId?: string): boolean {
+        if (!ticketId) {
+            return false;
+        }
+        return CONFIG.jira.ticketIdPattern.test(ticketId.trim());
+    }
+
+    /**
+     * Extract JIRA ticket number from Jira link (legacy method for backward compatibility)
+     * @deprecated Use extractJiraTicketId() instead
      */
     extractTicketNumber(jiraLink?: string): string {
-        if (!jiraLink) {
-            return 'N/A';
-        }
-        // Extract JIRA ticket ID from URL (e.g., "https://cisco-learning.atlassian.net/browse/GAI-558" -> "GAI-558")
-        const match = jiraLink.match(/\/browse\/([A-Z]+-\d+)/);
-        return match ? match[1] : 'N/A';
+        const ticketId = this.extractJiraTicketId(jiraLink);
+        return ticketId || 'N/A';
     }
 
     /**

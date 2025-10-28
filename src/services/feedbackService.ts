@@ -625,8 +625,8 @@ export class FeedbackService {
                                 
                                 if (latestRecord.Jira_Link__c && latestRecord.Jira_Link__c !== 'TBD') {
                                     jiraUrl = latestRecord.Jira_Link__c;
-                                    // Extract JIRA ticket number from URL like "https://cisco-learning.atlassian.net/browse/DEVSECOPS-14936"
-                                    const jiraUrlMatch = latestRecord.Jira_Link__c.match(/\/browse\/([A-Z]+-\d+)$/);
+                                    // Extract JIRA ticket number from URL - supports any project key format (GAI-572, DEVSECOPS-14936, etc.)
+                                    const jiraUrlMatch = latestRecord.Jira_Link__c.match(CONFIG.jira.ticketPattern);
                                     if (jiraUrlMatch) {
                                         jiraTicketNumber = jiraUrlMatch[1];
                                         break; // Success! Exit retry loop

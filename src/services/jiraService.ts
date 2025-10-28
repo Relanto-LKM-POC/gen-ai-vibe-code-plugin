@@ -228,11 +228,11 @@ export class JiraService {
 
     public async validateJiraIssue(jiraId: string): Promise<{isValid: boolean; error?: string; status?: string}> {
         try {
-            // Basic format validation for JIRA tickets (supports any project key format)
-            if (!jiraId.match(/^[A-Z]+-\d+$/)) {
+            // Basic format validation for JIRA tickets (supports any project key format including alphanumeric)
+            if (!jiraId.match(CONFIG.jira.ticketIdPattern)) {
                 return {
                     isValid: false,
-                    error: 'Invalid format. Expected: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567)'
+                    error: 'Invalid format. Expected: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567, ABC123-999)'
                 };
             }
 
@@ -266,8 +266,8 @@ export class JiraService {
     public async updateJiraIssue(request: JiraUpdateRequest): Promise<JiraUpdateResult> {
         try {
             // Validate inputs
-            if (!request.jiraId || !request.jiraId.match(/^[A-Z]+-\d+$/)) {
-                throw new Error('Invalid JIRA ID format. Expected format: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567)');
+            if (!request.jiraId || !request.jiraId.match(CONFIG.jira.ticketIdPattern)) {
+                throw new Error('Invalid JIRA ID format. Expected format: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567, ABC123-999)');
             }
 
             // Use manual hours if provided, otherwise use estimation data

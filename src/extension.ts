@@ -877,9 +877,9 @@ function registerCommands(context: vscode.ExtensionContext) {
                 // Extract Jira ticket ID from URL if available
                 let displayTicketId = result.ticketId || 'Unknown';
                 if (result.jiraUrl) {
-                    const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
-                    if (jiraTicketMatch) {
-                        displayTicketId = jiraTicketMatch[1]; // Extract DEVSECOPS-12208 from URL
+                    const extractedTicketId = taskService.extractJiraTicketId(result.jiraUrl);
+                    if (extractedTicketId) {
+                        displayTicketId = extractedTicketId;
                     }
                 }
                 vscode.window.showInformationMessage(`✅ Feature submitted successfully! Ticket: ${displayTicketId}`);
@@ -940,9 +940,8 @@ function registerCommands(context: vscode.ExtensionContext) {
             if (existingSubmission && existingSubmission.jiraUrl) {
                 try {
                     // Extract JIRA ticket ID from URL
-                    const jiraTicketMatch = existingSubmission.jiraUrl.match(/\/browse\/([A-Z]+-\d+)/);
-                    if (jiraTicketMatch) {
-                        const jiraTicketId = jiraTicketMatch[1];
+                    const jiraTicketId = taskService.extractJiraTicketId(existingSubmission.jiraUrl);
+                    if (jiraTicketId) {
                         console.log(`Verifying if JIRA ticket ${jiraTicketId} still exists...`);
                         
                         // Verify ticket exists in JIRA
