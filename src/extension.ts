@@ -28,10 +28,8 @@ let feedbackService: FeedbackService;
 let taskService: TaskService;
 let notificationManager: NotificationManager;
 
-// Global timeout variable
-declare global {
-    var vibeAnalysisTimeout: any;
-}
+// Module-level timeout variable for debouncing
+let vibeAnalysisTimeout: NodeJS.Timeout | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('🎯 Spec Driven Development is now active!');
@@ -153,9 +151,6 @@ function registerCommands(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Mark as manual command to show notifications
-            copilotIntegration.setManualCommand();
-
             const result = await notificationManager.withProgress(
                 'analyze-code',
                 'Analyzing code and applying instructions...',
@@ -163,7 +158,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                     progress.report({ increment: 20, message: "Analyzing file context..." });
 
                     // Analyze current context
-                    const codeContext = contextAnalyzer.analyzeCurrentContext();
+                    const codeContext = contextAnalyzer.analyzeDocument(activeEditor.document);
                     
                     // Get all instructions with pre-selection based on current file
                     const instructionsWithSelection = instructionManager.getAllInstructionsWithSelection(activeEditor.document.fileName);
@@ -337,9 +332,6 @@ function registerCommands(context: vscode.ExtensionContext) {
                 vscode.window.showWarningMessage('No active editor found');
                 return;
             }
-
-            // Mark as manual command to show notifications
-            copilotIntegration.setManualCommand();
 
             const instructions = instructionManager.getInstructionsForFile(activeEditor.document.fileName);
             
@@ -1129,9 +1121,6 @@ function registerCommands(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Mark as manual command to show notifications
-            copilotIntegration.setManualCommand();
-
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `Analyzing folder: ${path.basename(folderUri.fsPath)}...`,
@@ -1209,9 +1198,6 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Analyze Workspace Code & Apply Instructions
     const analyzeWorkspaceCodeCommand = vscode.commands.registerCommand('specDrivenDevelopment.analyzeWorkspaceCode', async () => {
         try {
-            // Mark as manual command to show notifications
-            copilotIntegration.setManualCommand();
-
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Analyzing entire workspace...',
@@ -1821,8 +1807,10 @@ function setupEventListeners(context: vscode.ExtensionContext) {
     const documentChange = vscode.workspace.onDidChangeTextDocument(async (event: vscode.TextDocumentChangeEvent) => {
         if (event.document === vscode.window.activeTextEditor?.document) {
             // Debounce context analysis for performance
-            clearTimeout((globalThis as any).vibeAnalysisTimeout);
-            (globalThis as any).vibeAnalysisTimeout = setTimeout(async () => {
+            if (vibeAnalysisTimeout) {
+                clearTimeout(vibeAnalysisTimeout);
+            }
+            vibeAnalysisTimeout = setTimeout(async () => {
                 try {
                     const codeContext = contextAnalyzer.analyzeDocument(event.document);
                     // Context analysis completed - UI providers removed for simplified panel

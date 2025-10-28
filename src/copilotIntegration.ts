@@ -11,8 +11,6 @@ export class CopilotIntegration {
     private static readonly WORKSPACE_VSCODE_DIR = '.spec-driven-files/.vscode';
     private static readonly WORKSPACE_HOWTO_DIR = '.spec-driven-files/how-to-guides';
     private outputChannel: vscode.OutputChannel;
-    private lastNotificationTime: number = 0;
-    private isManualCommand: boolean = false;
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('Spec Driven Development');
@@ -956,27 +954,8 @@ export class CopilotIntegration {
     }
 
     private shouldShowNotification(): boolean {
-        // Only show notifications for manual commands or if enough time has passed
-        const now = Date.now();
-        const timeDiff = now - this.lastNotificationTime;
-        const minInterval = 30000; // 30 seconds minimum between automatic notifications
-        
-        if (this.isManualCommand) {
-            this.lastNotificationTime = now;
-            this.isManualCommand = false; // Reset flag
-            return true;
-        }
-        
-        if (timeDiff > minInterval) {
-            this.lastNotificationTime = now;
-            return false; // Don't show automatic notifications
-        }
-        
-        return false;
-    }
-
-    public setManualCommand(): void {
-        this.isManualCommand = true;
+        const config = vscode.workspace.getConfiguration('specDrivenDevelopment');
+        return config.get('showNotifications', true);
     }
 
     private async openInstructionsFolder(): Promise<void> {
