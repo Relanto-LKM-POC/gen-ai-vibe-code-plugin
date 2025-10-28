@@ -367,9 +367,9 @@
             }
         });
 
-        // Handle refresh dropdowns
+        // Handle refresh tab - clear all fields and reload dropdowns
         loadDataBtn.addEventListener('click', () => {
-            loadFeedbackDropdowns();
+            refreshTabContent();
         });
 
         // Handle import from TaskMaster
@@ -529,6 +529,66 @@
         
         // Clear current imported task
         currentState.currentImportedTask = null;
+    }
+
+    // Function to refresh tab content - clear all fields and reload dropdowns
+    function refreshTabContent() {
+        console.log('Refreshing tab content - clearing all fields and reloading dropdowns');
+        
+        // Use existing clear form function
+        clearFeedbackForm();
+        
+        // Clear any previous auto-populate badge
+        const autopopulateBadge = document.getElementById('auto-populate-badge');
+        if (autopopulateBadge) {
+            autopopulateBadge.style.display = 'none';
+            autopopulateBadge.innerHTML = '';
+        }
+        
+        // Reset dropdowns to loading state
+        resetDropdownsToLoadingState();
+        
+        // Re-trigger the dropdown loading and auto-population
+        loadFeedbackDropdowns();
+        
+        // Show success message briefly
+        showRefreshMessage();
+    }
+
+    // Function to reset dropdowns to their initial loading state
+    function resetDropdownsToLoadingState() {
+        const initiativeSelect = document.getElementById('initiative');
+        const epicSelect = document.getElementById('epic');
+        const sprintSelect = document.getElementById('jira-sprint');
+        
+        if (initiativeSelect) {
+            initiativeSelect.innerHTML = '<option value="">Loading initiatives...</option>';
+        }
+        
+        if (epicSelect) {
+            epicSelect.innerHTML = '<option value="">Loading epics...</option>';
+        }
+        
+        if (sprintSelect) {
+            sprintSelect.innerHTML = '<option value="">Loading sprints...</option>';
+        }
+    }
+
+    // Function to show brief refresh success message
+    function showRefreshMessage() {
+        const feedbackResult = document.getElementById('feedback-result');
+        if (feedbackResult) {
+            feedbackResult.innerHTML = '<div class="success-message">Tab refreshed successfully! Auto-population in progress...</div>';
+            feedbackResult.style.display = 'block';
+            
+            // Clear the message after 3 seconds
+            setTimeout(() => {
+                if (feedbackResult.innerHTML.includes('Tab refreshed successfully')) {
+                    feedbackResult.innerHTML = '';
+                    feedbackResult.style.display = 'none';
+                }
+            }, 3000);
+        }
     }
 
     function setupNotificationEventListeners() {

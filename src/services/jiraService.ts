@@ -154,11 +154,11 @@ export class JiraService {
     }
 
     /**
-     * Step 2: Match EPIC-DEVSECOPS ticket to get Epic ID
+     * Step 2: Match JIRA ticket to get Epic ID
      */
-    private async matchEpicTicket(accessToken: string, devsecopsId: string): Promise<SalesforceTicketMatch> {
+    private async matchEpicTicket(accessToken: string, jiraId: string): Promise<SalesforceTicketMatch> {
         try {
-            const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c%2CStatus__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${devsecopsId}%25%27`;
+            const query = `SELECT+Id%2CName%2CEpic__c%2CJira_Link__c%2CStatus__c+FROM+Feedback__c+WHERE+Jira_Link__c+LIKE+%27%25${jiraId}%25%27`;
             const queryUrl = getSalesforceApiUrl(`${CONFIG.api.endpoints.query}/?q=${query}`);
 
             const response = await fetch(queryUrl, {
@@ -177,7 +177,7 @@ export class JiraService {
             const queryData = await response.json() as SalesforceQueryResponse;
 
             if (queryData.totalSize === 0 || !queryData.records || queryData.records.length === 0) {
-                throw new Error(`No matching ticket found for DEVSECOPS ID: ${devsecopsId}`);
+                throw new Error(`No matching ticket found for JIRA ID: ${jiraId}`);
             }
 
             return queryData.records[0];
@@ -228,11 +228,11 @@ export class JiraService {
 
     public async validateJiraIssue(jiraId: string): Promise<{isValid: boolean; error?: string; status?: string}> {
         try {
-            // Basic format validation for DEVSECOPS tickets
-            if (!jiraId.match(/^DEVSECOPS-\d+$/)) {
+            // Basic format validation for JIRA tickets (supports any project key format)
+            if (!jiraId.match(/^[A-Z]+-\d+$/)) {
                 return {
                     isValid: false,
-                    error: 'Invalid format. Expected: DEVSECOPS-XXXX'
+                    error: 'Invalid format. Expected: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567)'
                 };
             }
 
@@ -266,8 +266,8 @@ export class JiraService {
     public async updateJiraIssue(request: JiraUpdateRequest): Promise<JiraUpdateResult> {
         try {
             // Validate inputs
-            if (!request.jiraId || !request.jiraId.match(/^DEVSECOPS-\d+$/)) {
-                throw new Error('Invalid JIRA ID format. Expected format: DEVSECOPS-XXXX');
+            if (!request.jiraId || !request.jiraId.match(/^[A-Z]+-\d+$/)) {
+                throw new Error('Invalid JIRA ID format. Expected format: PROJECT-XXXX (e.g., DEVSECOPS-1234, GAI-567)');
             }
 
             // Use manual hours if provided, otherwise use estimation data

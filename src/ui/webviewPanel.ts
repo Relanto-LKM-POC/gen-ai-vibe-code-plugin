@@ -558,7 +558,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                         Submit Feature
                                     </button>
                                     <button class="secondary-button" id="load-data-btn">
-                                        Refresh Dropdowns
+                                        Refresh Tab
                                     </button>
                                 </div>
                                 

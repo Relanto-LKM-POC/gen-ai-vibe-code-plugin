@@ -587,6 +587,16 @@
     display: block;
 }
 
+.success-message {
+    padding: 12px;
+    border: 1px solid #4caf50;
+    border-radius: 6px;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    font-size: 14px;
+    margin: 10px 0;
+}
+
 .validation-result.error, .update-result.error, .feedback-result.error, .result-display.error {
     border: 1px solid #f44336;
     color: var(--vscode-foreground);

@@ -607,7 +607,7 @@ export class TaskService {
     }
 
     /**
-     * Extract DEVSECOPS ticket number from Jira link
+     * Extract JIRA ticket number from Jira link
      */
     extractTicketNumber(jiraLink?: string): string {
         if (!jiraLink) {
