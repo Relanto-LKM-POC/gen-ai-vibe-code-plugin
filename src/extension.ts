@@ -1781,42 +1781,51 @@ function registerCommands(context: vscode.ExtensionContext) {
 function setupEventListeners(context: vscode.ExtensionContext) {
     // Listen for active editor changes
     const activeEditorChange = vscode.window.onDidChangeActiveTextEditor(async (editor: vscode.TextEditor | undefined) => {
-        if (editor && isAutoApplyEnabled()) {
-            try {
+        try {
+            if (editor && isAutoApplyEnabled()) {
                 const codeContext = contextAnalyzer.analyzeDocument(editor.document);
                 const instructions = instructionManager.getInstructionsForFile(editor.document.fileName);
                 
                 if (instructions.length > 0) {
                     await copilotIntegration.applyInstructionsToWorkspace(instructions);
                 }
-            } catch (error) {
-                console.error('Failed to auto-apply instructions:', error);
             }
+        } catch (error) {
+            console.error('[SDD] Failed to auto-apply instructions:', error);
+            // Don't rethrow - prevent extension crash
         }
     });
 
     // Listen for configuration changes
     const configChange = vscode.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
-        if (event.affectsConfiguration('specDrivenDevelopment')) {
-            console.log('Spec Driven Development configuration changed');
+        try {
+            if (event.affectsConfiguration('specDrivenDevelopment')) {
+                console.log('[SDD] Configuration changed');
+            }
+        } catch (error) {
+            console.error('[SDD] Configuration change handler error:', error);
         }
     });
 
     // Listen for text document changes (for context analysis)
     const documentChange = vscode.workspace.onDidChangeTextDocument(async (event: vscode.TextDocumentChangeEvent) => {
-        if (event.document === vscode.window.activeTextEditor?.document) {
-            // Debounce context analysis for performance
-            if (vibeAnalysisTimeout) {
-                clearTimeout(vibeAnalysisTimeout);
-            }
-            vibeAnalysisTimeout = setTimeout(async () => {
-                try {
-                    const codeContext = contextAnalyzer.analyzeDocument(event.document);
-                    // Context analysis completed - UI providers removed for simplified panel
-                } catch (error) {
-                    console.error('Failed to analyze document changes:', error);
+        try {
+            if (event.document === vscode.window.activeTextEditor?.document) {
+                // Debounce context analysis for performance
+                if (vibeAnalysisTimeout) {
+                    clearTimeout(vibeAnalysisTimeout);
                 }
-            }, 1000); // 1 second debounce
+                vibeAnalysisTimeout = setTimeout(async () => {
+                    try {
+                        const codeContext = contextAnalyzer.analyzeDocument(event.document);
+                        // Context analysis completed - UI providers removed for simplified panel
+                    } catch (error) {
+                        console.error('[SDD] Failed to analyze document changes:', error);
+                    }
+                }, 1000); // 1 second debounce
+            }
+        } catch (error) {
+            console.error('[SDD] Document change handler error:', error);
         }
     });
 
@@ -1826,7 +1835,6 @@ function setupEventListeners(context: vscode.ExtensionContext) {
         documentChange
     );
 }
-
 function setupAutoApplyInstructions(context: vscode.ExtensionContext) {
     // Auto-apply instructions when files are opened
     if (isAutoApplyEnabled()) {
@@ -1839,9 +1847,10 @@ function setupAutoApplyInstructions(context: vscode.ExtensionContext) {
                         await copilotIntegration.applyInstructionsToWorkspace(instructions);
                     }
                 } catch (error) {
-                    console.error('Failed to auto-apply initial instructions:', error);
+                    console.error('[SDD] Failed to auto-apply initial instructions:', error);
+                    // Don't rethrow - prevent extension crash
                 }
-            }, 1000); // Delay to ensure everything is loaded
+            }, 2000); // Delay to ensure extension is fully loaded
         }
     }
 }
@@ -1881,24 +1890,45 @@ export async function handlePromptClick(prompt: any) {
 }
 
 export function deactivate() {
+    console.log('[SDD] Starting extension deactivation and cleanup...');
+    
+    // Clean up timeouts
+    if (vibeAnalysisTimeout) {
+        clearTimeout(vibeAnalysisTimeout);
+        vibeAnalysisTimeout = undefined;
+        console.log('[SDD] Cleared vibeAnalysisTimeout');
+    }
+    
+    // Dispose services
     if (copilotIntegration) {
         copilotIntegration.dispose();
+        console.log('[SDD] Disposed copilotIntegration');
     }
     if (resourceManager) {
         resourceManager.dispose();
+        console.log('[SDD] Disposed resourceManager');
     }
     if (awsService) {
         awsService.dispose();
+        console.log('[SDD] Disposed awsService');
     }
     if (estimationParser) {
         estimationParser.dispose();
+        console.log('[SDD] Disposed estimationParser');
     }
     if (jiraService) {
         jiraService.dispose();
+        console.log('[SDD] Disposed jiraService');
     }
     if (feedbackService) {
         feedbackService.dispose();
+        console.log('[SDD] Disposed feedbackService');
     }
+    if (notificationManager) {
+        notificationManager.dispose();
+        console.log('[SDD] Disposed notificationManager');
+    }
+    
     // taskService doesn't have a dispose method, so no cleanup needed
-    console.log('Spec Driven Development deactivated');
+    console.log('[SDD] Spec Driven Development deactivated and cleaned up successfully');
 }
