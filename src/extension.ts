@@ -7,6 +7,7 @@ import { CopilotIntegration } from './copilotIntegration';
 import { ResourceManager } from './resourceManager';
 import { SpecDrivenDevelopmentPanel } from './ui/webviewPanel';
 import { AWSService } from './services/awsService';
+import { UserService } from './services/userService';
 import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
 import { FeedbackService } from './services/feedbackService';
@@ -22,6 +23,7 @@ let copilotIntegration: CopilotIntegration;
 let resourceManager: ResourceManager;
 let specDrivenDevelopmentPanel: SpecDrivenDevelopmentPanel;
 let awsService: AWSService;
+let userService: UserService;
 let estimationParser: EstimationParser;
 let jiraService: JiraService;
 let feedbackService: FeedbackService;
@@ -50,10 +52,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // Initialize new services
         awsService = new AWSService(context);
+        userService = new UserService(context);
         estimationParser = new EstimationParser(context);
-        jiraService = new JiraService(context, awsService);
-        feedbackService = new FeedbackService(context, awsService);
-        taskService = new TaskService(context, awsService);
+        jiraService = new JiraService(context, awsService, userService);
+        feedbackService = new FeedbackService(context, awsService, userService);
+        taskService = new TaskService(context, awsService, userService);
         
         // Initialize notification manager
         notificationManager = NotificationManager.getInstance(context);
@@ -1728,6 +1731,49 @@ function registerCommands(context: vscode.ExtensionContext) {
         }
     });
 
+    // User Configuration Command
+    const configureUserCommand = vscode.commands.registerCommand('vibeAssistant.configureUser', async () => {
+        try {
+            const userInfo = await userService.getUserInfo();
+            
+            const action = await vscode.window.showInformationMessage(
+                `Current User: ${userInfo.email} (Source: ${userInfo.source})`,
+                'Change Email',
+                'Refresh from GitHub',
+                'View Statistics',
+                'OK'
+            );
+
+            if (action === 'Change Email') {
+                const newEmail = await vscode.window.showInputBox({
+                    prompt: 'Enter your email address',
+                    value: userInfo.email,
+                    validateInput: (value) => {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        return emailRegex.test(value) ? null : 'Invalid email format';
+                    }
+                });
+
+                if (newEmail) {
+                    await vscode.workspace.getConfiguration('vibeAssistant').update('userEmail', newEmail, vscode.ConfigurationTarget.Global);
+                    userService.clearCache();
+                    vscode.window.showInformationMessage(`Email updated to: ${newEmail}`);
+                }
+            } else if (action === 'Refresh from GitHub') {
+                userService.clearCache();
+                const newInfo = await userService.getUserInfo();
+                vscode.window.showInformationMessage(`Refreshed: ${newInfo.email} (Source: ${newInfo.source})`);
+            } else if (action === 'View Statistics') {
+                // Show user-specific ticket statistics
+                vscode.window.showInformationMessage(
+                    `User-specific ticket filtering is now enabled for ${userInfo.email}`
+                );
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to configure user: ${(error as Error).message}`);
+        }
+    });
+
     // Register all commands
     context.subscriptions.push(
         analyzeCodeCommand,
@@ -1740,6 +1786,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         refreshPromptsCommand,
         searchInstructionsCommand,
         searchPromptsCommand,
+        configureUserCommand,
         // New Spec Driven Development Panel Commands
         openPanelCommand,
         connectAWSCommand,
@@ -1911,6 +1958,10 @@ export function deactivate() {
     if (awsService) {
         awsService.dispose();
         console.log('[SDD] Disposed awsService');
+    }
+    if (userService) {
+        userService.dispose();
+        console.log('[SDD] Disposed userService');
     }
     if (estimationParser) {
         estimationParser.dispose();
