@@ -84,12 +84,16 @@ export class UserService {
         const shouldConfigure = await vscode.window.showWarningMessage(
             '⚠️ Could not auto-detect @cisco.com email from Git configuration. Please configure your Cisco email manually.',
             'Configure Email Now',
+            'Open Settings',
             'Later'
         );
         
         if (shouldConfigure === 'Configure Email Now') {
             // Open the configure email command
             vscode.commands.executeCommand('vibeAssistant.configureUser');
+        } else if (shouldConfigure === 'Open Settings') {
+            // Open VS Code settings directly to the email configuration
+            vscode.commands.executeCommand('workbench.action.openSettings', 'vibeAssistant.userEmail');
         }
 
         // Return placeholder (will block API calls until properly configured)

@@ -1804,13 +1804,14 @@ function registerCommands(context: vscode.ExtensionContext) {
     // User Configuration Command
     const configureUserCommand = vscode.commands.registerCommand('vibeAssistant.configureUser', async () => {
         try {
-            const userInfo = await userService.getUserInfo();
+            // Get current configured email without triggering auto-detection popup
+            const currentConfiguredEmail = vscode.workspace.getConfiguration('vibeAssistant').get<string>('userEmail') || '';
             
             // Show input box directly for email configuration
             const newEmail = await vscode.window.showInputBox({
                 prompt: 'Enter your Cisco email address for JIRA ticket filtering',
                 placeHolder: 'e.g., john.doe@cisco.com',
-                value: userInfo.source !== 'system' ? userInfo.email : '',
+                value: currentConfiguredEmail,
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
                         return 'Email address is required';
@@ -1845,10 +1846,9 @@ function registerCommands(context: vscode.ExtensionContext) {
             if (newEmail) {
                 await vscode.workspace.getConfiguration('vibeAssistant').update('userEmail', newEmail, vscode.ConfigurationTarget.Global);
                 userService.clearCache();
-                // Force immediate re-evaluation of user email
-                const updatedEmail = await userService.getUserEmail();
-                console.log(`Email configuration updated: ${updatedEmail}`);
-                vscode.window.showInformationMessage(`✅ Email configured: ${updatedEmail}. You can now retrieve your tasks.`);
+                // Don't trigger auto-detection popup - just confirm the configuration
+                console.log(`Email configuration updated: ${newEmail}`);
+                vscode.window.showInformationMessage(`✅ Email configured: ${newEmail}. You can now retrieve your tasks.`);
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to configure email: ${(error as Error).message}`);
