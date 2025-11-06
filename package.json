@@ -366,11 +366,6 @@
           "default": "",
           "description": "User email for JIRA ticket filtering (leave empty to auto-detect from GitHub API)"
         },
-        "vibeAssistant.defaultEmailDomain": {
-          "type": "string",
-          "default": "cisco.com",
-          "description": "Default email domain for system-generated emails when auto-detection fails"
-        },
         "specDrivenDevelopment.enableDebugLogging": {
           "type": "boolean",
           "default": false,

@@ -176,6 +176,13 @@ export class TaskService {
         try {
             const token = await this.getAccessToken();
             const userEmail = await this.userService.getUserEmail();
+            const userInfo = await this.userService.getUserInfo();
+            
+            // Validate that we have a properly configured email (not system-generated)
+            if (userInfo.source === 'system') {
+                throw new Error('User email not configured. Please configure your email using the "Configure User Email" command before retrieving tasks.');
+            }
+            
             const username = await this.userService.getUsernameFromEmail();
             const limit = options.limit || 20;
             const offset = options.offset || 0;
@@ -265,6 +272,13 @@ export class TaskService {
         try {
             const token = await this.getAccessToken();
             const userEmail = await this.userService.getUserEmail();
+            const userInfo = await this.userService.getUserInfo();
+            
+            // Validate that we have a properly configured email (not system-generated)
+            if (userInfo.source === 'system') {
+                throw new Error('User email not configured. Please configure your email using the "Configure User Email" command before retrieving tasks.');
+            }
+            
             const username = await this.userService.getUsernameFromEmail();
             const limit = options.limit || 20;
             const offset = options.offset || 0;
@@ -346,6 +360,13 @@ export class TaskService {
         try {
             const token = await this.getAccessToken();
             const userEmail = await this.userService.getUserEmail();
+            const userInfo = await this.userService.getUserInfo();
+            
+            // Validate that we have a properly configured email (not system-generated)
+            if (userInfo.source === 'system') {
+                throw new Error('User email not configured. Please configure your email using the "Configure User Email" command before retrieving tasks.');
+            }
+            
             const username = await this.userService.getUsernameFromEmail();
             const limit = options.limit || 20;
             const offset = options.offset || 0;

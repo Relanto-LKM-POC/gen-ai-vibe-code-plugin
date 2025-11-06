@@ -1453,7 +1453,21 @@ function registerCommands(context: vscode.ExtensionContext) {
             });
         } catch (error) {
             console.error('Error in retrieveWipTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve WIP tickets: ${(error as Error).message}`);
+            
+            // Check if this is an email configuration error
+            const errorMessage = (error as Error).message;
+            if (errorMessage.includes('User email not configured')) {
+                const action = await vscode.window.showErrorMessage(
+                    '❌ User email not configured. Configure your email to retrieve personalized tasks.',
+                    'Configure Email'
+                );
+                if (action === 'Configure Email') {
+                    vscode.commands.executeCommand('vibeAssistant.configureUser');
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to retrieve WIP tickets: ${errorMessage}`);
+            }
+            
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'wip', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1504,7 +1518,21 @@ function registerCommands(context: vscode.ExtensionContext) {
             });
         } catch (error) {
             console.error('Error in retrieveRunningTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve tickets: ${(error as Error).message}`);
+            
+            // Check if this is an email configuration error
+            const errorMessage = (error as Error).message;
+            if (errorMessage.includes('User email not configured')) {
+                const action = await vscode.window.showErrorMessage(
+                    '❌ User email not configured. Configure your email to retrieve personalized tasks.',
+                    'Configure Email'
+                );
+                if (action === 'Configure Email') {
+                    vscode.commands.executeCommand('vibeAssistant.configureUser');
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to retrieve tickets: ${errorMessage}`);
+            }
+            
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'running', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1555,7 +1583,21 @@ function registerCommands(context: vscode.ExtensionContext) {
             });
         } catch (error) {
             console.error('Error in retrieveArchivedTasksCommand:', error);
-            vscode.window.showErrorMessage(`Failed to retrieve done tickets: ${(error as Error).message}`);
+            
+            // Check if this is an email configuration error
+            const errorMessage = (error as Error).message;
+            if (errorMessage.includes('User email not configured')) {
+                const action = await vscode.window.showErrorMessage(
+                    '❌ User email not configured. Configure your email to retrieve personalized tasks.',
+                    'Configure Email'
+                );
+                if (action === 'Configure Email') {
+                    vscode.commands.executeCommand('vibeAssistant.configureUser');
+                }
+            } else {
+                vscode.window.showErrorMessage(`Failed to retrieve done tickets: ${errorMessage}`);
+            }
+            
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendTaskList([], 'archived', { totalCount: 0, hasMore: false, currentOffset: 0, currentLimit: 20 });
             }
@@ -1736,41 +1778,91 @@ function registerCommands(context: vscode.ExtensionContext) {
         try {
             const userInfo = await userService.getUserInfo();
             
-            const action = await vscode.window.showInformationMessage(
-                `Current User: ${userInfo.email} (Source: ${userInfo.source})`,
-                'Change Email',
-                'Refresh from GitHub',
-                'View Statistics',
-                'OK'
-            );
-
-            if (action === 'Change Email') {
-                const newEmail = await vscode.window.showInputBox({
-                    prompt: 'Enter your email address',
-                    value: userInfo.email,
-                    validateInput: (value) => {
-                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                        return emailRegex.test(value) ? null : 'Invalid email format';
+            // Show input box directly for email configuration
+            const newEmail = await vscode.window.showInputBox({
+                prompt: 'Enter your email address for JIRA ticket filtering',
+                placeHolder: 'your.email@company.com',
+                value: userInfo.source !== 'system' ? userInfo.email : '',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return 'Email address is required';
                     }
-                });
-
-                if (newEmail) {
-                    await vscode.workspace.getConfiguration('vibeAssistant').update('userEmail', newEmail, vscode.ConfigurationTarget.Global);
-                    userService.clearCache();
-                    vscode.window.showInformationMessage(`Email updated to: ${newEmail}`);
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    return emailRegex.test(value) ? null : 'Invalid email format';
                 }
-            } else if (action === 'Refresh from GitHub') {
+            });
+
+            if (newEmail) {
+                await vscode.workspace.getConfiguration('vibeAssistant').update('userEmail', newEmail, vscode.ConfigurationTarget.Global);
                 userService.clearCache();
-                const newInfo = await userService.getUserInfo();
-                vscode.window.showInformationMessage(`Refreshed: ${newInfo.email} (Source: ${newInfo.source})`);
-            } else if (action === 'View Statistics') {
-                // Show user-specific ticket statistics
-                vscode.window.showInformationMessage(
-                    `User-specific ticket filtering is now enabled for ${userInfo.email}`
-                );
+                // Force immediate re-evaluation of user email
+                const updatedEmail = await userService.getUserEmail();
+                console.log(`Email configuration updated: ${updatedEmail}`);
+                vscode.window.showInformationMessage(`✅ Email configured: ${updatedEmail}. You can now retrieve your tasks.`);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to configure user: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`Failed to configure email: ${(error as Error).message}`);
+        }
+    });
+
+    // Debug command to check user filtering
+    const debugUserFilterCommand = vscode.commands.registerCommand('specDrivenDevelopment.debugUserFilter', async () => {
+        try {
+            vscode.window.showInformationMessage('🔍 Checking user filter configuration...');
+            
+            // Get user email and username
+            const userEmail = await userService.getUserEmail();
+            const username = await userService.getUsernameFromEmail();
+            const userInfo = await userService.getUserInfo();
+            
+            // Check GitHub token configuration
+            const githubToken = vscode.workspace.getConfiguration('vibeAssistant').get<string>('githubToken');
+            const hasGithubToken = !!githubToken;
+            
+            // Check manual email configuration
+            const manualEmail = vscode.workspace.getConfiguration('vibeAssistant').get<string>('userEmail');
+            const hasManualEmail = !!manualEmail;
+            
+            // Show debug information
+            const debugInfo = `
+🔍 User Filter Debug Information:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📧 Current Email: ${userEmail}
+👤 Username (from email): ${username}
+🎯 Email Source: ${userInfo.source}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔑 GitHub Token Configured: ${hasGithubToken ? '✅ Yes' : '❌ No'}
+⚙️ Manual Email Configured: ${hasManualEmail ? '✅ Yes' : '❌ No'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Status: ${userInfo.source === 'system' ? '❌ Email not configured - API calls blocked' : '✅ Email configured - API calls allowed'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${userInfo.source !== 'system' ? `🎯 Filter Query (WIP):
+WHERE Jira_Link__c != null AND Status__c != 'Done' AND (CreatedBy.Email = '${userEmail}' OR Assignee_through_VS__c = '${username}')
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
+� How to Configure Email:
+1. Use Command Palette: "Configure User Email"
+2. Or set GitHub token: Settings → vibeAssistant.githubToken
+3. Or set manual email: Settings → vibeAssistant.userEmail
+
+📋 Requirements:
+• Your email in Salesforce must match configured email
+• 'Assignee_through_VS__c' field should contain your username
+            `.trim();
+            
+            // Show in an output channel for better formatting
+            const outputChannel = vscode.window.createOutputChannel('User Filter Debug');
+            outputChannel.clear();
+            outputChannel.appendLine(debugInfo);
+            outputChannel.show();
+            
+            // Also show a summary message
+            const statusIcon = userInfo.source === 'system' ? '❌' : '✅';
+            vscode.window.showInformationMessage(
+                `${statusIcon} Email: ${userEmail} | Source: ${userInfo.source} | Token: ${hasGithubToken ? 'Yes' : 'No'} - Check Output panel for details`
+            );
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to debug user filter: ${(error as Error).message}`);
         }
     });
 
@@ -1787,6 +1879,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         searchInstructionsCommand,
         searchPromptsCommand,
         configureUserCommand,
+        debugUserFilterCommand,
         // New Spec Driven Development Panel Commands
         openPanelCommand,
         connectAWSCommand,

@@ -48,17 +48,17 @@ export class UserService {
             console.warn('Failed to get GitHub user email:', error);
         }
 
-        // Fallback to system username + domain
-        const systemEmail = this.getSystemEmail();
+        // Return a clear placeholder that indicates configuration is needed
+        const placeholderEmail = 'user@company.com';
         this.cachedUserInfo = {
-            email: systemEmail,
+            email: placeholderEmail,
             source: 'system'
         };
         
-        // Prompt user to configure email
-        this.promptUserToConfigureEmail();
+        // Don't automatically prompt - let the calling code handle this
+        console.warn('Email not configured. Please configure your email for proper task filtering.');
         
-        return systemEmail;
+        return placeholderEmail;
     }
 
     /**
@@ -124,12 +124,12 @@ export class UserService {
     }
 
     /**
-     * Get system-based email (fallback)
+     * Get system-based email (fallback) - now returns clear placeholder
      */
     private getSystemEmail(): string {
-        const username = os.userInfo().username;
-        const domain = vscode.workspace.getConfiguration('vibeAssistant').get<string>('defaultEmailDomain', 'cisco.com');
-        return `${username}@${domain}`;
+        // Instead of using system username which can be confusing (like "Relanto@cisco.com"),
+        // return a clear placeholder that indicates configuration is needed
+        return 'user@company.com';
     }
 
     /**
