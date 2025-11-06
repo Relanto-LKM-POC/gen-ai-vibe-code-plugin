@@ -132,11 +132,7 @@
         "title": "Clear Feature History",
         "category": "Spec Driven Development"
       },
-      {
-        "command": "specDrivenDevelopment.configureGitHubToken",
-        "title": "Configure GitHub Token",
-        "category": "Spec Driven Development"
-      },
+
       {
         "command": "specDrivenDevelopment.parseCopilotEstimation",
         "title": "Parse Copilot Estimation from Chat",
@@ -356,15 +352,11 @@
           "default": false,
           "description": "Show detailed information in notifications"
         },
-        "specDrivenDevelopment.githubToken": {
-          "type": "string",
-          "default": "",
-          "description": "GitHub Personal Access Token for creating issues (requires 'repo' or 'public_repo' scope)"
-        },
+
         "vibeAssistant.userEmail": {
           "type": "string",
           "default": "",
-          "description": "User email for JIRA ticket filtering (leave empty to auto-detect from GitHub API)"
+          "description": "Cisco email address for JIRA ticket filtering (must be @cisco.com, auto-configured from GitHub API if empty)"
         },
         "specDrivenDevelopment.enableDebugLogging": {
           "type": "boolean",

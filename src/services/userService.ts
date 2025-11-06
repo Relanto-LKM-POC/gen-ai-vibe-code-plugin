@@ -4,7 +4,7 @@ import * as os from 'os';
 export interface UserInfo {
     email: string;
     name?: string;
-    source: 'github' | 'manual' | 'system';
+    source: 'manual' | 'system' | 'git-config';
 }
 
 export class UserService {
@@ -16,7 +16,7 @@ export class UserService {
     }
 
     /**
-     * Get user email from GitHub API or fallback to manual configuration
+     * Get user email with auto-configuration fallback mechanism
      */
     public async getUserEmail(): Promise<string> {
         // Check cache first
@@ -24,101 +24,198 @@ export class UserService {
             return this.cachedUserInfo.email;
         }
 
-        // Try to get from VS Code settings (manual configuration)
+        // Step 1: Check manual configuration first (highest priority)
+        // Once set in vibeAssistant.userEmail, use it directly
         const manualEmail = vscode.workspace.getConfiguration('vibeAssistant').get<string>('userEmail');
-        if (manualEmail && this.isValidEmail(manualEmail)) {
+        if (manualEmail && this.isValidEmail(manualEmail) && this.isCiscoEmail(manualEmail)) {
+            console.log('[Manual Email] Using configured email');
             this.cachedUserInfo = {
                 email: manualEmail,
                 source: 'manual'
             };
             return manualEmail;
+        } else if (manualEmail && this.isValidEmail(manualEmail) && !this.isCiscoEmail(manualEmail)) {
+            console.warn(`Manual email ${manualEmail} is not a cisco address - trying Git config instead`);
         }
 
-        // Try to get from GitHub API
+        // Step 2: Try Git configuration (no API calls needed)
+        console.log('[Git Config] Trying Git user configuration...');
         try {
-            const githubEmail = await this.getGitHubUserEmail();
-            if (githubEmail) {
-                this.cachedUserInfo = {
-                    email: githubEmail,
-                    source: 'github'
-                };
-                return githubEmail;
+            const gitEmail = await this.getGitUserEmail();
+            if (gitEmail && this.isValidEmail(gitEmail)) {
+                if (this.isCiscoEmail(gitEmail)) {
+                    console.log('[Git Config] Valid @cisco.com email found, auto-configuring...', gitEmail);
+                    
+                    // AUTO-SAVE to VS Code settings (prevents future Git config checks)
+                    await vscode.workspace.getConfiguration('vibeAssistant').update(
+                        'userEmail', 
+                        gitEmail, 
+                        vscode.ConfigurationTarget.Global
+                    );
+                    
+                    console.log('[Git Config] ✅ Email auto-configured from Git settings!');
+                    this.cachedUserInfo = {
+                        email: gitEmail,
+                        source: 'git-config'
+                    };
+                    
+                    // Show success notification
+                    vscode.window.showInformationMessage(
+                        `✅ Email auto-configured from Git: ${gitEmail}`
+                    );
+                    
+                    return gitEmail;
+                } else {
+                    console.warn(`[Git Config] Found Git email "${gitEmail}" but it's not @cisco.com - ignoring`);
+                }
+            } else if (gitEmail) {
+                console.warn(`[Git Config] Found Git email "${gitEmail}" but it's not valid format - ignoring`);
+            } else {
+                console.log('[Git Config] No Git email found in configuration');
             }
         } catch (error) {
-            console.warn('Failed to get GitHub user email:', error);
+            console.warn('Failed to get Git user email:', error);
         }
 
-        // Return a clear placeholder that indicates configuration is needed
+        // Step 3: No Git config found or not @cisco.com, prompt for manual configuration
+        console.log('[Auto-Config] No valid Git email found, prompting for manual configuration...');
+        
+        // Show prompt with action button
+        const shouldConfigure = await vscode.window.showWarningMessage(
+            '⚠️ Could not auto-detect @cisco.com email from Git configuration. Please configure your Cisco email manually.',
+            'Configure Email Now',
+            'Later'
+        );
+        
+        if (shouldConfigure === 'Configure Email Now') {
+            // Open the configure email command
+            vscode.commands.executeCommand('vibeAssistant.configureUser');
+        }
+
+        // Return placeholder (will block API calls until properly configured)
         const placeholderEmail = 'user@company.com';
         this.cachedUserInfo = {
             email: placeholderEmail,
             source: 'system'
         };
         
-        // Don't automatically prompt - let the calling code handle this
-        console.warn('Email not configured. Please configure your email for proper task filtering.');
-        
         return placeholderEmail;
     }
 
+
+
     /**
-     * Get user email from GitHub API
+     * Get user email from local Git configuration (no API calls needed)
      */
-    private async getGitHubUserEmail(): Promise<string | null> {
+    private async getGitUserEmail(): Promise<string | null> {
         try {
-            const githubToken = vscode.workspace.getConfiguration('vibeAssistant').get<string>('githubToken');
-            if (!githubToken) {
-                console.log('No GitHub token configured');
-                return null;
-            }
-
-            // Fetch user info from GitHub API
-            const response = await fetch('https://api.github.com/user', {
-                headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'User-Agent': 'Vibe-Code-Assistant-Extension',
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`GitHub API error: ${response.status}`);
-            }
-
-            const userData = await response.json();
-            
-            // GitHub user object has 'email' field
-            if (userData.email && this.isValidEmail(userData.email)) {
-                console.log('Successfully retrieved email from GitHub API');
-                return userData.email;
-            }
-
-            // If primary email is null, try to fetch from emails endpoint
-            const emailsResponse = await fetch('https://api.github.com/user/emails', {
-                headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'User-Agent': 'Vibe-Code-Assistant-Extension',
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-
-            if (emailsResponse.ok) {
-                const emails = await emailsResponse.json();
-                // Find primary email
-                const primaryEmail = emails.find((e: any) => e.primary && e.verified);
-                if (primaryEmail) {
-                    return primaryEmail.email;
-                }
-                // Fallback to first verified email
-                const verifiedEmail = emails.find((e: any) => e.verified);
-                if (verifiedEmail) {
-                    return verifiedEmail.email;
+            // Method 1: Use VS Code Git extension API
+            const gitExtension = vscode.extensions.getExtension('vscode.git');
+            if (gitExtension && gitExtension.isActive) {
+                const git = gitExtension.exports;
+                const api = git.getAPI(1);
+                
+                if (api && api.repositories && api.repositories.length > 0) {
+                    const repo = api.repositories[0];
+                    if (repo && repo.rootUri) {
+                        try {
+                            // Get Git config from the repository
+                            const config = await vscode.workspace.fs.readFile(
+                                vscode.Uri.joinPath(repo.rootUri, '.git', 'config')
+                            );
+                            const configText = Buffer.from(config).toString('utf8');
+                            
+                            // Parse git config for user.email
+                            const emailMatch = configText.match(/^\s*email\s*=\s*(.+)$/m);
+                            if (emailMatch && emailMatch[1]) {
+                                const email = emailMatch[1].trim();
+                                console.log('Found Git config email:', email);
+                                return email;
+                            }
+                        } catch (error) {
+                            console.warn('Could not read .git/config file:', error);
+                        }
+                    }
                 }
             }
 
+            // Method 2: Try global Git configuration
+            const globalGitEmail = await this.getGlobalGitConfig();
+            if (globalGitEmail) {
+                return globalGitEmail;
+            }
+
+            // Method 3: Use VS Code terminal to run git config command
+            const gitConfigEmail = await this.runGitConfigCommand();
+            if (gitConfigEmail) {
+                return gitConfigEmail;
+            }
+
+            console.log('No Git user email found in configuration');
             return null;
+            
         } catch (error) {
-            console.error('Failed to fetch GitHub user email:', error);
+            console.error('Failed to get Git user email:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get email from global Git configuration
+     */
+    private async getGlobalGitConfig(): Promise<string | null> {
+        try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            // Try global git configuration
+            const { stdout } = await execAsync('git config --global user.email', { 
+                timeout: 3000 // 3 second timeout
+            });
+            
+            const email = stdout.trim();
+            if (email && this.isValidEmail(email)) {
+                console.log('Found global Git user.email:', email);
+                return email;
+            }
+            
+            return null;
+            
+        } catch (error) {
+            console.warn('Global git config failed (normal if git not configured):', (error as Error).message);
+            return null;
+        }
+    }
+
+    /**
+     * Run git config command to get user email using child_process
+     */
+    private async runGitConfigCommand(): Promise<string | null> {
+        try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            
+            // Get the workspace folder to run git command in
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : undefined;
+            
+            const { stdout } = await execAsync('git config user.email', { 
+                cwd,
+                timeout: 5000 // 5 second timeout
+            });
+            
+            const email = stdout.trim();
+            if (email && this.isValidEmail(email)) {
+                console.log('Found Git user.email via command:', email);
+                return email;
+            }
+            
+            return null;
+            
+        } catch (error) {
+            console.warn('Git config command failed (normal if no git repo):', (error as Error).message);
             return null;
         }
     }
@@ -138,6 +235,13 @@ export class UserService {
     private isValidEmail(email: string): boolean {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
+    }
+
+    /**
+     * Validate that email is from @cisco.com domain
+     */
+    private isCiscoEmail(email: string): boolean {
+        return email.toLowerCase().endsWith('@cisco.com');
     }
 
     /**
@@ -165,7 +269,6 @@ export class UserService {
 
     /**
      * Extract username from email (part before @)
-     * Example: "speesay@cisco.com" -> "speesay"
      */
     public async getUsernameFromEmail(): Promise<string> {
         const email = await this.getUserEmail();

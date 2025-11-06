@@ -84,6 +84,11 @@
                 if (targetTab === 'devsecops-hub') {
                     autoLoadDefaultTaskList();
                 }
+                
+                // Configure username/email when Manage Features tab is opened
+                if (targetTab === 'feedback') {
+                    configureUserForFeatures();
+                }
             });
         });
     }
@@ -1400,6 +1405,14 @@
         
         // Load the running tasks
         loadRunningTasks();
+    }
+
+    function configureUserForFeatures() {
+        console.log('Configuring user for feature creation...');
+        // Send message to extension to trigger username/email configuration
+        vscode.postMessage({ 
+            command: 'configureUserForFeatures'
+        });
     }
 
     function checkAndAutoLoadTasks() {

@@ -69,6 +69,10 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('specDrivenDevelopment.autoPopulateFromGit');
                         break;
 
+                    case 'configureUserForFeatures':
+                        vscode.commands.executeCommand('specDrivenDevelopment.configureUserForFeatures');
+                        break;
+
                     case 'getEstimationData':
                         this.handleGetEstimationData();
                         break;

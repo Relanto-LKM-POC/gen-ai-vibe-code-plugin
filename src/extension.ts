@@ -815,6 +815,13 @@ function registerCommands(context: vscode.ExtensionContext) {
     const autoPopulateFromGitCommand = vscode.commands.registerCommand('specDrivenDevelopment.autoPopulateFromGit', async () => {
         try {
             console.log('Auto-populate from Git command triggered');
+            
+            // Trigger username/email configuration along with git auto-population
+            console.log('Triggering username/email configuration for correct assignee...');
+            const userEmail = await userService.getUserEmail();
+            const username = await userService.getUsernameFromEmail();
+            console.log(`User configured: ${userEmail} (username: ${username})`);
+            
             const result = await feedbackService.autoPopulateFromGit();
             
             if (specDrivenDevelopmentPanel) {
@@ -824,6 +831,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             // Log result for debugging
             if (result.success) {
                 console.log(`Auto-population successful: ${result.repoName} → ${result.applicationName} → ${result.recommendedInitiativeName}`);
+                console.log(`Assignee configured: ${username} (${userEmail})`);
             } else {
                 console.log(`Auto-population failed: ${result.fallbackReason}`);
             }
@@ -838,6 +846,26 @@ function registerCommands(context: vscode.ExtensionContext) {
                     fallbackReason: `Error: ${(error as Error).message}`
                 });
             }
+        }
+    });
+
+    const configureUserForFeaturesCommand = vscode.commands.registerCommand('specDrivenDevelopment.configureUserForFeatures', async () => {
+        try {
+            console.log('Configure user for features command triggered');
+            
+            // Trigger username/email configuration for feature creation
+            const userEmail = await userService.getUserEmail();
+            const username = await userService.getUsernameFromEmail();
+            console.log(`User configured for feature creation: ${userEmail} (username: ${username})`);
+            
+            // Optional: Show subtle notification that user is configured
+            const userInfo = await userService.getUserInfo();
+            if (userInfo.source !== 'system') {
+                console.log(`✅ User ready for feature creation with assignee: ${username}`);
+            }
+            
+        } catch (error) {
+            console.error('Error in configureUserForFeaturesCommand:', error);
         }
     });
 
@@ -1780,15 +1808,37 @@ function registerCommands(context: vscode.ExtensionContext) {
             
             // Show input box directly for email configuration
             const newEmail = await vscode.window.showInputBox({
-                prompt: 'Enter your email address for JIRA ticket filtering',
-                placeHolder: 'your.email@company.com',
+                prompt: 'Enter your Cisco email address for JIRA ticket filtering',
+                placeHolder: 'e.g., john.doe@cisco.com',
                 value: userInfo.source !== 'system' ? userInfo.email : '',
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
                         return 'Email address is required';
                     }
+                    
+                    // Check basic email format first
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    return emailRegex.test(value) ? null : 'Invalid email format';
+                    if (!emailRegex.test(value)) {
+                        // More specific feedback based on what's missing
+                        if (!value.includes('@')) {
+                            return 'Please include @ in your email address';
+                        }
+                        if (!value.includes('.')) {
+                            return 'Please include a domain (e.g., @cisco.com)';
+                        }
+                        return 'Please enter a valid email format (e.g., your.name@cisco.com)';
+                    }
+                    
+                    // Check domain requirement - more specific feedback
+                    if (!value.toLowerCase().endsWith('@cisco.com')) {
+                        const domain = value.toLowerCase().split('@')[1];
+                        if (domain && domain !== 'cisco.com') {
+                            return `Please use @cisco.com instead of @${domain}`;
+                        }
+                        return 'Please use your cisco email address';
+                    }
+                    
+                    return null;
                 }
             });
 
@@ -1815,9 +1865,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             const username = await userService.getUsernameFromEmail();
             const userInfo = await userService.getUserInfo();
             
-            // Check GitHub token configuration
-            const githubToken = vscode.workspace.getConfiguration('vibeAssistant').get<string>('githubToken');
-            const hasGithubToken = !!githubToken;
+
             
             // Check manual email configuration
             const manualEmail = vscode.workspace.getConfiguration('vibeAssistant').get<string>('userEmail');
@@ -1831,20 +1879,25 @@ function registerCommands(context: vscode.ExtensionContext) {
 👤 Username (from email): ${username}
 🎯 Email Source: ${userInfo.source}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔑 GitHub Token Configured: ${hasGithubToken ? '✅ Yes' : '❌ No'}
+
 ⚙️ Manual Email Configured: ${hasManualEmail ? '✅ Yes' : '❌ No'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Status: ${userInfo.source === 'system' ? '❌ Email not configured - API calls blocked' : '✅ Email configured - API calls allowed'}
+💡 Status: ${userInfo.source === 'system' ? '❌ Email not configured - API calls blocked' : 
+    userInfo.source === 'manual' ? '✅ Manual email configured - API calls allowed' :
+    userInfo.source === 'git-config' ? '✅ Git config email retrieved - API calls allowed' : 
+    '✅ Email configured - API calls allowed'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${userInfo.source !== 'system' ? `🎯 Filter Query (WIP):
 WHERE Jira_Link__c != null AND Status__c != 'Done' AND (CreatedBy.Email = '${userEmail}' OR Assignee_through_VS__c = '${username}')
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 � How to Configure Email:
 1. Use Command Palette: "Configure User Email"
-2. Or set GitHub token: Settings → vibeAssistant.githubToken
+2. Or ensure Git is configured: git config --global user.email your@cisco.com
 3. Or set manual email: Settings → vibeAssistant.userEmail
 
 📋 Requirements:
+• Email must be cisco.com domain
+• Git config email will be auto-detected if available
 • Your email in Salesforce must match configured email
 • 'Assignee_through_VS__c' field should contain your username
             `.trim();
@@ -1858,7 +1911,7 @@ WHERE Jira_Link__c != null AND Status__c != 'Done' AND (CreatedBy.Email = '${use
             // Also show a summary message
             const statusIcon = userInfo.source === 'system' ? '❌' : '✅';
             vscode.window.showInformationMessage(
-                `${statusIcon} Email: ${userEmail} | Source: ${userInfo.source} | Token: ${hasGithubToken ? 'Yes' : 'No'} - Check Output panel for details`
+                `${statusIcon} Email: ${userEmail} | Source: ${userInfo.source} - Check Output panel for details`
             );
             
         } catch (error) {
@@ -1895,6 +1948,7 @@ WHERE Jira_Link__c != null AND Status__c != 'Done' AND (CreatedBy.Email = '${use
         loadSprintDetailsCommand,
         loadSprintsForTeamCommand,
         autoPopulateFromGitCommand,
+        configureUserForFeaturesCommand,
         submitFeedbackCommand,
         importTaskMasterCommand,
         checkDuplicateTaskMasterCommand,
