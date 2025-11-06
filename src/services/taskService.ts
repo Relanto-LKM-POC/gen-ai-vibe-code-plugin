@@ -305,6 +305,8 @@ export class TaskService {
                 `SELECT Id,CreatedBy.Email,Delivery_Lifecycle__c,Epic__c,Name,Description__c,Estimated_Effort_Hours__c,Estimation_Completion_Date__c,Jira_Priority__c,CreatedDate,Jira_Link__c,Type__c,Jira_Sprint_Details__c,Work_Type__c,Jira_Acceptance_Criteria__c,Initiative__c,Deployment_Date__c,Status__c,Actual_Effort_Hours__c,Resolution__c,AI_Adopted__c,From_External_VS__c,Assignee_through_VS__c FROM Feedback__c ${whereClause} ORDER BY CreatedDate DESC LIMIT ${limit} OFFSET ${offset}`
             );
 
+            console.log('Running tasks main query:', decodeURIComponent(query));
+
             const response = await fetch(getSalesforceQueryUrl(query), {
                 method: 'GET',
                 headers: {
@@ -321,8 +323,10 @@ export class TaskService {
             
             // Get total count for pagination
             const countQuery = encodeURIComponent(
-                `SELECT COUNT() FROM Feedback__c${whereClause}`
+                `SELECT COUNT() FROM Feedback__c ${whereClause}`
             );
+            
+            console.log('Running tasks count query:', decodeURIComponent(countQuery));
             
             let totalCount = data.records?.length || 0;
             try {
@@ -337,9 +341,12 @@ export class TaskService {
                 if (countResponse.ok) {
                     const countData = await countResponse.json();
                     totalCount = countData.totalSize || 0;
+                    console.log(`Running tasks - Total count: ${totalCount}, Records fetched: ${data.records?.length || 0}, Offset: ${offset}, Limit: ${limit}`);
+                } else {
+                    console.warn('Running tasks count query failed:', countResponse.status, countResponse.statusText);
                 }
             } catch (error) {
-                console.warn('Failed to get total count, using records length');
+                console.warn('Failed to get total count for running tasks, using records length:', error);
             }
 
             return {
