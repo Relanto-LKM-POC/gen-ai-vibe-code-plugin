@@ -22,17 +22,24 @@ export class TaskMasterService {
             throw new Error('No workspace folder is open');
         }
 
-        // Build file path
-        const taskFilePath = path.join(
-            workspaceFolder.uri.fsPath, 
-            '.taskmaster', 
-            'tasks', 
-            'task.json'
-        );
+        // Check for both possible file names
+        const possiblePaths = [
+            path.join(workspaceFolder.uri.fsPath, '.taskmaster', 'tasks', 'task.json'),
+            path.join(workspaceFolder.uri.fsPath, '.taskmaster', 'tasks', 'tasks.json')
+        ];
 
-        // Check if file exists - throw error if not
-        if (!fs.existsSync(taskFilePath)) {
-            throw new Error('TaskMaster file does not exist at .taskmaster/tasks/task.json');
+        let taskFilePath: string | null = null;
+        
+        // Find which file exists
+        for (const filePath of possiblePaths) {
+            if (fs.existsSync(filePath)) {
+                taskFilePath = filePath;
+                break;
+            }
+        }
+
+        if (!taskFilePath) {
+            throw new Error('TaskMaster file does not exist. Looking for either .taskmaster/tasks/task.json or .taskmaster/tasks/tasks.json');
         }
 
         try {
@@ -40,16 +47,39 @@ export class TaskMasterService {
             const fileContent = fs.readFileSync(taskFilePath, 'utf8');
             const parsedData = JSON.parse(fileContent);
             
-            // Handle both single object and array formats
-            let tasksArray: TaskMasterTask[];
+            let allTasks: TaskMasterTask[] = [];
+            
+            // Handle direct array format (legacy)
             if (Array.isArray(parsedData)) {
-                tasksArray = parsedData;
+                allTasks = parsedData;
             } else {
-                tasksArray = [parsedData];
+                // Handle nested context format
+                for (const [contextName, contextData] of Object.entries(parsedData)) {
+                    if (contextData && typeof contextData === 'object' && 'tasks' in contextData) {
+                        const tasks = (contextData as any).tasks;
+                        
+                        if (Array.isArray(tasks) && tasks.length > 0) {
+                            allTasks = tasks.filter(task => task && task.id && task.title);
+                            break; // Use first context with valid tasks
+                        }
+                        
+                        if (tasks && typeof tasks === 'object') {
+                            const taskArray = Object.values(tasks);
+                            if (taskArray.length > 0 && taskArray[0] && (taskArray[0] as any).id) {
+                                allTasks = taskArray.filter(task => task && (task as any).id && (task as any).title) as TaskMasterTask[];
+                                break; // Use first context with valid tasks
+                            }
+                        }
+                    }
+                }
+                
+                if (allTasks.length === 0) {
+                    throw new Error('No valid tasks found in any context');
+                }
             }
             
             // Validate each task and log missing optional fields
-            tasksArray.forEach((task, index) => {
+            allTasks.forEach((task, index) => {
                 try {
                     this.validateTaskData(task);
                     
@@ -65,7 +95,7 @@ export class TaskMasterService {
                 }
             });
             
-            return tasksArray;
+            return allTasks;
         } catch (parseError) {
             if (parseError instanceof SyntaxError) {
                 throw new Error('Invalid JSON format in TaskMaster file');
