@@ -5,11 +5,11 @@ import * as path from 'path';
 export interface TaskMasterTask {
     id: number;
     title: string;
-    description: string;
-    status: string;
-    priority: string;
-    type: "story" | "bug" | "defect";
-    estimation: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    type?: "story" | "bug" | "defect";
+    estimation?: string;
     acceptanceCriteria?: string;
     initiative?: string;
 }
@@ -48,10 +48,17 @@ export class TaskMasterService {
                 tasksArray = [parsedData];
             }
             
-            // Validate each task
+            // Validate each task and log missing optional fields
             tasksArray.forEach((task, index) => {
                 try {
                     this.validateTaskData(task);
+                    
+                    // Log missing optional fields for user awareness
+                    const optionalFields = ['description', 'type', 'estimation', 'priority', 'status'];
+                    const missingOptionalFields = optionalFields.filter(field => !task[field]);
+                    if (missingOptionalFields.length > 0) {
+                        console.log(`Task ${task.title}: Missing optional fields (${missingOptionalFields.join(', ')}) - will need to be filled manually`);
+                    }
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
                     throw new Error(`Task ${index + 1}: ${errorMessage}`);
@@ -68,14 +75,16 @@ export class TaskMasterService {
     }
 
     private static validateTaskData(data: any): void {
-        const requiredFields = ['id', 'title', 'description', 'type', 'estimation'];
+        // Only require absolutely essential fields - others can be filled manually
+        const requiredFields = ['id', 'title'];
         const missingFields = requiredFields.filter(field => !data[field]);
         
         if (missingFields.length > 0) {
-            throw new Error(`Missing required fields in TaskMaster file: ${missingFields.join(', ')}`);
+            throw new Error(`Missing essential fields in TaskMaster file: ${missingFields.join(', ')}`);
         }
 
-        if (!['story', 'bug', 'defect'].includes(data.type)) {
+        // Validate type field only if it's present (optional field)
+        if (data.type && !['story', 'bug', 'defect'].includes(data.type)) {
             throw new Error('Invalid type in TaskMaster file. Must be: story, bug, or defect');
         }
     }

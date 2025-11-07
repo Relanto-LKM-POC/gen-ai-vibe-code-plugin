@@ -12,7 +12,7 @@ import { EstimationParser } from './services/estimationParser';
 import { JiraService } from './services/jiraService';
 import { FeedbackService } from './services/feedbackService';
 import { TaskService } from './services/taskService';
-import { TaskMasterService } from './services/taskMasterService';
+import { TaskMasterService, TaskMasterTask } from './services/taskMasterService';
 // GitHub configuration removed - only using Salesforce config now
 import { NotificationManager } from './services/notificationManager';
 
@@ -944,17 +944,34 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
 
             if (taskDataArray.length === 1) {
-                vscode.window.showInformationMessage('TaskMaster task imported successfully!');
+                const task = taskDataArray[0];
+                const missingFields = ['description', 'type', 'estimation', 'priority', 'status'].filter(field => !task[field as keyof TaskMasterTask]);
+                if (missingFields.length > 0) {
+                    vscode.window.showInformationMessage(
+                        `TaskMaster task imported successfully! Please manually fill: ${missingFields.join(', ')}`
+                    );
+                } else {
+                    vscode.window.showInformationMessage('TaskMaster task imported successfully!');
+                }
             } else {
                 vscode.window.showInformationMessage(`Found ${taskDataArray.length} tasks. Please select one to import.`);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            vscode.window.showErrorMessage(`Failed to import TaskMaster data: ${errorMessage}`);
+            
+            // Provide more helpful error messages for common issues
+            let userFriendlyMessage = errorMessage;
+            if (errorMessage.includes('Missing essential fields')) {
+                userFriendlyMessage = `${errorMessage}\n\nNote: Only 'id' and 'title' are required. Other fields can be filled manually after import.`;
+            } else if (errorMessage.includes('Invalid JSON format')) {
+                userFriendlyMessage = `${errorMessage}\n\nPlease check the .taskmaster/tasks/task.json file for syntax errors.`;
+            }
+            
+            vscode.window.showErrorMessage(`Failed to import TaskMaster data: ${userFriendlyMessage}`);
             
             // Send error to webview so it can re-enable the button
             if (specDrivenDevelopmentPanel) {
-                specDrivenDevelopmentPanel.sendTaskMasterError(errorMessage);
+                specDrivenDevelopmentPanel.sendTaskMasterError(userFriendlyMessage);
             }
         }
     });
