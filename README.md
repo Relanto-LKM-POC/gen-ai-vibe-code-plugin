@@ -176,8 +176,8 @@ Install from the VS Code Marketplace or use the Command Palette (`Ctrl+Shift+P` 
 - **VS Code Compatibility**: 1.74.0+
 
 ### 🔗 **Quick Links**
-- **Repository**: [GitHub](https://github.com/Relanto-LKM-POC/spec-driven-development)
-- **Issues**: [Report Issues](https://github.com/Relanto-LKM-POC/spec-driven-development/issues)
+- **Repository**: [GitHub](https://github.com/cx-learning-platform/spec-driven-development)
+- **Issues**: [Report Issues](https://github.com/cx-learning-platform/spec-driven-development/issues)
 - **License**: [MIT License](LICENSE)
 
 ---

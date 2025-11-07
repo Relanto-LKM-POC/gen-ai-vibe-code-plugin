@@ -228,7 +228,7 @@ export class UserService {
      * Get system-based email (fallback) - now returns clear placeholder
      */
     private getSystemEmail(): string {
-        // Instead of using system username which can be confusing (like "Relanto@cisco.com"),
+        // Instead of using system username which can be confusing (like "user@cisco.com"),
         // return a clear placeholder that indicates configuration is needed
         return 'user@company.com';
     }
