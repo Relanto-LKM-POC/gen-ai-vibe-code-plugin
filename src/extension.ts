@@ -635,17 +635,52 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.updateAWSStatus(status);
             }
             
-            // Show success message
+            // Show success message with clean configuration details
             if (status.connected) {
-                const profileMsg = status.profile ? ` using [${status.profile}] profile` : '';
-                vscode.window.showInformationMessage(`✅ Successfully connected to AWS${profileMsg}!`);
+                const region = status.region || 'us-east-1';
+                const profile = status.profile || 'default';
+                vscode.window.showInformationMessage(
+                    `✅ AWS Connection Successful\n\n` +
+                    `Configuration Details:\n` +
+                    `• Region: ${region}\n` +
+                    `• Profile: ${profile}\n` +
+                    `• Secrets Manager: ${status.secretsManagerAccess ? 'Ready' : 'Not Available'}`
+                );
             }
             
             // Update status bar
             await updateAWSStatusBar();
         } catch (error) {
-            // Only show error once here
-            vscode.window.showErrorMessage(`❌ ${(error as Error).message}`);
+            // Get connection details from service for error notification
+            const connectionLog = awsService.getConnectionLog();
+            
+            // Extract configuration details from logs
+            let configDetails = '';
+            const profileLog = connectionLog.find(log => log.includes('Configured AWS Profile:'));
+            const regionLog = connectionLog.find(log => log.includes('Configured AWS Region:'));
+            
+            if (profileLog) {
+                const profileMatch = profileLog.match(/Configured AWS Profile: "([^"]+)"/);
+                if (profileMatch) {
+                    configDetails += `• Profile: ${profileMatch[1]}\n`;
+                }
+            }
+            
+            if (regionLog) {
+                const regionMatch = regionLog.match(/Configured AWS Region: "([^"]+)"/);
+                if (regionMatch) {
+                    configDetails += `• Region: ${regionMatch[1]}\n`;
+                }
+            }
+            
+            // Show detailed error with configuration info
+            const errorMsg = (error as Error).message;
+            vscode.window.showErrorMessage(
+                `❌ AWS Connection Failed\n\n` +
+                `Configuration Used:\n${configDetails || '• Profile: default\n• Region: AWS CLI default\n'}\n` +
+                `Error: ${errorMsg}\n\n` +
+                `💡 Check your AWS credentials and configuration`
+            );
             await updateAWSStatusBar();
         }
     });
