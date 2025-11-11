@@ -51,7 +51,7 @@ export class AWSService {
      */
     private logConnectionStep(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
         const timestamp = new Date().toISOString();
-        const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+        const logMessage = `[SDD:AWS] ${level.toUpperCase()} | [${timestamp}] ${message}`;
         this.connectionLog.push(logMessage);
         console.log(logMessage);
         
@@ -173,7 +173,7 @@ export class AWSService {
             
             return undefined;
         } catch (error) {
-            console.warn(`Failed to read .env file: ${(error as Error).message}`);
+            console.warn(`[SDD:AWS] WARN | Failed to read .env file: ${(error as Error).message}`);
             return undefined;
         }
     }
@@ -185,18 +185,6 @@ export class AWSService {
         
         const configuredSecret = vscode.workspace.getConfiguration('specDrivenDevelopment').get('salesforceSecretName', '');
         return configuredSecret || CONFIG.aws.secretsManager.defaultSecretName;
-    }
-
-    private getConfiguredSalesforceKeywords(): string[] {
-        // Priority: .env file > VS Code settings > default
-        const envValue = this.readFromEnvFile('SALESFORCE_SECRET_KEYWORDS');
-        if (envValue) {
-            // Parse comma-separated keywords from env file
-            return envValue.split(',').map(k => k.trim()).filter(k => k.length > 0);
-        }
-        
-        const configuredKeywords = vscode.workspace.getConfiguration('specDrivenDevelopment').get('salesforceSecretKeywords', []);
-        return configuredKeywords.length > 0 ? configuredKeywords : ['salesforce', 'sf', 'crm', 'sales', 'force'];
     }
 
     private buildAwsCommand(baseCommand: string, profile?: string, region?: string): string {
@@ -266,7 +254,7 @@ export class AWSService {
                 try {
                     this.selectedProfile = await this.testAWSCliWithProfiles();
                     this.logConnectionStep(`✓ Successfully authenticated with profile: "${this.selectedProfile}"`);
-                    console.log(`Selected AWS profile: ${this.selectedProfile}`);
+                    console.log(`[SDD:AWS] INFO | Selected AWS profile: ${this.selectedProfile}`);
                 } catch (error: any) {
                     this.logConnectionStep(`❌ Authentication failed: ${error.message}`, 'error');
                     this.provideTroubleshootingSuggestions(error.message);
@@ -311,7 +299,7 @@ export class AWSService {
                 } catch (credError) {
                     const errorMsg = (credError as Error).message;
                     this.logConnectionStep(`⚠ Salesforce credentials issue: ${errorMsg}`, 'warn');
-                    console.warn('Salesforce credentials not available:', errorMsg);
+                    console.warn(`[SDD:AWS] WARN | Salesforce credentials not available: ${errorMsg}`);
                     credentialError = errorMsg;
                     // Continue without Salesforce credentials - they can be fetched later if needed
                 }
@@ -511,7 +499,7 @@ export class AWSService {
                     : `aws sts get-caller-identity --profile ${profile}`;
                 
                 await execAsync(command);
-                console.log(`Successfully connected using profile: ${profile}`);
+                console.log(`[SDD:AWS] INFO | Successfully connected using profile: ${profile}`);
                 
                 // Warn if not using configured profile
                 if (this.currentProfile && profile !== this.currentProfile) {
@@ -580,18 +568,17 @@ export class AWSService {
             const profileMsg = this.currentProfile ? ` profile: ${this.currentProfile}` : ' default profile';
             const regionMsg = this.currentRegion ? ` region: ${this.currentRegion}` : ' default region';
             const configuredSecretName = this.getConfiguredSalesforceSecretName();
-            const fallbackKeywords = this.getConfiguredSalesforceKeywords();
             
             this.logConnectionStep(`Searching for Salesforce secret: "${configuredSecretName}"`);
             this.logConnectionStep(`Using${profileMsg},${regionMsg}`);
-            console.log(`Looking for Salesforce secret: "${configuredSecretName}" in${profileMsg},${regionMsg}`);
+            console.log(`[SDD:AWS] INFO | Looking for Salesforce secret: "${configuredSecretName}" in${profileMsg},${regionMsg}`);
             
             const listCommand = this.buildAwsCommand('aws secretsmanager list-secrets');
             const { stdout: listOutput } = await execAsync(listCommand);
             const secretsList = JSON.parse(listOutput.trim());
             
             this.logConnectionStep(`Found ${secretsList.SecretList.length} total secrets in Secrets Manager`);
-            console.log(`Found ${secretsList.SecretList.length} secrets total`);
+            console.log(`[SDD:AWS] INFO | Found ${secretsList.SecretList.length} secrets total`);
             
             // Log available secrets for debugging
             if (secretsList.SecretList.length > 0) {
@@ -622,33 +609,9 @@ export class AWSService {
                 }
             }
             
-            // If still not found, ask user before trying fallback keywords
-            if (!salesforceSecret) {
-                this.logConnectionStep(`Partial match not found, trying fallback keywords: [${fallbackKeywords.join(', ')}]`);
-                const fallback = await vscode.window.showWarningMessage(
-                    `Secret "${configuredSecretName}" not found. Search using keywords [${fallbackKeywords.join(', ')}]?`,
-                    'Yes', 'No'
-                );
-                
-                if (fallback === 'Yes') {
-                    this.logConnectionStep(`User approved fallback keyword search`);
-                    console.log(`Trying fallback keywords: ${fallbackKeywords.join(', ')}`);
-                    salesforceSecret = secretsList.SecretList.find((secret: any) => {
-                        const name = secret.Name.toLowerCase();
-                        return fallbackKeywords.some(keyword => name.includes(keyword.toLowerCase()));
-                    });
-                    
-                    if (salesforceSecret) {
-                        this.logConnectionStep(`✓ Found using fallback keyword: "${salesforceSecret.Name}"`);
-                    }
-                } else {
-                    this.logConnectionStep('User declined fallback keyword search', 'warn');
-                }
-            }
-            
             if (!salesforceSecret) {
                 const availableSecrets = secretsList.SecretList.map((s: any) => s.Name);
-                const errorMsg = `No Salesforce secret found matching "${configuredSecretName}" or keywords [${fallbackKeywords.join(', ')}] in${regionMsg}`;
+                const errorMsg = `No Salesforce secret found matching "${configuredSecretName}" in${regionMsg}`;
                 this.logConnectionStep(errorMsg, 'error');
                 this.logConnectionStep(`Available secrets (${availableSecrets.length}): ${availableSecrets.join(', ') || 'None'}`, 'error');
                 
@@ -660,7 +623,7 @@ export class AWSService {
             }
             
             this.logConnectionStep(`Retrieving secret value for: "${salesforceSecret.Name}"`);
-            console.log(`Using secret: ${salesforceSecret.Name}`);
+            console.log(`[SDD:AWS] INFO | Using secret: ${salesforceSecret.Name}`);
             const secretName = salesforceSecret.Name;
             const command = this.buildAwsCommand(`aws secretsmanager get-secret-value --secret-id "${secretName}"`);
             const { stdout } = await execAsync(command);
