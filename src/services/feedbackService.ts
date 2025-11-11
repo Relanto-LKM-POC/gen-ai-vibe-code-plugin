@@ -246,7 +246,7 @@ export class FeedbackService {
                 console.log(`Initiative__c field references: ${referencedObject}`);
                 
                 // Now query the correct object
-                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+${referencedObject}`), {
+                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+${referencedObject}+WHERE+Updated_Initiative__c+%3D+true`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -265,7 +265,7 @@ export class FeedbackService {
                 }));
             } else {
                 // Fallback to CX_Initiative__c based on discovered field relationship
-                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+CX_Initiative__c`), {
+                const response = await fetchWithTimeout(getSalesforceQueryUrl(`SELECT+Id%2CName+FROM+CX_Initiative__c+WHERE+Updated_Initiative__c+%3D+true`), {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -972,8 +972,9 @@ export class FeedbackService {
             const query = encodeURIComponent(
                 `SELECT id, name, Team_Name__c, Status__c ` +
                 `FROM Epic__c ` +
-                `WHERE Team_Name__c LIKE '%${jiraTeam.replace(/'/g, "\\'")}%' ` +
-                `AND Status__c != 'done' ` +
+                `WHERE Status__c != 'Done' ` +
+                `AND Updated_Initiative__c = true ` +
+                `AND Team_Name__c LIKE '%${jiraTeam.replace(/'/g, "\\'")}%' ` +
                 `ORDER BY CreatedDate DESC`
             );
 
