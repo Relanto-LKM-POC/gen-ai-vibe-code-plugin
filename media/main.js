@@ -111,6 +111,7 @@
     function setupAWSEventListeners() {
         const connectBtn = document.getElementById('connect-aws-btn');
         const refreshBtn = document.getElementById('refresh-aws-btn');
+        const disconnectBtn = document.getElementById('disconnect-aws-btn');
 
         connectBtn.addEventListener('click', () => {
             updateAWSStatus({ status: 'connecting' });
@@ -125,6 +126,10 @@
         refreshBtn.addEventListener('click', () => {
             vscode.postMessage({ command: 'refreshAWSConnection' });
             vscode.postMessage({ command: 'getEnhancedAWSStatus' });
+        });
+
+        disconnectBtn.addEventListener('click', () => {
+            vscode.postMessage({ command: 'disconnectAWS' });
         });
     }
 
@@ -618,6 +623,7 @@
         const statusText = document.getElementById('aws-status-text');
         const connectBtn = document.getElementById('connect-aws-btn');
         const refreshBtn = document.getElementById('refresh-aws-btn');
+        const disconnectBtn = document.getElementById('disconnect-aws-btn');
         const connectionDetails = document.getElementById('aws-connection-details');
         const loading = document.getElementById('aws-loading');
 
@@ -629,6 +635,7 @@
                 statusText.textContent = '🟢 Connected & Ready';
                 connectBtn.style.display = 'none';
                 refreshBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'inline-block';
                 connectionDetails.style.display = 'block';
                 loading.style.display = 'none';
                 updateConnectionDetails(status);
@@ -647,6 +654,7 @@
                 statusText.textContent = '🟡 Connecting...';
                 connectBtn.style.display = 'none';
                 refreshBtn.style.display = 'none';
+                disconnectBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'block';
                 // Update secret validation to show connecting state
@@ -657,6 +665,7 @@
                 statusText.textContent = '🔴 Connection Failed';
                 connectBtn.style.display = 'inline-block';
                 refreshBtn.style.display = 'none';
+                disconnectBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'none';
                 // Update secret validation to show error state
@@ -667,6 +676,7 @@
                 statusText.textContent = '🔴 Not Connected';
                 connectBtn.style.display = 'inline-block';
                 refreshBtn.style.display = 'none';
+                disconnectBtn.style.display = 'none';
                 connectionDetails.style.display = 'none';
                 loading.style.display = 'none';
                 // Update secret validation to show disconnected state

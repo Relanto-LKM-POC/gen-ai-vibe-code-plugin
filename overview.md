@@ -107,7 +107,7 @@ When you use "Add Workspace Guidelines", the extension creates:
 
 ```
 your-project/
-├── .spec-driven-files/
+├── .spec-driven-development/
 │   ├── instructions/          # 📚 Contextual Coding Instructions
 │   │   ├── go.best-practices.instructions.md
 │   │   ├── go.development.instructions.md

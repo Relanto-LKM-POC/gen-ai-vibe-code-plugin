@@ -29,9 +29,31 @@ let jiraService: JiraService;
 let feedbackService: FeedbackService;
 let taskService: TaskService;
 let notificationManager: NotificationManager;
+let awsStatusBarItem: vscode.StatusBarItem;
 
 // Module-level timeout variable for debouncing
 let vibeAnalysisTimeout: NodeJS.Timeout | undefined;
+
+// Function to update AWS status bar
+async function updateAWSStatusBar() {
+    if (!awsStatusBarItem || !awsService) return;
+    
+    const isConnected = await awsService.isConnected();
+    if (isConnected) {
+        const connectionTime = await awsService.getConnectionTime();
+        const selectedProfile = awsService.getSelectedProfile();
+        const profileMsg = selectedProfile ? ` [${selectedProfile}]` : '';
+        const expiryMsg = connectionTime ? `\nExpires: ${new Date(connectionTime).toLocaleString()}` : '';
+        
+        awsStatusBarItem.text = `$(cloud) AWS: Connected${profileMsg}`;
+        awsStatusBarItem.tooltip = `AWS Connected${profileMsg}${expiryMsg}`;
+        awsStatusBarItem.command = 'specDrivenDevelopment.disconnectAWS';
+    } else {
+        awsStatusBarItem.text = "$(cloud) AWS: Disconnected";
+        awsStatusBarItem.tooltip = "AWS Connection Status - Click to connect";
+        awsStatusBarItem.command = 'specDrivenDevelopment.connectAWS';
+    }
+}
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('🎯 Spec Driven Development is now active!');
@@ -86,6 +108,21 @@ export async function activate(context: vscode.ExtensionContext) {
         statusBarItem.command = 'specDrivenDevelopment.openPanel';
         statusBarItem.show();
         context.subscriptions.push(statusBarItem);
+
+        // AWS connection status bar item
+        awsStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+        awsStatusBarItem.text = "$(cloud) AWS: Disconnected";
+        awsStatusBarItem.tooltip = "AWS Connection Status - Click to connect";
+        awsStatusBarItem.command = 'specDrivenDevelopment.connectAWS';
+        awsStatusBarItem.show();
+        context.subscriptions.push(awsStatusBarItem);
+
+        // Update status bar initially
+        await updateAWSStatusBar();
+
+        // Update status bar when connection changes
+        const updateStatusBarInterval = setInterval(updateAWSStatusBar, 30000); // Every 30 seconds
+        context.subscriptions.push({ dispose: () => clearInterval(updateStatusBarInterval) });
 
         // Show welcome message for first-time users
         const hasShownWelcome = context.globalState.get('hasShownWelcome', false);
@@ -584,26 +621,32 @@ function registerCommands(context: vscode.ExtensionContext) {
 
     const connectAWSCommand = vscode.commands.registerCommand('specDrivenDevelopment.connectAWS', async () => {
         try {
-            await vscode.window.withProgress({
+            const status = await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Connecting to AWS...',
                 cancellable: false
             }, async (progress) => {
                 progress.report({ increment: 0, message: 'Testing AWS CLI credentials...' });
-                const status = await awsService.connectToAWS();
-                
-                if (specDrivenDevelopmentPanel) {
-                    specDrivenDevelopmentPanel.updateAWSStatus(status);
-                }
-                
-                if (status.connected) {
-                    vscode.window.showInformationMessage('✅ Successfully connected to AWS!');
-                } else {
-                    vscode.window.showErrorMessage(`❌ Failed to connect to AWS: ${status.error}`);
-                }
+                return await awsService.connectToAWS();
             });
+            
+            // Update UI with the status
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateAWSStatus(status);
+            }
+            
+            // Show success message
+            if (status.connected) {
+                const profileMsg = status.profile ? ` using [${status.profile}] profile` : '';
+                vscode.window.showInformationMessage(`✅ Successfully connected to AWS${profileMsg}!`);
+            }
+            
+            // Update status bar
+            await updateAWSStatusBar();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to connect to AWS: ${(error as Error).message}`);
+            // Only show error once here
+            vscode.window.showErrorMessage(`❌ ${(error as Error).message}`);
+            await updateAWSStatusBar();
         }
     });
 
@@ -613,9 +656,29 @@ function registerCommands(context: vscode.ExtensionContext) {
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.updateAWSStatus(status);
             }
-            vscode.window.showInformationMessage('AWS connection refreshed');
+            vscode.window.showInformationMessage('✅ AWS connection refreshed successfully');
+            await updateAWSStatusBar();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to refresh AWS connection: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(`❌ Failed to refresh AWS connection: ${(error as Error).message}`);
+            await updateAWSStatusBar();
+        }
+    });
+
+    const disconnectAWSCommand = vscode.commands.registerCommand('specDrivenDevelopment.disconnectAWS', async () => {
+        try {
+            await awsService.disconnect();
+            const disconnectedStatus = {
+                connected: false,
+                status: 'disconnected' as const
+            };
+            if (specDrivenDevelopmentPanel) {
+                specDrivenDevelopmentPanel.updateAWSStatus(disconnectedStatus);
+            }
+            vscode.window.showInformationMessage('✅ Disconnected from AWS');
+            await updateAWSStatusBar();
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to disconnect from AWS: ${(error as Error).message}`);
+            await updateAWSStatusBar();
         }
     });
 
@@ -1954,6 +2017,7 @@ WHERE Jira_Link__c != null AND Status__c != 'Done' AND (CreatedBy.Email = '${use
         openPanelCommand,
         connectAWSCommand,
         refreshAWSConnectionCommand,
+        disconnectAWSCommand,
         getRealTimeAWSStatusCommand,
         getEnhancedAWSStatusCommand,
         listAWSSecretsCommand,
