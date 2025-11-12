@@ -919,11 +919,19 @@ export class FeedbackService {
             const token = await this.getAccessTokenWithRetryAndProtection();
 
             // API 15: Query App_Items__c
+            // const query = encodeURIComponent(
+            //     `SELECT id, name, Initiative__c, App__r.Name, Initiative__r.Id, Initiative__r.Name, Initiative__r.Jira_Team__c ` +
+            //     `FROM App_Items__c ` + 
+            //     `where Initiative__r.Updated_Initiative__c =true` +
+            //     `AND App__r.Name = '${applicationName.replace(/'/g, "\\'")}'`
+            // );
+
             const query = encodeURIComponent(
                 `SELECT id, name, Initiative__c, App__r.Name, Initiative__r.Id, Initiative__r.Name, Initiative__r.Jira_Team__c ` +
-                `FROM App_Items__c ` +
-                `WHERE App__r.Name = '${applicationName.replace(/'/g, "\\'")}'`
-            );
+                `FROM App_Items__c ` + 
+                `WHERE Initiative__r.Updated_Initiative__c = true ` + // Added space after WHERE and before =
+                `AND App__r.Name = '${applicationName.replace(/'/g, "\\'")}'`
+               );
 
             const response = await fetchWithTimeout(getSalesforceQueryUrl(query), {
                 method: 'GET',
@@ -973,7 +981,7 @@ export class FeedbackService {
                 `SELECT id, name, Team_Name__c, Status__c ` +
                 `FROM Epic__c ` +
                 `WHERE Status__c != 'Done' ` +
-                `AND Updated_Initiative__c = true ` +
+                // `AND Updated_Initiative__c = true ` +
                 `AND Team_Name__c LIKE '%${jiraTeam.replace(/'/g, "\\'")}%' ` +
                 `ORDER BY CreatedDate DESC`
             );
