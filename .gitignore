@@ -13,5 +13,11 @@ Thumbs.db
 .env*
 action_items.txt
 API_CALLS.txt
-WIP_Limit.md
-JIRA_Flow_Diagram.md
+new-req.md
+# Spec Driven Development - AI Instructions & Prompts
+# Auto-generated AI guidance files - excluded from version control
+.spec-driven-development/
+
+# Note: These files enhance GitHub Copilot with project-specific guidance.
+# They are excluded to keep your repository clean and focused on your code.
+# The extension will recreate them as needed when analyzing code.

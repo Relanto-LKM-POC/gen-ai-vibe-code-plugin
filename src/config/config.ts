@@ -4,10 +4,10 @@
  */
 export const CONFIG = {
     salesforce: {
-        // authUrl: 'https://test.salesforce.com/services/oauth2/token',
-        // baseUrl: 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com',
         authUrl: 'https://test.salesforce.com/services/oauth2/token',
-        baseUrl: 'https://ciscolearningservices--clnuat4.sandbox.my.salesforce-setup.com',
+        baseUrl: 'https://ciscolearningservices--secqa.sandbox.my.salesforce-setup.com',
+        // authUrl: 'https://test.salesforce.com/services/oauth2/token',
+        // baseUrl: 'https://ciscolearningservices--clnuat4.sandbox.my.salesforce-setup.com',
         apiVersion: 'v56.0'
     },
     
@@ -47,6 +47,26 @@ export const CONFIG = {
         
         // Pattern to validate standalone JIRA ticket IDs like GAI-572, DEVSECOPS-12208, ABC123-999
         ticketIdPattern: /^[A-Z0-9]+-\d+$/i
+    },
+    
+    termsAndConditions: {
+        // Periodic display intervals (in milliseconds)
+        periodicIntervals: {
+            twiceDaily: 12 * 60 * 60 * 1000,      // 12 hours
+            thriceWeekly: 56 * 60 * 60 * 1000     // ~56 hours (3 times per week)
+        },
+        
+        // Bill of Materials files to detect in workspace root
+        // Add new files here to include them in BOM detection
+        billOfMaterialsFiles: [
+            '.taskmaster',
+            '.devcontainer',
+            '.devbox',
+            '.spec-driven-development'
+        ],
+        
+        // Active periodic schedule to use ('twiceDaily' or 'thriceWeekly')
+        activeSchedule: 'twiceDaily' as 'twiceDaily' | 'thriceWeekly'
     }
 } as const;
 

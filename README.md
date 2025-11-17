@@ -22,6 +22,17 @@
 
 ### 🚀 **Development Setup**
 
+**Step 0: Connect to AWS Development Account**
+```
+Windows:
+> .\duo-sso_windows_amd64 -duo-idp -session-duration 3600 -factor push
+
+Mac:
+> duo-sso  -session-duration 3600
+
+Then, Select the `532054877749` account with `developer` role
+```
+
 **Step 1: Clone and Install**
 ```bash
 git clone <your-git-repo-link>
@@ -35,14 +46,18 @@ npm run compile
 ```
 
 **Step 3: Run the Extension**
-1. Press **`Fn+F5`** (or **`F5`** on some keyboards) in VS Code
-2. This opens a new **Extension Development Host** window
-3. The extension is now running in the test instance
-4. Make changes to code, run `npm run compile` again, then reload the test window (`Ctrl+R`)
-
-**Step 4: Configure AWS with SSO (Duo)**
 ```bash
-.\duo-sso_windows_amd64 -duo-idp -session-duration 3600 -factor push
+npm run package
+
+code --install-extension spec-driven-development-1.0.0.vsix
+````
+
+---
+
+#### To uninstall the extension
+```bash
+code --uninstall-extension Gen-Ai-publisher.spec-driven-development
+and Open Command Palette(Ctrl+Shift+p) and select `Developer: Reload Window" from the dropdown
 ```
 
 ---
@@ -92,7 +107,7 @@ Should list secrets (or empty list if none exist). If error, check IAM permissio
 ```bash
 aws configure get region
 ```
-Ensure the region matches where your Secrets Manager secrets are stored.
+Ensure the region matches where your Secrets Manager secrets are stored (us-east-1).
 
 ---
 
