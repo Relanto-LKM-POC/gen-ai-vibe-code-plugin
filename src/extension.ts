@@ -951,8 +951,8 @@ function registerCommands(context: vscode.ExtensionContext) {
                 console.log(`[SDD:Core] INFO | Auto-population failed: ${result.fallbackReason}`);
             }
 
-            // After auto-populate completes, check T&C
-            // This ensures application name is fetched from Hub before showing popup
+            // After auto-populate completes (success or failure), check T&C
+            // This ensures we always ask for consent even if repo is not in Hub
             setTimeout(async () => {
                 try {
                     console.log('[SDD:Core] INFO | Checking T&C after auto-populate completion...');
@@ -964,6 +964,16 @@ function registerCommands(context: vscode.ExtensionContext) {
 
         } catch (error) {
             console.error('[SDD:Core] ERROR | Error in autoPopulateFromGitCommand:', error);
+            
+            // Even if auto-populate throws error, still check T&C
+            setTimeout(async () => {
+                try {
+                    console.log('[SDD:Core] INFO | Auto-populate error - checking T&C anyway...');
+                    await termsConditionsService.checkAndShowTermsConditions();
+                } catch (tcError) {
+                    console.error('[SDD:Core] ERROR | Failed to check T&C:', tcError);
+                }
+            }, 500);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendAutoPopulationResult({
                     success: false,
