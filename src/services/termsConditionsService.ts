@@ -52,8 +52,8 @@ export class TermsConditionsService {
      */
     async shouldShowTCPopup(): Promise<boolean> {
         try {
-            const lastConsentStatus = this.context.globalState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
-            const lastTimestamp = this.context.globalState.get<number>('tc.lastAcceptanceTimestamp', 0);
+            const lastConsentStatus = this.context.workspaceState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
+            const lastTimestamp = this.context.workspaceState.get<number>('tc.lastAcceptanceTimestamp', 0);
             const currentTime = Date.now();
 
             // First-time user - never shown before
@@ -328,7 +328,7 @@ export class TermsConditionsService {
             console.log('[SDD:T&C] INFO | Initializing periodic data collection');
 
             // Get current consent status
-            const lastConsentStatus = this.context.globalState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
+            const lastConsentStatus = this.context.workspaceState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
 
             if (lastConsentStatus === 'agree') {
                 // User has agreed - start automatic periodic collection (twice a day)
@@ -336,7 +336,7 @@ export class TermsConditionsService {
                 this.startPeriodicCollection();
             } else if (lastConsentStatus === 'disagree') {
                 // User disagreed - check if it's time to ask again (after 3 days)
-                const lastDisagreedTimestamp = this.context.globalState.get<number>('tc.lastAcceptanceTimestamp', 0);
+                const lastDisagreedTimestamp = this.context.workspaceState.get<number>('tc.lastAcceptanceTimestamp', 0);
                 const timeSinceDisagreed = Date.now() - lastDisagreedTimestamp;
 
                 if (timeSinceDisagreed >= TermsConditionsService.DISAGREED_RETRY_INTERVAL) {
@@ -428,7 +428,7 @@ export class TermsConditionsService {
             );
 
             // Update last collection timestamp
-            await this.context.globalState.update('tc.lastPeriodicCollectionTimestamp', Date.now());
+            await this.context.workspaceState.update('tc.lastPeriodicCollectionTimestamp', Date.now());
 
             console.log('[SDD:T&C] INFO | Periodic data collection completed successfully');
 
@@ -524,13 +524,13 @@ export class TermsConditionsService {
      */
     private getStorageState(): TCStorageState {
         return {
-            lastTCAcceptanceTimestamp: this.context.globalState.get<number>('tc.lastAcceptanceTimestamp'),
-            lastConsentStatus: this.context.globalState.get<'agree' | 'disagree'>('tc.lastConsentStatus'),
-            lastBillOfMaterials: this.context.globalState.get<string[]>('tc.lastBillOfMaterials'),
-            lastRepositoryName: this.context.globalState.get<string>('tc.lastRepositoryName'),
-            lastApplicationName: this.context.globalState.get<string>('tc.lastApplicationName'),
-            lastExtensionVersion: this.context.globalState.get<string>('tc.lastExtensionVersion'),
-            lastPeriodicDisplayTimestamp: this.context.globalState.get<number>('tc.lastPeriodicDisplayTimestamp')
+            lastTCAcceptanceTimestamp: this.context.workspaceState.get<number>('tc.lastAcceptanceTimestamp'),
+            lastConsentStatus: this.context.workspaceState.get<'agree' | 'disagree'>('tc.lastConsentStatus'),
+            lastBillOfMaterials: this.context.workspaceState.get<string[]>('tc.lastBillOfMaterials'),
+            lastRepositoryName: this.context.workspaceState.get<string>('tc.lastRepositoryName'),
+            lastApplicationName: this.context.workspaceState.get<string>('tc.lastApplicationName'),
+            lastExtensionVersion: this.context.workspaceState.get<string>('tc.lastExtensionVersion'),
+            lastPeriodicDisplayTimestamp: this.context.workspaceState.get<number>('tc.lastPeriodicDisplayTimestamp')
         };
     }
 
@@ -541,25 +541,25 @@ export class TermsConditionsService {
         const updates: Thenable<void>[] = [];
         
         if (state.lastTCAcceptanceTimestamp !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastAcceptanceTimestamp', state.lastTCAcceptanceTimestamp));
+            updates.push(this.context.workspaceState.update('tc.lastAcceptanceTimestamp', state.lastTCAcceptanceTimestamp));
         }
         if (state.lastConsentStatus !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastConsentStatus', state.lastConsentStatus));
+            updates.push(this.context.workspaceState.update('tc.lastConsentStatus', state.lastConsentStatus));
         }
         if (state.lastBillOfMaterials !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastBillOfMaterials', state.lastBillOfMaterials));
+            updates.push(this.context.workspaceState.update('tc.lastBillOfMaterials', state.lastBillOfMaterials));
         }
         if (state.lastRepositoryName !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastRepositoryName', state.lastRepositoryName));
+            updates.push(this.context.workspaceState.update('tc.lastRepositoryName', state.lastRepositoryName));
         }
         if (state.lastApplicationName !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastApplicationName', state.lastApplicationName));
+            updates.push(this.context.workspaceState.update('tc.lastApplicationName', state.lastApplicationName));
         }
         if (state.lastExtensionVersion !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastExtensionVersion', state.lastExtensionVersion));
+            updates.push(this.context.workspaceState.update('tc.lastExtensionVersion', state.lastExtensionVersion));
         }
         if (state.lastPeriodicDisplayTimestamp !== undefined) {
-            updates.push(this.context.globalState.update('tc.lastPeriodicDisplayTimestamp', state.lastPeriodicDisplayTimestamp));
+            updates.push(this.context.workspaceState.update('tc.lastPeriodicDisplayTimestamp', state.lastPeriodicDisplayTimestamp));
         }
 
         await Promise.all(updates);
@@ -575,14 +575,14 @@ export class TermsConditionsService {
         this.stopPeriodicCollection();
         
         // Clear all stored T&C data
-        await this.context.globalState.update('tc.lastAcceptanceTimestamp', undefined);
-        await this.context.globalState.update('tc.lastConsentStatus', undefined);
-        await this.context.globalState.update('tc.lastBillOfMaterials', undefined);
-        await this.context.globalState.update('tc.lastRepositoryName', undefined);
-        await this.context.globalState.update('tc.lastApplicationName', undefined);
-        await this.context.globalState.update('tc.lastExtensionVersion', undefined);
-        await this.context.globalState.update('tc.lastPeriodicDisplayTimestamp', undefined);
-        await this.context.globalState.update('tc.lastPeriodicCollectionTimestamp', undefined);
+        await this.context.workspaceState.update('tc.lastAcceptanceTimestamp', undefined);
+        await this.context.workspaceState.update('tc.lastConsentStatus', undefined);
+        await this.context.workspaceState.update('tc.lastBillOfMaterials', undefined);
+        await this.context.workspaceState.update('tc.lastRepositoryName', undefined);
+        await this.context.workspaceState.update('tc.lastApplicationName', undefined);
+        await this.context.workspaceState.update('tc.lastExtensionVersion', undefined);
+        await this.context.workspaceState.update('tc.lastPeriodicDisplayTimestamp', undefined);
+        await this.context.workspaceState.update('tc.lastPeriodicCollectionTimestamp', undefined);
         
         console.log('[SDD:T&C] INFO | T&C state reset complete');
         vscode.window.showInformationMessage('✅ Terms & Conditions state reset successfully. You will be asked to consent again on next AWS connection.');
