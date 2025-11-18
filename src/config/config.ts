@@ -19,7 +19,8 @@ export const CONFIG = {
             feedbackDescribe: '/services/data/v56.0/sobjects/Feedback__c/describe',
             epic: '/services/data/v56.0/sobjects/Epic__c',
             epicDescribe: '/services/data/v56.0/sobjects/Epic__c/describe',
-            initiative: '/services/data/v56.0/sobjects/CX_Initiative__c'
+            initiative: '/services/data/v56.0/sobjects/CX_Initiative__c',
+            specDrivenUserDetails: '/services/data/v56.0/sobjects/Spec_Driven_User_Details__c'
         }
     },
     

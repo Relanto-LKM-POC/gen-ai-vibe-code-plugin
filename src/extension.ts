@@ -88,6 +88,14 @@ export async function activate(context: vscode.ExtensionContext) {
         // Initialize Terms & Conditions service (requires UserService and FeedbackService)
         termsConditionsService = new TermsConditionsService(context, userService, feedbackService);
 
+        // Start periodic data collection (if user has agreed)
+        await termsConditionsService.initializePeriodicCollection();
+
+        // Add to subscriptions for cleanup
+        context.subscriptions.push({
+            dispose: () => termsConditionsService.dispose()
+        });
+
         // Initialize UI providers
         specDrivenDevelopmentPanel = new SpecDrivenDevelopmentPanel(context);
 
@@ -651,6 +659,9 @@ function registerCommands(context: vscode.ExtensionContext) {
                     `• Profile: ${profile}\n` +
                     `• Secrets Manager: ${status.secretsManagerAccess ? 'Ready' : 'Not Available'}`
                 );
+
+                // Note: T&C check will happen after auto-populate completes
+                // to ensure application name is fetched from Hub
             }
             
             // Update status bar
@@ -941,19 +952,13 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
 
             // After auto-populate completes, check T&C
+            // This ensures application name is fetched from Hub before showing popup
             setTimeout(async () => {
                 try {
                     console.log('[SDD:Core] INFO | Checking T&C after auto-populate completion...');
-                    const shouldShow = await termsConditionsService.shouldShowTCPopup();
-                    if (shouldShow) {
-                        console.log('[SDD:Core] INFO | Showing T&C popup...');
-                        const userChoice = await termsConditionsService.showTCPopup();
-                        if (userChoice) {
-                            await termsConditionsService.processUserConsent(userChoice);
-                        }
-                    }
+                    await termsConditionsService.checkAndShowTermsConditions();
                 } catch (error) {
-                    console.error('[SDD:Core] ERROR | Failed to process T&C popup:', error);
+                    console.error('[SDD:Core] ERROR | Failed to check T&C:', error);
                 }
             }, 500);
 
@@ -1989,22 +1994,8 @@ function registerCommands(context: vscode.ExtensionContext) {
                 console.log(`[SDD:Core] INFO | Email configuration updated: ${newEmail}`);
                 vscode.window.showInformationMessage(`✅ Email configured: ${newEmail}. You can now retrieve your tasks.`);
                 
-                // After successful email configuration, check if T&C should be shown
-                setTimeout(async () => {
-                    try {
-                        console.log('[SDD:Core] INFO | Email configured successfully, checking T&C...');
-                        const shouldShow = await termsConditionsService.shouldShowTCPopup();
-                        if (shouldShow) {
-                            console.log('[SDD:Core] INFO | Showing T&C popup after email configuration...');
-                            const userChoice = await termsConditionsService.showTCPopup();
-                            if (userChoice) {
-                                await termsConditionsService.processUserConsent(userChoice);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('[SDD:Core] ERROR | Failed to process T&C popup:', error);
-                    }
-                }, 500);
+                // Note: T&C check is handled after AWS connection, not here
+                // to avoid duplicate popups
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to configure email: ${(error as Error).message}`);

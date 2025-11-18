@@ -4,7 +4,7 @@ import * as path from 'path';
 import { UserService } from './userService';
 import { GitService } from './gitService';
 import { FeedbackService } from './feedbackService';
-import { CONFIG } from '../config/config';
+import { CONFIG, getSalesforceApiUrl } from '../config/config';
 
 export interface BillOfMaterialsPayload {
     user_email: string;
@@ -34,10 +34,12 @@ export class TermsConditionsService {
     private context: vscode.ExtensionContext;
     private userService: UserService;
     private feedbackService: FeedbackService;
-    
-    // Mock API endpoints (replace with actual Salesforce API URLs when available)
-    private readonly MOCK_API_BILL_OF_MATERIALS = 'https://mock-api.devsecops.hub/v1/bill-of-materials';
-    private readonly MOCK_API_USER_CONSENT = 'https://mock-api.devsecops.hub/v1/user-consent';
+    private periodicCollectionInterval: NodeJS.Timeout | undefined;
+
+    // Timing constants for T&C behavior
+    private static readonly PERIODIC_COLLECTION_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours (twice a day)
+    private static readonly DISAGREED_RETRY_INTERVAL = 3 * 24 * 60 * 60 * 1000; // 3 days
+    private static readonly AGREED_REMINDER_INTERVAL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
     constructor(context: vscode.ExtensionContext, userService: UserService, feedbackService: FeedbackService) {
         this.context = context;
@@ -49,24 +51,46 @@ export class TermsConditionsService {
      * Check if T&C popup should be shown based on trigger conditions
      */
     async shouldShowTCPopup(): Promise<boolean> {
-        const state = this.getStorageState();
-        
-        // Trigger 1: First-time user
-        if (!state.lastTCAcceptanceTimestamp) {
-            return true;
-        }
+        try {
+            const lastConsentStatus = this.context.globalState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
+            const lastTimestamp = this.context.globalState.get<number>('tc.lastAcceptanceTimestamp', 0);
+            const currentTime = Date.now();
 
-        // Trigger 2: Periodic schedule (twice a day)
-        if (this.shouldShowPeriodic(state)) {
-            return true;
-        }
+            // First-time user - never shown before
+            if (!lastConsentStatus) {
+                console.log('[SDD:T&C] INFO | T&C never shown - will display');
+                return true;
+            }
 
-        // Trigger 3: Change detection
-        if (await this.hasTrackedFieldsChanged(state)) {
-            return true;
-        }
+            // User disagreed - ask again after 3 days
+            if (lastConsentStatus === 'disagree') {
+                const timeSinceDisagreed = currentTime - lastTimestamp;
+                if (timeSinceDisagreed >= TermsConditionsService.DISAGREED_RETRY_INTERVAL) {
+                    console.log('[SDD:T&C] INFO | 3 days passed since user disagreed - will ask again');
+                    return true;
+                }
+                const daysRemaining = Math.ceil((TermsConditionsService.DISAGREED_RETRY_INTERVAL - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
+                console.log(`[SDD:T&C] INFO | User disagreed ${daysRemaining} day(s) ago - will not show T&C yet`);
+                return false;
+            }
 
-        return false;
+            // User agreed - ask for re-consent after 30 days
+            if (lastConsentStatus === 'agree') {
+                const timeSinceAgreed = currentTime - lastTimestamp;
+                if (timeSinceAgreed >= TermsConditionsService.AGREED_REMINDER_INTERVAL) {
+                    console.log('[SDD:T&C] INFO | 30 days passed since user agreed - will ask for re-consent');
+                    return true;
+                }
+                console.log('[SDD:T&C] INFO | User agreed recently - periodic collection is active');
+                return false;
+            }
+
+            return false;
+
+        } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to check if T&C should be shown:', error);
+            return false;
+        }
     }
 
     /**
@@ -96,38 +120,36 @@ export class TermsConditionsService {
      */
     async processUserConsent(consentStatus: 'agree' | 'disagree'): Promise<void> {
         try {
+            console.log(`[SDD:T&C] INFO | Processing user consent: ${consentStatus}`);
+
             // Get user email and repository info
             const userEmail = await this.getUserEmail();
             const repositoryName = await this.getRepositoryName();
             const applicationName = await this.getApplicationName();
             const extensionVersion = this.getExtensionVersion();
             
-            // Detect bill of materials
+            // Detect bill of materials only if user agrees
             let billOfMaterials: string[] = [];
             if (consentStatus === 'agree') {
                 billOfMaterials = await this.detectBillOfMaterials();
+                console.log('[SDD:T&C] INFO | Collected Bill of Materials:', billOfMaterials);
+            } else {
+                console.log('[SDD:T&C] INFO | User disagreed - Bill of Materials will be empty');
             }
 
-            // Prepare API payloads
-            const bomPayload: BillOfMaterialsPayload = {
-                user_email: userEmail,
-                repository_name: repositoryName,
-                application_name: applicationName,
-                timestamp: new Date().toISOString(),
-                bill_of_materials: billOfMaterials
-            };
+            // Get current timestamp in ISO format
+            const timestamp = new Date().toISOString();
 
-            const consentPayload: UserConsentPayload = {
-                user_email: userEmail,
-                consent_status: consentStatus,
-                extension_version: extensionVersion
-            };
-
-            // Call both mock APIs
-            await Promise.all([
-                this.sendBillOfMaterialsAPI(bomPayload),
-                this.sendUserConsentAPI(consentPayload)
-            ]);
+            // Send to Salesforce Hub
+            await this.sendUserDetailsToSalesforce(
+                userEmail,
+                consentStatus,
+                extensionVersion,
+                repositoryName,
+                applicationName,
+                billOfMaterials,
+                timestamp
+            );
 
             // Update internal state
             await this.updateStorageState({
@@ -140,13 +162,27 @@ export class TermsConditionsService {
                 lastPeriodicDisplayTimestamp: Date.now()
             });
 
-            vscode.window.showInformationMessage(
-                `Terms & Conditions ${consentStatus === 'agree' ? 'accepted' : 'declined'}. Metadata data sent.`
-            );
+            // Handle periodic collection based on consent
+            if (consentStatus === 'agree') {
+                // Start periodic collection (every 12 hours)
+                this.startPeriodicCollection();
+                
+                vscode.window.showInformationMessage(
+                    `Terms & Conditions accepted. Data will be collected twice daily (every 12 hours). Found ${billOfMaterials.length} configuration file(s). You'll be asked to re-consent in 30 days.`
+                );
+            } else {
+                // Stop periodic collection if it was running
+                this.stopPeriodicCollection();
+                
+                vscode.window.showInformationMessage(
+                    'Terms & Conditions declined. No data will be collected. We will ask again in 3 days.'
+                );
+            }
 
         } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to process user consent:', error);
             vscode.window.showErrorMessage(
-                `Failed to process Terms & Conditions: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to send data to Salesforce: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
             throw error;
         }
@@ -183,86 +219,223 @@ export class TermsConditionsService {
     }
 
     /**
-     * Check if periodic display is due
-     * Schedule is configured in CONFIG.termsAndConditions.activeSchedule
+     * Check and show T&C popup if needed
+     * Should be called after AWS connection is established
      */
-    private shouldShowPeriodic(state: TCStorageState): boolean {
-        if (!state.lastPeriodicDisplayTimestamp) {
-            return false;
+    async checkAndShowTermsConditions(): Promise<void> {
+        try {
+            const shouldShow = await this.shouldShowTCPopup();
+            if (shouldShow) {
+                console.log('[SDD:T&C] INFO | Showing T&C popup after AWS connection');
+                const userChoice = await this.showTCPopup();
+                if (userChoice) {
+                    await this.processUserConsent(userChoice);
+                }
+            } else {
+                console.log('[SDD:T&C] INFO | T&C check passed - no popup needed');
+            }
+        } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to check and show T&C:', error);
         }
-
-        const timeSinceLastDisplay = Date.now() - state.lastPeriodicDisplayTimestamp;
-        
-        // Get active schedule from config
-        const activeInterval = CONFIG.termsAndConditions.activeSchedule === 'twiceDaily'
-            ? CONFIG.termsAndConditions.periodicIntervals.twiceDaily
-            : CONFIG.termsAndConditions.periodicIntervals.thriceWeekly;
-        
-        return timeSinceLastDisplay >= activeInterval;
     }
 
     /**
-     * Check if tracked fields have changed
+     * Cleanup when extension deactivates
      */
-    private async hasTrackedFieldsChanged(state: TCStorageState): Promise<boolean> {
-        const currentRepoName = await this.getRepositoryName();
-        const currentAppName = await this.getApplicationName();
-        const currentVersion = this.getExtensionVersion();
-        const currentBOM = await this.detectBillOfMaterials();
+    dispose(): void {
+        this.stopPeriodicCollection();
+    }
 
-        // Check for changes
-        if (state.lastRepositoryName !== currentRepoName) return true;
-        if (state.lastApplicationName !== currentAppName) return true;
-        if (state.lastExtensionVersion !== currentVersion) return true;
-        
-        // Check bill of materials changes
-        if (!state.lastBillOfMaterials || 
-            state.lastBillOfMaterials.length !== currentBOM.length ||
-            !state.lastBillOfMaterials.every(item => currentBOM.includes(item))) {
-            return true;
+    /**
+     * Send User Details (Consent + Bill of Materials) to Salesforce Hub
+     */
+    private async sendUserDetailsToSalesforce(
+        userEmail: string,
+        consentStatus: 'agree' | 'disagree',
+        extensionVersion: string,
+        repositoryName: string,
+        applicationName: string,
+        billOfMaterials: string[],
+        timestamp: string
+    ): Promise<void> {
+        try {
+            console.log('[SDD:T&C] INFO | Sending User Details to Salesforce Hub');
+
+            // Get Salesforce access token (reuse from FeedbackService)
+            const accessToken = await (this.feedbackService as any).getAccessTokenWithRetryAndProtection();
+
+            // Format Bill of Materials as semicolon-separated string
+            // Example: ".taskmaster" -> "Taskmaster"
+            const formatBillOfMaterialsItem = (item: string): string => {
+                const cleaned = item.startsWith('.') ? item.substring(1) : item;
+                return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+            };
+
+            // For "disagree": empty string "" (will be stored as null)
+            // For "agree": semicolon-separated like "Spec-driven-development;Taskmaster;Devbox"
+            const billOfMaterialsString = consentStatus === 'disagree' 
+                ? '' 
+                : billOfMaterials.map(formatBillOfMaterialsItem).join(';');
+
+            // Prepare Salesforce payload
+            const salesforcePayload = {
+                Name: userEmail,
+                Consent_Status__c: consentStatus === 'agree' ? 'Yes' : 'No',
+                Extension_Version__c: extensionVersion,
+                Repository_Name__c: repositoryName,
+                Application_Name__c: applicationName,
+                Timestamp__c: timestamp,
+                Bill_of_Materials__c: billOfMaterialsString
+            };
+
+            console.log('[SDD:T&C] DEBUG | Salesforce Payload:', JSON.stringify(salesforcePayload, null, 2));
+
+            const response = await fetch(getSalesforceApiUrl(CONFIG.api.endpoints.specDrivenUserDetails + '/'), {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(salesforcePayload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to send User Details to Salesforce: ${response.status} ${response.statusText}. ${errorText}`);
+            }
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                console.error('[SDD:T&C] ERROR | Salesforce returned errors:', result.errors);
+                throw new Error(`Salesforce API errors: ${JSON.stringify(result.errors)}`);
+            }
+
+            console.log('[SDD:T&C] INFO | User Details sent successfully to Salesforce Hub. Record ID:', result.id);
+
+        } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to send User Details to Salesforce:', error);
+            throw error;
         }
-
-        return false;
     }
 
     /**
-     * Mock API call for Bill of Materials
+     * Initialize periodic data collection
+     * Called when extension activates
      */
-    private async sendBillOfMaterialsAPI(payload: BillOfMaterialsPayload): Promise<void> {
-        console.log('🔵 [MOCK API] Sending Bill of Materials:', JSON.stringify(payload, null, 2));
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock success response
-        console.log('✅ [MOCK API] Bill of Materials sent successfully');
-        
-        // TODO: Replace with actual Salesforce API call when available
-        // const response = await fetch(this.MOCK_API_BILL_OF_MATERIALS, {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(payload)
-        // });
+    async initializePeriodicCollection(): Promise<void> {
+        try {
+            console.log('[SDD:T&C] INFO | Initializing periodic data collection');
+
+            // Get current consent status
+            const lastConsentStatus = this.context.globalState.get<'agree' | 'disagree' | undefined>('tc.lastConsentStatus');
+
+            if (lastConsentStatus === 'agree') {
+                // User has agreed - start automatic periodic collection (twice a day)
+                console.log('[SDD:T&C] INFO | User has agreed to T&C - Starting periodic collection (every 12 hours)');
+                this.startPeriodicCollection();
+            } else if (lastConsentStatus === 'disagree') {
+                // User disagreed - check if it's time to ask again (after 3 days)
+                const lastDisagreedTimestamp = this.context.globalState.get<number>('tc.lastAcceptanceTimestamp', 0);
+                const timeSinceDisagreed = Date.now() - lastDisagreedTimestamp;
+
+                if (timeSinceDisagreed >= TermsConditionsService.DISAGREED_RETRY_INTERVAL) {
+                    console.log('[SDD:T&C] INFO | 3 days passed since user disagreed - Will ask again');
+                } else {
+                    const daysRemaining = Math.ceil((TermsConditionsService.DISAGREED_RETRY_INTERVAL - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
+                    console.log(`[SDD:T&C] INFO | User disagreed recently - Will ask again in ${daysRemaining} day(s)`);
+                }
+            } else {
+                // No consent yet - will show T&C on first use
+                console.log('[SDD:T&C] INFO | No consent status found - Will show T&C on first use');
+            }
+
+        } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to initialize periodic collection:', error);
+        }
     }
 
     /**
-     * Mock API call for User Consent
+     * Start periodic data collection (every 12 hours)
+     * Only runs if user has agreed to T&C
      */
-    private async sendUserConsentAPI(payload: UserConsentPayload): Promise<void> {
-        console.log('🔵 [MOCK API] Sending User Consent:', JSON.stringify(payload, null, 2));
+    private startPeriodicCollection(): void {
+        // Clear any existing interval
+        this.stopPeriodicCollection();
+
+        // Don't collect immediately on startup - wait for first interval
+        // This prevents duplicate records when user just agreed
         
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock success response
-        console.log('✅ [MOCK API] User Consent sent successfully');
-        
-        // TODO: Replace with actual Salesforce API call when available
-        // const response = await fetch(this.MOCK_API_USER_CONSENT, {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(payload)
-        // });
+        // Set up interval for twice-daily collection (every 12 hours)
+        this.periodicCollectionInterval = setInterval(() => {
+            this.collectAndSendPeriodicData();
+        }, TermsConditionsService.PERIODIC_COLLECTION_INTERVAL);
+
+        console.log('[SDD:T&C] INFO | Periodic collection started - will run every 12 hours');
+    }
+
+    /**
+     * Stop periodic data collection
+     */
+    private stopPeriodicCollection(): void {
+        if (this.periodicCollectionInterval) {
+            clearInterval(this.periodicCollectionInterval);
+            this.periodicCollectionInterval = undefined;
+            console.log('[SDD:T&C] INFO | Periodic collection stopped');
+        }
+    }
+
+    /**
+     * Collect and send data periodically (background operation)
+     * Runs every 12 hours if user has agreed
+     */
+    private async collectAndSendPeriodicData(): Promise<void> {
+        try {
+            console.log('[SDD:T&C] INFO | Running periodic data collection');
+
+            // Check if AWS is connected before attempting collection
+            const isAWSConnected = await (this.feedbackService as any).awsService?.isConnected();
+            if (!isAWSConnected) {
+                console.log('[SDD:T&C] INFO | Skipping periodic collection - AWS not connected');
+                return;
+            }
+
+            // Get user email
+            const userEmail = await this.getUserEmail();
+            if (!userEmail) {
+                console.warn('[SDD:T&C] WARN | Cannot collect data - user email not found');
+                return;
+            }
+
+            // Collect current data
+            const extensionVersion = this.getExtensionVersion();
+            const repositoryName = await this.getRepositoryName();
+            const applicationName = await this.getApplicationName();
+            const billOfMaterials = await this.detectBillOfMaterials();
+            const timestamp = new Date().toISOString();
+
+            console.log('[SDD:T&C] INFO | Periodic collection - Found', billOfMaterials.length, 'configuration files');
+
+            // Send to Salesforce (user already agreed, so status is 'agree')
+            await this.sendUserDetailsToSalesforce(
+                userEmail,
+                'agree', // User has already agreed
+                extensionVersion,
+                repositoryName,
+                applicationName,
+                billOfMaterials,
+                timestamp
+            );
+
+            // Update last collection timestamp
+            await this.context.globalState.update('tc.lastPeriodicCollectionTimestamp', Date.now());
+
+            console.log('[SDD:T&C] INFO | Periodic data collection completed successfully');
+
+        } catch (error) {
+            console.error('[SDD:T&C] ERROR | Failed to collect periodic data:', error);
+            // Don't show error to user - this is a background operation
+        }
     }
 
     /**
@@ -396,6 +569,12 @@ export class TermsConditionsService {
      * Reset T&C state (useful for testing)
      */
     async resetState(): Promise<void> {
+        console.log('[SDD:T&C] INFO | Resetting T&C state...');
+        
+        // Stop periodic collection if running
+        this.stopPeriodicCollection();
+        
+        // Clear all stored T&C data
         await this.context.globalState.update('tc.lastAcceptanceTimestamp', undefined);
         await this.context.globalState.update('tc.lastConsentStatus', undefined);
         await this.context.globalState.update('tc.lastBillOfMaterials', undefined);
@@ -403,7 +582,9 @@ export class TermsConditionsService {
         await this.context.globalState.update('tc.lastApplicationName', undefined);
         await this.context.globalState.update('tc.lastExtensionVersion', undefined);
         await this.context.globalState.update('tc.lastPeriodicDisplayTimestamp', undefined);
+        await this.context.globalState.update('tc.lastPeriodicCollectionTimestamp', undefined);
         
-        vscode.window.showInformationMessage('Terms & Conditions state reset successfully');
+        console.log('[SDD:T&C] INFO | T&C state reset complete');
+        vscode.window.showInformationMessage('✅ Terms & Conditions state reset successfully. You will be asked to consent again on next AWS connection.');
     }
 }
