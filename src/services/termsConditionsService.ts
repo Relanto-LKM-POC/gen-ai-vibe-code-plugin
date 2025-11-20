@@ -35,6 +35,7 @@ export class TermsConditionsService {
     private userService: UserService;
     private feedbackService: FeedbackService;
     private periodicCollectionInterval: NodeJS.Timeout | undefined;
+    private isShowingTCPopup: boolean = false;
 
     // Timing constants for T&C behavior
     private static readonly PERIODIC_COLLECTION_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours (twice a day)
@@ -122,10 +123,18 @@ export class TermsConditionsService {
         try {
             console.log(`[SDD:T&C] INFO | Processing user consent: ${consentStatus}`);
 
-            // Get user email and repository info
-            const userEmail = await this.getUserEmail();
+            // Get user email with validation (Fix #3)
+            let userEmail: string;
+            try {
+                userEmail = await this.getUserEmail();
+            } catch (emailError) {
+                vscode.window.showErrorMessage(
+                    `Cannot process consent: ${(emailError as Error).message}. Please run "Configure User Email" command.`
+                );
+                return;
+            }
             const repositoryName = await this.getRepositoryName();
-            const applicationName = await this.getApplicationName();
+            const applicationName = await this.getApplicationName(false); // Interactive mode
             const extensionVersion = this.getExtensionVersion();
             
             // Detect bill of materials only if user agrees
@@ -224,17 +233,34 @@ export class TermsConditionsService {
      */
     async checkAndShowTermsConditions(): Promise<void> {
         try {
+            // Prevent concurrent popups (Fix #6)
+            if (this.isShowingTCPopup) {
+                console.log('[SDD:T&C] INFO | T&C popup already showing - skipping duplicate request');
+                return;
+            }
+            
             const shouldShow = await this.shouldShowTCPopup();
             if (shouldShow) {
-                console.log('[SDD:T&C] INFO | Showing T&C popup after AWS connection');
-                const userChoice = await this.showTCPopup();
-                if (userChoice) {
+                this.isShowingTCPopup = true;
+                try {
+                    console.log('[SDD:T&C] INFO | Showing T&C popup after AWS connection');
+                    const userChoice = await this.showTCPopup();
+                    
+                    // Handle dialog dismissal (Fix #1)
+                    if (userChoice === undefined) {
+                        console.log('[SDD:T&C] INFO | User dismissed T&C dialog - will ask again on next AWS connection');
+                        return;
+                    }
+                    
                     await this.processUserConsent(userChoice);
+                } finally {
+                    this.isShowingTCPopup = false;
                 }
             } else {
                 console.log('[SDD:T&C] INFO | T&C check passed - no popup needed');
             }
         } catch (error) {
+            this.isShowingTCPopup = false;
             console.error('[SDD:T&C] ERROR | Failed to check and show T&C:', error);
         }
     }
@@ -400,37 +426,64 @@ export class TermsConditionsService {
                 return;
             }
 
-            // Get user email
-            const userEmail = await this.getUserEmail();
-            if (!userEmail) {
-                console.warn('[SDD:T&C] WARN | Cannot collect data - user email not found');
+            // Get user email with error handling
+            let userEmail: string;
+            try {
+                userEmail = await this.getUserEmail();
+            } catch (error) {
+                console.warn('[SDD:T&C] WARN | Cannot collect data - user email not configured');
                 return;
             }
 
             // Collect current data
             const extensionVersion = this.getExtensionVersion();
             const repositoryName = await this.getRepositoryName();
-            const applicationName = await this.getApplicationName();
+            const applicationName = await this.getApplicationName(true); // Silent mode for background (Fix #4)
             const billOfMaterials = await this.detectBillOfMaterials();
             const timestamp = new Date().toISOString();
 
             console.log('[SDD:T&C] INFO | Periodic collection - Found', billOfMaterials.length, 'configuration files');
 
-            // Send to Salesforce (user already agreed, so status is 'agree')
-            await this.sendUserDetailsToSalesforce(
-                userEmail,
-                'agree', // User has already agreed
-                extensionVersion,
-                repositoryName,
-                applicationName,
-                billOfMaterials,
-                timestamp
-            );
-
-            // Update last collection timestamp
-            await this.context.workspaceState.update('tc.lastPeriodicCollectionTimestamp', Date.now());
-
-            console.log('[SDD:T&C] INFO | Periodic data collection completed successfully');
+            // Retry logic for network failures (Fix #5)
+            const maxRetries = 3;
+            let lastError: Error | undefined;
+            
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    await this.sendUserDetailsToSalesforce(
+                        userEmail,
+                        'agree', // User has already agreed
+                        extensionVersion,
+                        repositoryName,
+                        applicationName,
+                        billOfMaterials,
+                        timestamp
+                    );
+                    
+                    // Success - update timestamp and exit
+                    await this.context.workspaceState.update('tc.lastPeriodicCollectionTimestamp', Date.now());
+                    console.log('[SDD:T&C] INFO | Periodic data collection completed successfully');
+                    return;
+                    
+                } catch (error) {
+                    lastError = error as Error;
+                    console.warn(`[SDD:T&C] WARN | Periodic collection attempt ${attempt + 1}/${maxRetries} failed:`, error);
+                    
+                    // Don't retry on authentication errors
+                    if (lastError.message.includes('401') || lastError.message.includes('Authentication')) {
+                        console.error('[SDD:T&C] ERROR | Authentication failed - stopping retries');
+                        break;
+                    }
+                    
+                    // Wait before retry (exponential backoff: 5s, 10s, 20s)
+                    if (attempt < maxRetries - 1) {
+                        const delay = 5000 * Math.pow(2, attempt);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            console.error('[SDD:T&C] ERROR | Periodic collection failed after', maxRetries, 'attempts:', lastError?.message);
 
         } catch (error) {
             console.error('[SDD:T&C] ERROR | Failed to collect periodic data:', error);
@@ -444,12 +497,17 @@ export class TermsConditionsService {
     private async getUserEmail(): Promise<string> {
         try {
             // Use the existing UserService which reads from specDrivenDevelopment.userEmail config
-            // This is already configured in your .spec-driven-development settings
             const email = await this.userService.getUserEmail();
+            
+            // Validate email is not the system-generated placeholder
+            if (!email || email === 'user@example.com') {
+                throw new Error('User email not configured');
+            }
+            
             return email;
         } catch (error) {
-            console.error('Error getting email from UserService:', error);
-            return 'user@example.com';
+            console.error('[SDD:T&C] ERROR | Cannot proceed without valid user email:', error);
+            throw new Error('User email is required for Terms & Conditions. Please configure your email first.');
         }
     }
 
@@ -478,8 +536,9 @@ export class TermsConditionsService {
     /**
      * Get application name from Hub using existing FeedbackService API
      * Uses Git_Details__c API to map repository name to application name
+     * @param silent - If true, suppresses user-facing notifications (for background operations)
      */
-    private async getApplicationName(): Promise<string> {
+    private async getApplicationName(silent: boolean = false): Promise<string> {
         try {
             // First get repository name
             const repoName = await this.getRepositoryName();
@@ -496,11 +555,15 @@ export class TermsConditionsService {
                 return application.name;
             }
             
-            // Repository not found in Hub - show warning notification
+            // Repository not found in Hub
             console.warn(`[SDD:T&C] WARN | Repository '${repoName}' does not exist in Hub`);
-            vscode.window.showWarningMessage(
-                `⚠️ Repository "${repoName}" does not exist in Hub.`
-            );
+            
+            // Only show notification during interactive flows, not background collection (Fix #4)
+            if (!silent) {
+                vscode.window.showWarningMessage(
+                    `⚠️ Repository "${repoName}" does not exist in Hub.`
+                );
+            }
             
             return 'NA';
             
