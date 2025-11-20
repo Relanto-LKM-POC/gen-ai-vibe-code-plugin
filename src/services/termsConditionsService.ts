@@ -37,11 +37,6 @@ export class TermsConditionsService {
     private periodicCollectionInterval: NodeJS.Timeout | undefined;
     private isShowingTCPopup: boolean = false;
 
-    // Timing constants for T&C behavior
-    private static readonly PERIODIC_COLLECTION_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours (twice a day)
-    private static readonly DISAGREED_RETRY_INTERVAL = 3 * 24 * 60 * 60 * 1000; // 3 days
-    private static readonly AGREED_REMINDER_INTERVAL = 30 * 24 * 60 * 60 * 1000; // 30 days
-
     constructor(context: vscode.ExtensionContext, userService: UserService, feedbackService: FeedbackService) {
         this.context = context;
         this.userService = userService;
@@ -66,11 +61,11 @@ export class TermsConditionsService {
             // User disagreed - ask again after 3 days
             if (lastConsentStatus === 'disagree') {
                 const timeSinceDisagreed = currentTime - lastTimestamp;
-                if (timeSinceDisagreed >= TermsConditionsService.DISAGREED_RETRY_INTERVAL) {
+                if (timeSinceDisagreed >= CONFIG.termsAndConditions.timing.disagreedRetryInterval) {
                     console.log('[SDD:T&C] INFO | 3 days passed since user disagreed - will ask again');
                     return true;
                 }
-                const daysRemaining = Math.ceil((TermsConditionsService.DISAGREED_RETRY_INTERVAL - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
+                const daysRemaining = Math.ceil((CONFIG.termsAndConditions.timing.disagreedRetryInterval - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
                 console.log(`[SDD:T&C] INFO | User disagreed ${daysRemaining} day(s) ago - will not show T&C yet`);
                 return false;
             }
@@ -78,7 +73,7 @@ export class TermsConditionsService {
             // User agreed - ask for re-consent after 30 days
             if (lastConsentStatus === 'agree') {
                 const timeSinceAgreed = currentTime - lastTimestamp;
-                if (timeSinceAgreed >= TermsConditionsService.AGREED_REMINDER_INTERVAL) {
+                if (timeSinceAgreed >= CONFIG.termsAndConditions.timing.agreedReminderInterval) {
                     console.log('[SDD:T&C] INFO | 30 days passed since user agreed - will ask for re-consent');
                     return true;
                 }
@@ -150,7 +145,7 @@ export class TermsConditionsService {
             const timestamp = new Date().toISOString();
 
             // Send to Salesforce Hub
-            await this.sendUserDetailsToSalesforce(
+            const billOfMaterialsArray = await this.sendUserDetailsToSalesforce(
                 userEmail,
                 consentStatus,
                 extensionVersion,
@@ -176,15 +171,28 @@ export class TermsConditionsService {
                 // Start periodic collection (every 12 hours)
                 this.startPeriodicCollection();
                 
+                // Show original notification
                 vscode.window.showInformationMessage(
                     `Terms & Conditions accepted. Data will be collected twice daily (every 12 hours). Found ${billOfMaterials.length} configuration file(s). You'll be asked to re-consent in 30 days.`
+                );
+                
+                // Show notification with bill of materials collected
+                const bomList = billOfMaterialsArray.map(item => `${item.name} (${item.version})`).join(', ');
+                vscode.window.showInformationMessage(
+                    `Bill of Materials collected: ${bomList}`
                 );
             } else {
                 // Stop periodic collection if it was running
                 this.stopPeriodicCollection();
                 
+                // Show original notification
                 vscode.window.showInformationMessage(
                     'Terms & Conditions declined. No data will be collected. We will ask again in 3 days.'
+                );
+                
+                // Show notification with collected items (repo and app name)
+                vscode.window.showInformationMessage(
+                    `No Bill of Materials collected. Collected items: ${repositoryName}, ${applicationName}`
                 );
             }
 
@@ -194,6 +202,31 @@ export class TermsConditionsService {
                 `Failed to send data to Salesforce: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
             throw error;
+        }
+    }
+
+    /**
+     * Check if copilot-wrapper is healthy by hitting the health endpoint
+     * @returns true if copilot-wrapper is healthy, false otherwise
+     */
+    private async isCopilotWrapperHealthy(): Promise<boolean> {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.termsAndConditions.copilotWrapper.healthCheckTimeout);
+
+            const response = await fetch(CONFIG.termsAndConditions.copilotWrapper.healthCheckUrl, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const text = await response.text();
+                return text.toLowerCase().includes('healthy');
+            }
+            return false;
+        } catch (error) {
+            console.log('[SDD:T&C] INFO | Copilot-wrapper health check failed:', error);
+            return false;
         }
     }
 
@@ -224,7 +257,70 @@ export class TermsConditionsService {
             }
         }
 
+        // Check if copilot-wrapper is healthy and add it if so
+        const isCopilotWrapperHealthy = await this.isCopilotWrapperHealthy();
+        if (isCopilotWrapperHealthy) {
+            console.log('[SDD:T&C] INFO | Copilot-wrapper is healthy - adding to bill of materials');
+            detectedFiles.push('copilot-wrapper');
+        } else {
+            console.log('[SDD:T&C] INFO | Copilot-wrapper is not healthy - excluding from bill of materials');
+        }
+
         return detectedFiles;
+    }
+
+    /**
+     * Get version for a specific bill of materials item
+     * @param item - The file/folder name (e.g., '.spec-driven-development', '.taskmaster')
+     * @returns Version string or 'NA' or '-' based on the tool
+     */
+    private async getVersionForBillOfMaterialsItem(item: string): Promise<string> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return '-';
+        }
+
+        const rootPath = workspaceFolders[0].uri.fsPath;
+
+        try {
+            // 1. .spec-driven-development: get version from installed VS Code extension
+            if (item === '.spec-driven-development') {
+                return this.getExtensionVersion();
+            }
+
+            // 2. .taskmaster: get version from .vscode/mcp.json
+            if (item === '.taskmaster') {
+                const mcpJsonPath = path.join(rootPath, '.vscode', 'mcp.json');
+                if (fs.existsSync(mcpJsonPath)) {
+                    const mcpJsonContent = fs.readFileSync(mcpJsonPath, 'utf-8');
+                    const mcpJson = JSON.parse(mcpJsonContent);
+                    
+                    // Extract version from args array: ['-y', 'task-master-ai@0.31.2']
+                    const args = mcpJson?.servers?.["task-master-ai"]?.args;
+                    if (Array.isArray(args)) {
+                        // Find the arg that contains '@' and extract version
+                        const versionArg = args.find((arg: string) => typeof arg === 'string' && arg.includes('@'));
+                        if (versionArg) {
+                            const version = versionArg.split('@')[1];
+                            return version || '-';
+                        }
+                    }
+                }
+                return '-';
+            }
+
+            // 3, 4, 5. .devbox, .devcontainer, copilot-wrapper: return 'NA'
+            if (item === '.devbox' || item === '.devcontainer' || item === 'copilot-wrapper') {
+                return 'NA';
+            }
+
+            // Default for unknown items
+            return 'NA';
+
+        } catch (error) {
+            console.error(`[SDD:T&C] ERROR | Failed to get version for ${item}:`, error);
+            return '-';
+        }
     }
 
     /**
@@ -283,31 +379,34 @@ export class TermsConditionsService {
         applicationName: string,
         billOfMaterials: string[],
         timestamp: string
-    ): Promise<void> {
+    ): Promise<{ name: string; version: string }[]> {
         try {
             console.log('[SDD:T&C] INFO | Sending User Details to Salesforce Hub');
 
             // Get Salesforce access token (reuse from FeedbackService)
             const accessToken = await (this.feedbackService as any).getAccessTokenWithRetryAndProtection();
 
-            // Format Bill of Materials as semicolon-separated string
-            // Example: ".taskmaster" -> "Taskmaster"
-            const formatBillOfMaterialsItem = (item: string): string => {
+            // Format Bill of Materials as JSON array with dynamic versions
+            // Example: ".taskmaster" -> { "name": "Taskmaster", "version": "0.31.2" }
+            const formatBillOfMaterialsItem = async (item: string): Promise<{ name: string; version: string }> => {
                 const cleaned = item.startsWith('.') ? item.substring(1) : item;
-                return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+                const formattedName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+                const version = await this.getVersionForBillOfMaterialsItem(item);
+                return { name: formattedName, version };
             };
 
-            // For "disagree": empty string "" (will be stored as null)
-            // For "agree": semicolon-separated like "Spec-driven-development;Taskmaster;Devbox"
-            const billOfMaterialsString = consentStatus === 'disagree' 
-                ? '' 
-                : billOfMaterials.map(formatBillOfMaterialsItem).join(';');
+            // For "disagree": empty array [] (will be stored as empty JSON array)
+            // For "agree": JSON array like [{"name":"Spec-driven-development","version":"1.0.0"},...]
+            const billOfMaterialsArray = consentStatus === 'disagree' 
+                ? [] 
+                : await Promise.all(billOfMaterials.map(formatBillOfMaterialsItem));
+            
+            const billOfMaterialsString = JSON.stringify(billOfMaterialsArray);
 
             // Prepare Salesforce payload
             const salesforcePayload = {
                 Name: userEmail,
                 Consent_Status__c: consentStatus === 'agree' ? 'Yes' : 'No',
-                Extension_Version__c: extensionVersion,
                 Repository_Name__c: repositoryName,
                 Application_Name__c: applicationName,
                 Timestamp__c: timestamp,
@@ -338,6 +437,8 @@ export class TermsConditionsService {
             }
 
             console.log('[SDD:T&C] INFO | User Details sent successfully to Salesforce Hub. Record ID:', result.id);
+            
+            return billOfMaterialsArray;
 
         } catch (error) {
             console.error('[SDD:T&C] ERROR | Failed to send User Details to Salesforce:', error);
@@ -365,10 +466,10 @@ export class TermsConditionsService {
                 const lastDisagreedTimestamp = this.context.workspaceState.get<number>('tc.lastAcceptanceTimestamp', 0);
                 const timeSinceDisagreed = Date.now() - lastDisagreedTimestamp;
 
-                if (timeSinceDisagreed >= TermsConditionsService.DISAGREED_RETRY_INTERVAL) {
+                if (timeSinceDisagreed >= CONFIG.termsAndConditions.timing.disagreedRetryInterval) {
                     console.log('[SDD:T&C] INFO | 3 days passed since user disagreed - Will ask again');
                 } else {
-                    const daysRemaining = Math.ceil((TermsConditionsService.DISAGREED_RETRY_INTERVAL - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
+                    const daysRemaining = Math.ceil((CONFIG.termsAndConditions.timing.disagreedRetryInterval - timeSinceDisagreed) / (24 * 60 * 60 * 1000));
                     console.log(`[SDD:T&C] INFO | User disagreed recently - Will ask again in ${daysRemaining} day(s)`);
                 }
             } else {
@@ -395,7 +496,7 @@ export class TermsConditionsService {
         // Set up interval for twice-daily collection (every 12 hours)
         this.periodicCollectionInterval = setInterval(() => {
             this.collectAndSendPeriodicData();
-        }, TermsConditionsService.PERIODIC_COLLECTION_INTERVAL);
+        }, CONFIG.termsAndConditions.timing.periodicCollectionInterval);
 
         console.log('[SDD:T&C] INFO | Periodic collection started - will run every 12 hours');
     }

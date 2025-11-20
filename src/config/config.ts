@@ -57,6 +57,19 @@ export const CONFIG = {
             thriceWeekly: 56 * 60 * 60 * 1000     // ~56 hours (3 times per week)
         },
         
+        // Timing constants for T&C behavior
+        timing: {
+            periodicCollectionInterval: 12 * 60 * 60 * 1000,  // 12 hours (twice a day)
+            disagreedRetryInterval: 3 * 24 * 60 * 60 * 1000,  // 3 days
+            agreedReminderInterval: 30 * 24 * 60 * 60 * 1000  // 30 days
+        },
+        
+        // Copilot-wrapper health check configuration
+        copilotWrapper: {
+            healthCheckUrl: 'http://localhost:4141/health',
+            healthCheckTimeout: 3000  // 3 seconds
+        },
+        
         // Bill of Materials files to detect in workspace root
         // Add new files here to include them in BOM detection
         billOfMaterialsFiles: [
