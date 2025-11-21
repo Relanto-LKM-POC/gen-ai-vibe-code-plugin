@@ -1246,14 +1246,14 @@
     background: var(--vscode-input-background);
     border: 1px solid var(--vscode-input-border);
     color: var(--vscode-input-foreground);
-    padding: 6px 12px;
+    padding: 6px 8px;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-radius: 2px;
-    min-height: 28px;
-    font-size: 13px;
+    font-size: 11px;
+    box-sizing: border-box;
 }
 
 .searchable-dropdown-header:hover {
