@@ -1236,6 +1236,103 @@
     margin-bottom: 15px;
 }
 
+/* Searchable Dropdown for Epic */
+.searchable-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-dropdown-header {
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    color: var(--vscode-input-foreground);
+    padding: 6px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 2px;
+    min-height: 28px;
+    font-size: 13px;
+}
+
+.searchable-dropdown-header:hover {
+    border-color: var(--vscode-focusBorder);
+}
+
+.searchable-dropdown-header.active {
+    border-color: var(--vscode-focusBorder);
+}
+
+.dropdown-arrow {
+    color: var(--vscode-input-foreground);
+    font-size: 9px;
+    transition: transform 0.2s;
+    opacity: 0.7;
+}
+
+.searchable-dropdown-header.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.searchable-dropdown-content {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-input-border);
+    border-top: none;
+    max-height: 200px;
+    overflow: hidden;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin-top: 1px;
+}
+
+.epic-search-input {
+    width: calc(100% - 16px);
+    padding: 6px 8px;
+    margin: 6px 8px 4px 8px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    color: var(--vscode-input-foreground);
+    outline: none;
+    border-radius: 2px;
+    font-size: 13px;
+}
+
+.epic-search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.epic-options-list {
+    max-height: 140px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.epic-option {
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--vscode-dropdown-foreground);
+    background: var(--vscode-dropdown-background);
+    font-size: 13px;
+}
+
+.epic-option:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.epic-option.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.epic-option.hidden {
+    display: none;
+}
+
 /* Task View Modal (shares base modal styles) */
 .task-view-modal {
     position: fixed;

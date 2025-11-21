@@ -97,7 +97,7 @@ export class TermsConditionsService {
             'Terms & Conditions',
             {
                 modal: true,
-                detail: 'By using this extension, you agree to share repository metadata with DevSecOps Hub for compliance and analytics purposes.\n\nWe collect:\n- Repository name and application name\n- Bill of Materials (detected configuration files)\n- Extension usage data\n- User consent status\n\nDo you accept these Terms & Conditions?'
+                detail: 'By using this extension, you acknowledge that certain metadata will be securely shared with the DevSecOps Hub to enable feature tracking, work management, and analytics.\n\nInformation Collected:\n\n• Repository Metadata: Repository name, branch information, and Git commit details used for automatic feature association and tracking.\n\n• Work Item Data: Feature descriptions, estimations, task details, and work types submitted through the extension to create and manage JIRA tickets in Salesforce.\n\n• Bill of Materials: Automatically detected configuration files and tooling artifacts for compliance validation.\n\n• User Information: Your name and email (from Git configuration) to associate work items with the correct team member.\n\n• Consent Status: Your acceptance or revocation of these terms.\n\nAll data is transmitted securely to Salesforce and handled in accordance with organizational security policies. This data is used exclusively for work tracking, compliance reporting, and improving the developer experience.\n\nDo you accept these Terms & Conditions and consent to the collection of metadata described above?'
             },
             'Agree',
             'Disagree'

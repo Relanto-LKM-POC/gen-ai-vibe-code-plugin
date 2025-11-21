@@ -250,6 +250,9 @@
         const feedbackTypeSelect = document.getElementById('feedback-type');
         const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
 
+        // Setup searchable Epic dropdown
+        setupSearchableEpicDropdown();
+
         // Handle feedback type change to show/hide acceptance criteria
         feedbackTypeSelect.addEventListener('change', () => {
             if (feedbackTypeSelect.value === 'Story') {
@@ -262,18 +265,28 @@
             }
         });
 
-        // Handle initiative change - load epics for selected initiative's jira team
+        // Handle initiative change - load epics for selected initiative's jira team AND auto-populate JIRA Component
         const initiativeSelect = document.getElementById('initiative');
         initiativeSelect.addEventListener('change', () => {
-            const epicSelect = document.getElementById('epic');
             const selectedInitiativeId = initiativeSelect.value;
             
             if (!selectedInitiativeId) {
-                // No initiative selected, clear epics
-                epicSelect.innerHTML = '<option value="">Select Epic...</option>';
-                epicSelect.value = '';
+                // No initiative selected, clear epics and JIRA Component
+                const selectedText = document.getElementById('epic-selected-text');
+                const hiddenInput = document.getElementById('epic');
+                if (selectedText) selectedText.textContent = 'Select Epic...';
+                if (hiddenInput) hiddenInput.value = '';
+                
+                // Clear JIRA Component
+                const jiraComponentSelect = document.getElementById('jira-component');
+                if (jiraComponentSelect) {
+                    jiraComponentSelect.value = '';
+                }
                 return;
             }
+            
+            // Auto-populate JIRA Component based on selected initiative
+            autoPopulateJiraComponent(selectedInitiativeId);
             
             // Find the selected initiative's jiraTeam
             const selectedOption = initiativeSelect.options[initiativeSelect.selectedIndex];
@@ -340,6 +353,7 @@
                 feedbackType: document.getElementById('feedback-type').value,
                 estimatedHours: parseFloat(document.getElementById('estimated-hours').value),
                 initiativeId: document.getElementById('initiative').value,
+                jiraComponent: document.getElementById('jira-component').value,
                 epicId: document.getElementById('epic').value,
                 description: document.getElementById('feedback-description').value,
                 acceptanceCriteria: document.getElementById('acceptance-criteria').value,
@@ -350,10 +364,10 @@
 
             // Basic validation
             if (!feedbackData.name || !feedbackData.feedbackType || !feedbackData.estimatedHours || 
-                !feedbackData.initiativeId || !feedbackData.epicId || !feedbackData.description) {
+                !feedbackData.initiativeId || !feedbackData.jiraComponent || !feedbackData.epicId || !feedbackData.description) {
                 showFeedbackResult({
                     success: false,
-                    message: 'Please fill in all required fields',
+                    message: 'Please fill in all required fields (Name, Type, Estimated Hours, Initiative, JIRA Component, Epic, and Description)',
                     error: 'Validation failed'
                 });
                 return;
@@ -479,7 +493,7 @@
     function updateFeedbackFormState() {
         const submitBtn = document.getElementById('submit-feedback-btn');
         const loadDataBtn = document.getElementById('load-data-btn');
-        const epicSelect = document.getElementById('epic');
+        const epicHeader = document.getElementById('epic-dropdown-header');
         
         if (canSubmitFeedback()) {
             submitBtn.disabled = false;
@@ -491,9 +505,9 @@
             submitBtn.textContent = 'Connect to AWS First';
             
             // Ensure epic dropdown is disabled when AWS is not connected
-            if (epicSelect) {
-                epicSelect.disabled = true;
-                epicSelect.innerHTML = '<option value="">Connect to AWS first</option>';
+            if (epicHeader) {
+                epicHeader.style.pointerEvents = 'none';
+                epicHeader.style.opacity = '0.6';
             }
         }
     }
@@ -504,7 +518,14 @@
         document.getElementById('feedback-type').value = '';
         document.getElementById('estimated-hours').value = '';
         document.getElementById('initiative').value = '';
-        document.getElementById('epic').value = '';
+        document.getElementById('jira-component').value = '';
+        
+        // Clear searchable epic dropdown
+        const epicHiddenInput = document.getElementById('epic');
+        const epicSelectedText = document.getElementById('epic-selected-text');
+        if (epicHiddenInput) epicHiddenInput.value = '';
+        if (epicSelectedText) epicSelectedText.textContent = 'Select Epic...';
+        
         document.getElementById('feedback-description').value = '';
         document.getElementById('acceptance-criteria').value = '';
         document.getElementById('work-type').value = '';
@@ -1173,7 +1194,7 @@
 
     // Populate initiatives dropdown
     function populateInitiativesDropdown(initiatives) {
-        // Store initiatives with jiraTeam data
+        // Store initiatives with jiraTeam and jiraComponent data
         currentState.allInitiatives = initiatives || [];
         
         const initiativeSelect = document.getElementById('initiative');
@@ -1195,6 +1216,10 @@
                 // Store jiraTeam as a data attribute
                 if (initiative.jiraTeam) {
                     option.setAttribute('data-jira-team', initiative.jiraTeam);
+                }
+                // Store jiraComponent as a data attribute
+                if (initiative.jiraComponent) {
+                    option.setAttribute('data-jira-component', initiative.jiraComponent);
                 }
                 initiativeSelect.appendChild(option);
             });
@@ -1251,32 +1276,62 @@
         }, 8000);
     }
 
-    // Populate epics dropdown
+    // Populate epics dropdown (searchable)
     function populateEpicsDropdown(epics) {
         // Store epics for reference
         currentState.allEpics = epics || [];
         
-        const epicSelect = document.getElementById('epic');
+        const optionsList = document.getElementById('epic-options-list');
+        const selectedText = document.getElementById('epic-selected-text');
+        const hiddenInput = document.getElementById('epic');
+        const header = document.getElementById('epic-dropdown-header');
         
-        if (!canSubmitFeedback()) {
-            epicSelect.innerHTML = '<option value="">Connect to AWS to load epics</option>';
-            epicSelect.disabled = true;
+        if (!optionsList || !selectedText || !hiddenInput) {
+            console.warn('Epic dropdown elements not found');
             return;
         }
         
-        epicSelect.disabled = false;
-        epicSelect.innerHTML = '<option value="">Select Epic...</option>';
+        if (!canSubmitFeedback()) {
+            optionsList.innerHTML = '<div class="epic-option" data-value="">Connect to AWS to load epics</div>';
+            selectedText.textContent = 'Connect to AWS to load epics';
+            header.style.pointerEvents = 'none';
+            header.style.opacity = '0.6';
+            return;
+        }
+        
+        header.style.pointerEvents = 'auto';
+        header.style.opacity = '1';
+        hiddenInput.value = '';
+        selectedText.textContent = 'Select Epic...';
+        optionsList.innerHTML = '';
         
         if (epics && epics.length > 0) {
-            // Show all epics - no filtering needed
+            // Add default option
+            const defaultOption = document.createElement('div');
+            defaultOption.className = 'epic-option';
+            defaultOption.setAttribute('data-value', '');
+            defaultOption.textContent = 'Select Epic...';
+            defaultOption.addEventListener('click', () => selectEpicOption('', 'Select Epic...'));
+            optionsList.appendChild(defaultOption);
+            
+            // Add epic options
             epics.forEach(epic => {
-                const option = document.createElement('option');
-                option.value = epic.id;
+                const option = document.createElement('div');
+                option.className = 'epic-option';
+                option.setAttribute('data-value', epic.id);
                 option.textContent = `${epic.name}${epic.teamName ? ' (' + epic.teamName + ')' : ''}`;
-                epicSelect.appendChild(option);
+                option.addEventListener('click', () => {
+                    selectEpicOption(epic.id, option.textContent);
+                });
+                optionsList.appendChild(option);
             });
         } else {
-            epicSelect.innerHTML = '<option value="">No epics available</option>';
+            const noOption = document.createElement('div');
+            noOption.className = 'epic-option';
+            noOption.setAttribute('data-value', '');
+            noOption.textContent = 'No epics available';
+            noOption.style.cursor = 'default';
+            optionsList.appendChild(noOption);
         }
     }
 
@@ -1306,6 +1361,143 @@
         } else {
             sprintSelect.innerHTML = '<option value="">No sprints available</option>';
         }
+    }
+
+    // Auto-populate JIRA Component based on selected Initiative
+    function autoPopulateJiraComponent(initiativeId) {
+        const jiraComponentField = document.getElementById('jira-component');
+        
+        if (!initiativeId || !jiraComponentField) {
+            return;
+        }
+        
+        // Find the initiative in stored data
+        const selectedInitiative = currentState.allInitiatives.find(
+            init => init.id === initiativeId
+        );
+        
+        if (selectedInitiative && selectedInitiative.jiraComponent) {
+            // Match and select the component
+            jiraComponentField.value = selectedInitiative.jiraComponent;
+            console.log(`Auto-selected JIRA Component: ${selectedInitiative.jiraComponent}`);
+        } else {
+            // No match found, reset to default
+            jiraComponentField.value = '';
+            console.log('No JIRA Component found for selected initiative');
+        }
+    }
+
+    // Setup Searchable Epic Dropdown
+    function setupSearchableEpicDropdown() {
+        const header = document.getElementById('epic-dropdown-header');
+        const content = document.getElementById('epic-dropdown-content');
+        const searchInput = document.getElementById('epic-search-input');
+        const optionsList = document.getElementById('epic-options-list');
+        const hiddenInput = document.getElementById('epic');
+        const selectedText = document.getElementById('epic-selected-text');
+
+        if (!header || !content || !searchInput || !optionsList || !hiddenInput) {
+            console.warn('Epic dropdown elements not found');
+            return;
+        }
+
+        // Toggle dropdown
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = content.style.display === 'block';
+            
+            if (isActive) {
+                closeEpicDropdown();
+            } else {
+                openEpicDropdown();
+            }
+        });
+
+        // Search functionality
+        searchInput.addEventListener('input', () => {
+            filterEpicOptions(searchInput.value);
+        });
+
+        // Prevent dropdown close when clicking inside search input
+        searchInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!header.contains(e.target) && !content.contains(e.target)) {
+                closeEpicDropdown();
+            }
+        });
+    }
+
+    function openEpicDropdown() {
+        const header = document.getElementById('epic-dropdown-header');
+        const content = document.getElementById('epic-dropdown-content');
+        const searchInput = document.getElementById('epic-search-input');
+        
+        if (content && header && searchInput) {
+            content.style.display = 'block';
+            header.classList.add('active');
+            searchInput.value = '';
+            searchInput.focus();
+            filterEpicOptions(''); // Show all options
+        }
+    }
+
+    function closeEpicDropdown() {
+        const header = document.getElementById('epic-dropdown-header');
+        const content = document.getElementById('epic-dropdown-content');
+        
+        if (content && header) {
+            content.style.display = 'none';
+            header.classList.remove('active');
+        }
+    }
+
+    function filterEpicOptions(searchTerm) {
+        const optionsList = document.getElementById('epic-options-list');
+        
+        if (!optionsList) return;
+
+        const options = optionsList.querySelectorAll('.epic-option');
+        const lowerSearch = searchTerm.toLowerCase();
+
+        options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            const matches = text.includes(lowerSearch);
+            
+            if (matches) {
+                option.classList.remove('hidden');
+            } else {
+                option.classList.add('hidden');
+            }
+        });
+    }
+
+    function selectEpicOption(value, text) {
+        const hiddenInput = document.getElementById('epic');
+        const selectedText = document.getElementById('epic-selected-text');
+        
+        if (hiddenInput) {
+            hiddenInput.value = value;
+        }
+        
+        if (selectedText) {
+            selectedText.textContent = text || 'Select Epic...';
+        }
+        
+        // Mark the selected option
+        const options = document.querySelectorAll('.epic-option');
+        options.forEach(opt => {
+            if (opt.getAttribute('data-value') === value) {
+                opt.classList.add('selected');
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+        
+        closeEpicDropdown();
     }
 
 
@@ -2234,6 +2426,7 @@ Do you want to submit it again?`);
             'view-task-type': taskData.Type__c || 'Unknown',
             'view-task-priority': taskData.Jira_Priority__c || 'Not specified',
             'view-work-type': taskData.Work_Type__c || 'Not specified',
+            'view-jira-component': taskData.Jira_Component__c || 'Not specified',
             'view-jira-sprint': sprintName,
             'view-estimated-hours': taskData.Estimated_Effort_Hours__c ? `${taskData.Estimated_Effort_Hours__c} hours` : 'Not specified',
             'view-actual-hours': taskData.Actual_Effort_Hours__c ? `${taskData.Actual_Effort_Hours__c} hours` : 'Not specified',
@@ -2629,6 +2822,15 @@ Do you want to submit it again?`);
                 initiativeField.value = data.recommendedInitiativeId;
                 initiativeField.dispatchEvent(new Event('change'));
                 console.log(`Auto-selected initiative: ${data.recommendedInitiativeName}`);
+                
+                // Auto-populate JIRA Component if available
+                if (data.jiraComponent) {
+                    const jiraComponentField = document.getElementById('jira-component');
+                    if (jiraComponentField) {
+                        jiraComponentField.value = data.jiraComponent;
+                        console.log(`Auto-selected JIRA Component: ${data.jiraComponent}`);
+                    }
+                }
             }
         }
         

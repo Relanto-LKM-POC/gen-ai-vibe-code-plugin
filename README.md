@@ -297,6 +297,27 @@ Install from the VS Code Marketplace or use the Command Palette (`Ctrl+Shift+P` 
 
 ---
 
+## 📝 Changelog
+
+### **Version 1.0.0** - November 2025
+
+#### 🎉 **New Features** (User Feedback)
+- **JIRA Component Field** - Added dropdown field in Manage Features tab with 7 component options. Auto-populates based on Initiative selection with manual override capability.
+- **Searchable Epic Dropdown** - Enhanced Epic selection with inline search functionality for improved navigation across 50+ options.
+
+#### 📢 **User Feedback**
+> **We listen to our users!** These features were implemented based on direct user feedback. Have suggestions? [Submit them here](https://github.com/cx-learning-platform/spec-driven-development/issues) and we'll prioritize them.
+
+---
+
+### **Version 1.0.0** - Initial Release
+- Core task management features
+- Salesforce & AWS integration
+- Development resources & guidelines
+- TaskMaster JSON import
+
+---
+
 <div align="center">
 
 **🎯 Spec Driven Development** • **Intelligent Task Management & Development Enhancement**
