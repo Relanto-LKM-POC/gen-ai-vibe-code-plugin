@@ -30,7 +30,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(
-            message => {
+            async message => {
                 switch (message.command) {
                     case 'connectAWS':
                         vscode.commands.executeCommand('specDrivenDevelopment.connectAWS');
@@ -133,6 +133,12 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             vscode.commands.executeCommand('specDrivenDevelopment.retrieveWipTasks', message.data);
                         } else {
                             vscode.commands.executeCommand('specDrivenDevelopment.retrieveRunningTasks', message.data);
+                        }
+                        break;
+                    
+                    case 'openExternalLink':
+                        if (message.url) {
+                            vscode.env.openExternal(vscode.Uri.parse(message.url));
                         }
                         break;
                 }
@@ -592,7 +598,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                         Submit Feature
                                     </button>
                                     <button class="secondary-button" id="load-data-btn">
-                                        Refresh Tab
+                                        Reset
                                     </button>
                                 </div>
                                 

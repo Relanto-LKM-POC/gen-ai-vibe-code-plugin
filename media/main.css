@@ -965,6 +965,17 @@
     margin: 0;
 }
 
+.task-title-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.task-title-link:hover {
+    text-decoration: underline;
+    color: var(--vscode-textLink-activeForeground);
+}
+
 .task-ticket {
     font-size: 11px;
     color: var(--vscode-textLink-foreground);
@@ -972,6 +983,16 @@
     padding: 2px 6px;
     border-radius: 3px;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.task-jira-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.task-jira-link:hover {
+    text-decoration: underline;
 }
 
 .task-description {

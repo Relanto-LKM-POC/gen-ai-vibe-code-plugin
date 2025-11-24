@@ -1621,7 +1621,7 @@
             return;
         }
         
-        // Set Tickets List as active by default
+        // Set WIP Tickets as active by default
         const wipBtn = document.getElementById('retrieve-wip-btn');
         const runningBtn = document.getElementById('running-tasks-btn');
         
@@ -1629,18 +1629,18 @@
             // Remove active from both buttons first
             wipBtn.classList.remove('active');
             runningBtn.classList.remove('active');
-            // Set running as active
-            runningBtn.classList.add('active');
+            // Set WIP as active
+            wipBtn.classList.add('active');
         }
         
         // Update the title
         const taskListTitle = document.getElementById('task-list-title');
         if (taskListTitle) {
-            taskListTitle.textContent = 'Tickets List';
+            taskListTitle.textContent = 'WIP Tickets';
         }
         
-        // Load the running tasks
-        loadRunningTasks();
+        // Load the WIP tasks
+        loadWipTasks();
     }
 
     function configureUserForFeatures() {
@@ -1761,6 +1761,12 @@
         const description = task.Description__c || 'No description available';
         const truncatedDescription = description.length > 100 ? description.substring(0, 100) + '...' : description;
         
+        // Build DevSecOps Hub link for the task title
+        const devsecopsHubUrl = `https://ciscolearningservices--clnuat4.sandbox.lightning.force.com/lightning/r/Feedback__c/${task.Id}/view`;
+        
+        // Build JIRA link for the ticket number
+        const jiraUrl = task.Jira_Link__c || '#';
+        
         // Show different action buttons based on task type
         let actionButtonsHTML = '';
         if (taskType === 'wip') {
@@ -1799,8 +1805,8 @@
             <div class="task-item" data-task-id="${task.Id}">
                 <div class="task-main-content">
                     <div class="task-header">
-                        <h4 class="task-name">${task.Name}</h4>
-                        <span class="task-ticket">${ticketNumber}</span>
+                        <h4 class="task-name"><a href="${devsecopsHubUrl}" class="task-title-link" title="Open in DevSecOps Hub">${task.Name}</a></h4>
+                        <span class="task-ticket"><a href="${jiraUrl}" class="task-jira-link" title="Open in JIRA">${ticketNumber}</a></span>
                     </div>
                     <p class="task-description">${truncatedDescription}</p>
                     <div class="task-meta">
@@ -1900,6 +1906,38 @@
                             console.warn('No task data attribute found for view button');
                         }
                         break;
+                }
+            });
+        });
+        
+        // Add event listeners for title and JIRA ticket links
+        const titleLinks = document.querySelectorAll('.task-title-link');
+        const jiraLinks = document.querySelectorAll('.task-jira-link');
+        
+        titleLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = link.getAttribute('href');
+                if (url && url !== '#') {
+                    vscode.postMessage({ 
+                        command: 'openExternalLink', 
+                        url: url 
+                    });
+                }
+            });
+        });
+        
+        jiraLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = link.getAttribute('href');
+                if (url && url !== '#') {
+                    vscode.postMessage({ 
+                        command: 'openExternalLink', 
+                        url: url 
+                    });
                 }
             });
         });
