@@ -77,6 +77,7 @@ export interface FeedbackSubmissionResult {
     jiraUrl?: string;
     timestamp: string;
     error?: string;
+    isTBD?: boolean;
 }
 
 export class FeedbackService {
@@ -610,8 +611,9 @@ export class FeedbackService {
 
             if (response.ok && result.success) {
                 let jiraTicketNumber = result.id; // Fallback to Salesforce ID
+                let isTBD = false; // Track if JIRA link is TBD
 
-                let jiraUrl = undefined;
+                let jiraUrl: string | undefined;
                 
                 try {
                     // Retry logic to wait for JIRA ticket creation (as it's asynchronous)
@@ -633,13 +635,21 @@ export class FeedbackService {
                             if (queryData.records && queryData.records.length > 0) {
                                 const latestRecord = queryData.records[0];
                                 
-                                if (latestRecord.Jira_Link__c && latestRecord.Jira_Link__c !== 'TBD') {
-                                    jiraUrl = latestRecord.Jira_Link__c;
-                                    // Extract JIRA ticket number from URL - supports any project key format (GAI-572, DEVSECOPS-14936, etc.)
-                                    const jiraUrlMatch = latestRecord.Jira_Link__c.match(CONFIG.jira.ticketPattern);
-                                    if (jiraUrlMatch) {
-                                        jiraTicketNumber = jiraUrlMatch[1];
-                                        break; // Success! Exit retry loop
+                                if (latestRecord.Jira_Link__c) {
+                                    if (latestRecord.Jira_Link__c === 'TBD') {
+                                        // Special handling for TBD
+                                        isTBD = true;
+                                        jiraTicketNumber = 'TBD';
+                                        jiraUrl = 'TBD';
+                                        break; // Exit retry loop
+                                    } else {
+                                        jiraUrl = latestRecord.Jira_Link__c;
+                                        // Extract JIRA ticket number from URL - supports any project key format (GAI-572, DEVSECOPS-14936, etc.)
+                                        const jiraUrlMatch = latestRecord.Jira_Link__c.match(CONFIG.jira.ticketPattern);
+                                        if (jiraUrlMatch) {
+                                            jiraTicketNumber = jiraUrlMatch[1];
+                                            break; // Success! Exit retry loop
+                                        }
                                     }
                                 }
                             }
@@ -659,7 +669,8 @@ export class FeedbackService {
                     message: 'Feature submitted to Salesforce successfully!',
                     ticketId: jiraTicketNumber,
                     jiraUrl: jiraUrl,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    isTBD: isTBD // Include TBD flag in the result
                 };
             } else {
                 // More detailed error handling

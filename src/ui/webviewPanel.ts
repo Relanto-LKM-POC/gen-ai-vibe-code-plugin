@@ -141,6 +141,16 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             vscode.env.openExternal(vscode.Uri.parse(message.url));
                         }
                         break;
+                    
+                    case 'showNotification':
+                        if (message.type === 'warning') {
+                            vscode.window.showWarningMessage(message.message);
+                        } else if (message.type === 'error') {
+                            vscode.window.showErrorMessage(message.message);
+                        } else {
+                            vscode.window.showInformationMessage(message.message);
+                        }
+                        break;
                 }
             },
             undefined,

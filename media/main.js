@@ -1053,7 +1053,11 @@
         if (result.success) {
             // Extract Jira ticket ID from Jira URL if available - supports any project format
             let displayTicketId = result.ticketId || 'N/A';
-            if (result.jiraUrl) {
+            
+            // Check if the ticket is TBD
+            if (result.isTBD || result.ticketId === 'TBD' || result.jiraUrl === 'TBD') {
+                displayTicketId = 'TBD';
+            } else if (result.jiraUrl && result.jiraUrl !== 'TBD') {
                 const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z0-9]+-\d+)/i);
                 if (jiraTicketMatch) {
                     displayTicketId = jiraTicketMatch[1]; // Extract GAI-572, DEVSECOPS-12208, etc. from URL
@@ -1075,10 +1079,14 @@
                         <span class="result-label">Status:</span>
                         <span class="result-value">${result.message}</span>
                     </div>
-                    ${result.jiraUrl ? `
+                    ${result.jiraUrl && result.jiraUrl !== 'TBD' ? `
                     <div class="result-item">
                         <span class="result-label">JIRA Link:</span>
                         <span class="result-value"><a href="${result.jiraUrl}" target="_blank">View in JIRA</a></span>
+                    </div>` : ''}
+                    ${displayTicketId === 'TBD' ? `
+                    <div class="result-item">
+                        <span>⚠️ Ticket is not created (TBD). Please delete this record from WIP Ticket Tab and create ticket again.</span>
                     </div>` : ''}
                 </div>
             `;
@@ -1822,6 +1830,10 @@
 
     function extractTicketNumber(jiraLink) {
         if (!jiraLink) return 'N/A';
+        
+        // If the link is exactly 'TBD', return 'TBD'
+        if (jiraLink === 'TBD') return 'TBD';
+        
         // Future-proof pattern supporting GAI-572, DEVSECOPS-12208, ABC123-999, etc.
         const match = jiraLink.match(/\/browse\/([A-Z0-9]+-\d+)/i);
         return match ? match[1] : 'N/A';
