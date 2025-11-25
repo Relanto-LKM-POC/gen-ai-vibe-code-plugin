@@ -1051,17 +1051,14 @@
         }
         
         if (result.success) {
-            // Extract Jira ticket ID from Jira URL if available - supports any project format
+            // Extract Jira ticket ID from result - backend already handles extraction
             let displayTicketId = result.ticketId || 'N/A';
             
-            // Check if the ticket is TBD
-            if (result.isTBD || result.ticketId === 'TBD' || result.jiraUrl === 'TBD') {
+            // Only show TBD if explicitly marked as TBD by backend
+            const isTBDTicket = result.isTBD === true || (result.jiraUrl === 'TBD' && result.ticketId === 'TBD');
+            
+            if (isTBDTicket) {
                 displayTicketId = 'TBD';
-            } else if (result.jiraUrl && result.jiraUrl !== 'TBD') {
-                const jiraTicketMatch = result.jiraUrl.match(/\/browse\/([A-Z0-9]+-\d+)/i);
-                if (jiraTicketMatch) {
-                    displayTicketId = jiraTicketMatch[1]; // Extract GAI-572, DEVSECOPS-12208, etc. from URL
-                }
             }
             
             feedbackResult.className = 'feedback-result success';
@@ -1079,12 +1076,12 @@
                         <span class="result-label">Status:</span>
                         <span class="result-value">${result.message}</span>
                     </div>
-                    ${result.jiraUrl && result.jiraUrl !== 'TBD' ? `
+                    ${result.devsecopsHubUrl ? `
                     <div class="result-item">
-                        <span class="result-label">JIRA Link:</span>
-                        <span class="result-value"><a href="${result.jiraUrl}" target="_blank">View in JIRA</a></span>
+                        <span class="result-label">Salesforce Link:</span>
+                        <span class="result-value"><a href="${result.devsecopsHubUrl}" target="_blank">View</a></span>
                     </div>` : ''}
-                    ${displayTicketId === 'TBD' ? `
+                    ${isTBDTicket ? `
                     <div class="result-item">
                         <span>⚠️ Ticket is not created (TBD). Please delete this record from WIP Ticket Tab and create ticket again.</span>
                     </div>` : ''}

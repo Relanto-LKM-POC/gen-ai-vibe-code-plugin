@@ -75,6 +75,8 @@ export interface FeedbackSubmissionResult {
     message: string;
     ticketId?: string;
     jiraUrl?: string;
+    feedbackId?: string;
+    devsecopsHubUrl?: string;
     timestamp: string;
     error?: string;
     isTBD?: boolean;
@@ -610,18 +612,22 @@ export class FeedbackService {
             console.log('[SDD:Feedback] INFO | Salesforce response:', { status: response.status, result });
 
             if (response.ok && result.success) {
-                let jiraTicketNumber = result.id; // Fallback to Salesforce ID
+                const feedbackId = result.id;
+                let jiraTicketNumber = feedbackId; // Fallback to Salesforce ID
                 let isTBD = false; // Track if JIRA link is TBD
 
                 let jiraUrl: string | undefined;
                 
                 try {
                     // Retry logic to wait for JIRA ticket creation (as it's asynchronous)
-                    const maxRetries = 3;
-                    const retryDelay = 2000; // 2 seconds
+                    const maxRetries = 5;
+                    const retryDelay = 2500; // 2.5 seconds
                     
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                        const queryResponse = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CJira_Link__c+FROM+Feedback__c+ORDER+BY+CreatedDate+DESC+LIMIT+1`), {
+                        console.log(`[SDD:Feedback] INFO | Attempt ${attempt}/${maxRetries} to fetch JIRA link for feedback ${feedbackId}`);
+                        
+                        // Query for the specific record that was just created using its ID
+                        const queryResponse = await fetch(getSalesforceQueryUrl(`SELECT+Id%2CJira_Link__c+FROM+Feedback__c+WHERE+Id%3D%27${feedbackId}%27`), {
                             method: 'GET',
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
@@ -633,24 +639,35 @@ export class FeedbackService {
                             const queryData = await queryResponse.json();
                             
                             if (queryData.records && queryData.records.length > 0) {
-                                const latestRecord = queryData.records[0];
+                                const createdRecord = queryData.records[0];
+                                console.log(`[SDD:Feedback] INFO | Jira_Link__c value:`, createdRecord.Jira_Link__c);
                                 
-                                if (latestRecord.Jira_Link__c) {
-                                    if (latestRecord.Jira_Link__c === 'TBD') {
-                                        // Special handling for TBD
-                                        isTBD = true;
-                                        jiraTicketNumber = 'TBD';
-                                        jiraUrl = 'TBD';
-                                        break; // Exit retry loop
+                                if (createdRecord.Jira_Link__c && createdRecord.Jira_Link__c.trim() !== '') {
+                                    if (createdRecord.Jira_Link__c === 'TBD') {
+                                        // TBD is a temporary placeholder - continue retrying unless it's the last attempt
+                                        console.log(`[SDD:Feedback] INFO | JIRA link is currently TBD (attempt ${attempt}/${maxRetries}), will retry...`);
+                                        if (attempt === maxRetries) {
+                                            // Only on the LAST attempt, treat TBD as final state
+                                            console.log('[SDD:Feedback] WARN | JIRA link still TBD after all retries - treating as final');
+                                            isTBD = true;
+                                            jiraTicketNumber = 'TBD';
+                                            jiraUrl = 'TBD';
+                                        }
+                                        // Continue to next retry attempt
                                     } else {
-                                        jiraUrl = latestRecord.Jira_Link__c;
+                                        jiraUrl = createdRecord.Jira_Link__c;
                                         // Extract JIRA ticket number from URL - supports any project key format (GAI-572, DEVSECOPS-14936, etc.)
-                                        const jiraUrlMatch = latestRecord.Jira_Link__c.match(CONFIG.jira.ticketPattern);
+                                        const jiraUrlMatch = createdRecord.Jira_Link__c.match(CONFIG.jira.ticketPattern);
                                         if (jiraUrlMatch) {
                                             jiraTicketNumber = jiraUrlMatch[1];
+                                            console.log(`[SDD:Feedback] INFO | Successfully extracted JIRA ticket: ${jiraTicketNumber}`);
                                             break; // Success! Exit retry loop
+                                        } else {
+                                            console.log(`[SDD:Feedback] WARN | JIRA link found but couldn't extract ticket ID: ${createdRecord.Jira_Link__c}`);
                                         }
                                     }
+                                } else {
+                                    console.log(`[SDD:Feedback] INFO | JIRA link is null or empty, waiting...`);
                                 }
                             }
                         }
@@ -658,17 +675,24 @@ export class FeedbackService {
                         // Wait before next attempt (except for the last attempt)
                         if (attempt < maxRetries) {
                             await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        } else {
+                            console.log(`[SDD:Feedback] WARN | Max retries reached, using fallback Salesforce ID: ${feedbackId}`);
                         }
                     }
                 } catch (error) {
+                    console.error('[SDD:Feedback] ERROR | Error fetching JIRA link:', error);
                     // Continue with Salesforce ID as fallback
                 }
+
+                const devsecopsHubUrl = `https://ciscolearningservices--clnuat4.sandbox.lightning.force.com/lightning/r/Feedback__c/${feedbackId}/view`;
 
                 return {
                     success: true,
                     message: 'Feature submitted to Salesforce successfully!',
                     ticketId: jiraTicketNumber,
                     jiraUrl: jiraUrl,
+                    feedbackId: feedbackId,
+                    devsecopsHubUrl: devsecopsHubUrl,
                     timestamp: new Date().toISOString(),
                     isTBD: isTBD // Include TBD flag in the result
                 };
