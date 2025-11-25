@@ -1551,3 +1551,86 @@
 .toggle-switch input:checked + .toggle-slider:hover {
     background-color: #059669;
 }
+
+/* Accordion Styles for Quick Feedback */
+.accordion-section {
+    margin-bottom: 20px;
+}
+
+.accordion-header {
+    cursor: pointer;
+    padding: 12px;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.accordion-header:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.accordion-arrow {
+    font-size: 12px;
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background-color: var(--vscode-textCodeBlock-background);
+}
+
+.accordion-content.expanded {
+    max-height: 600px;
+    padding: 15px;
+    border: 1px solid var(--vscode-input-border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+.config-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.config-row:last-child {
+    margin-bottom: 0;
+}
+
+.config-label {
+    font-weight: 500;
+    color: var(--vscode-foreground);
+    font-size: 12px;
+}
+
+.config-value {
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+}
+
+.config-input {
+    width: 100%;
+    padding: 6px 8px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 11px;
+    box-sizing: border-box;
+}
+
+.config-input:focus {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}

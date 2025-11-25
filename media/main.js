@@ -16,7 +16,8 @@
         editingTask: null, // Store currently editing task data
         currentTaskType: null, // Track which task list is currently displayed (wip, running, archived)
         availableTasks: [], // Store available TaskMaster tasks
-        currentImportedTask: null // Store currently imported TaskMaster task for duplicate checking
+        currentImportedTask: null, // Store currently imported TaskMaster task for duplicate checking
+        quickFeedbackPagination: null // Store quick feedback pagination state
     };
 
     // Unit conversion function
@@ -88,6 +89,13 @@
                 // Configure username/email when Manage Features tab is opened
                 if (targetTab === 'feedback') {
                     configureUserForFeatures();
+                }
+                
+                // Auto-load quick feedback when Quick Feedback tab is opened
+                if (targetTab === 'quick-feedback') {
+                    if (currentState.awsStatus && currentState.awsStatus.connected) {
+                        loadQuickFeedbackList();
+                    }
                 }
             });
         });
@@ -249,6 +257,9 @@
         const taskDropdown = document.getElementById('task-dropdown');
         const feedbackTypeSelect = document.getElementById('feedback-type');
         const acceptanceCriteriaGroup = document.getElementById('acceptance-criteria-group');
+
+        // Quick Feedback event listeners
+        setupQuickFeedbackEventListeners();
 
         // Setup searchable Epic dropdown
         setupSearchableEpicDropdown();
@@ -2087,6 +2098,22 @@
                 console.log('Duplicate check result:', message.data);
                 handleDuplicateCheckResult(message.data);
                 break;
+            
+            case 'quickFeedbackResult':
+                console.log('Quick feedback result received:', message.data);
+                showQuickFeedbackResult(message.data);
+                if (message.data.success) {
+                    // Clear form and reload list on success
+                    clearQuickFeedbackForm();
+                    loadQuickFeedbackList();
+                }
+                break;
+            
+            case 'quickFeedbackListLoaded':
+                console.log('[Quick Feedback] Quick feedback list loaded message received:', message.data);
+                console.log('[Quick Feedback] Feedbacks count:', message.data?.feedbacks?.length);
+                displayQuickFeedbackList(message.data.feedbacks, message.data.pagination);
+                break;
         }
     });
 
@@ -2906,6 +2933,474 @@ Do you want to submit it again?`);
             autoPopulateBadge.style.color = '#4caf50';
             autoPopulateBadge.style.fontSize = '12px';
             autoPopulateBadge.style.marginLeft = '8px';
+        }
+    }
+
+    // Quick Feedback Functions
+    
+    // Helper function to add business days (excluding weekends)
+    function addBusinessDays(date, days) {
+        const result = new Date(date);
+        let addedDays = 0;
+        
+        while (addedDays < days) {
+            result.setDate(result.getDate() + 1);
+            // Skip weekends (0 = Sunday, 6 = Saturday)
+            if (result.getDay() !== 0 && result.getDay() !== 6) {
+                addedDays++;
+            }
+        }
+        
+        return result;
+    }
+    
+    function setupQuickFeedbackEventListeners() {
+        // Accordion toggle
+        const accordionHeader = document.getElementById('quick-feedback-accordion-header');
+        const accordionContent = document.getElementById('quick-feedback-accordion-content');
+        const accordionArrow = accordionHeader?.querySelector('.accordion-arrow');
+        
+        accordionHeader?.addEventListener('click', () => {
+            const isExpanded = accordionContent?.classList.contains('expanded');
+            if (isExpanded) {
+                accordionContent?.classList.remove('expanded');
+                if (accordionArrow) accordionArrow.textContent = '▶';
+            } else {
+                accordionContent?.classList.add('expanded');
+                if (accordionArrow) accordionArrow.textContent = '▼';
+            }
+        });
+        
+        // Set default estimation date (current date + 10 business days, excluding weekends)
+        const estimationDateField = document.getElementById('quick-estimation-date');
+        if (estimationDateField) {
+            const defaultDate = addBusinessDays(new Date(), 10);
+            estimationDateField.value = defaultDate.toISOString().split('T')[0];
+        }
+        
+        // Submit button
+        const submitBtn = document.getElementById('submit-quick-feedback-btn');
+        submitBtn?.addEventListener('click', submitQuickFeedback);
+        
+        // Reset button
+        const resetBtn = document.getElementById('reset-quick-feedback-btn');
+        resetBtn?.addEventListener('click', clearQuickFeedbackForm);
+        
+        // Search functionality
+        const searchBtn = document.getElementById('quick-feedback-search-btn');
+        const searchInput = document.getElementById('quick-feedback-search-input');
+        const clearSearchBtn = document.getElementById('quick-feedback-clear-search-btn');
+        
+        searchBtn?.addEventListener('click', () => {
+            const searchTerm = searchInput?.value.trim();
+            if (searchTerm) {
+                loadQuickFeedbackList(0, searchTerm);
+            } else {
+                loadQuickFeedbackList();
+            }
+        });
+        
+        clearSearchBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            loadQuickFeedbackList();
+        });
+        
+        searchInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchBtn?.click();
+            }
+        });
+        
+        searchInput?.addEventListener('input', () => {
+            const hasValue = searchInput.value.trim().length > 0;
+            if (clearSearchBtn) {
+                clearSearchBtn.style.display = hasValue ? 'inline-block' : 'none';
+            }
+        });
+        
+        // Pagination
+        const prevBtn = document.getElementById('quick-feedback-prev-page-btn');
+        const nextBtn = document.getElementById('quick-feedback-next-page-btn');
+        
+        prevBtn?.addEventListener('click', () => {
+            if (currentState.quickFeedbackPagination && currentState.quickFeedbackPagination.currentOffset > 0) {
+                const newOffset = Math.max(0, currentState.quickFeedbackPagination.currentOffset - currentState.quickFeedbackPagination.currentLimit);
+                loadQuickFeedbackList(newOffset, currentState.quickFeedbackPagination.searchTerm);
+            }
+        });
+        
+        nextBtn?.addEventListener('click', () => {
+            if (currentState.quickFeedbackPagination && currentState.quickFeedbackPagination.hasMore) {
+                const newOffset = currentState.quickFeedbackPagination.currentOffset + currentState.quickFeedbackPagination.currentLimit;
+                loadQuickFeedbackList(newOffset, currentState.quickFeedbackPagination.searchTerm);
+            }
+        });
+    }
+    
+    function submitQuickFeedback() {
+        // Check AWS connection
+        if (!canSubmitFeedback()) {
+            showQuickFeedbackResult({
+                success: false,
+                message: 'AWS connection is required to submit quick feedback. Please connect to AWS first.',
+                error: 'AWS connection required'
+            });
+            return;
+        }
+        
+        // Get form values
+        const title = document.getElementById('quick-feedback-title')?.value;
+        const description = document.getElementById('quick-feedback-description')?.value;
+        const acceptanceCriteria = document.getElementById('quick-feedback-acceptance')?.value;
+        
+        // Get default configuration values
+        const deliveryLifecycle = document.getElementById('quick-delivery-lifecycle')?.value || 'Production';
+        const jiraType = document.getElementById('quick-jira-type')?.value || 'Story';
+        const jiraPriority = document.getElementById('quick-jira-priority')?.value || 'Major-P3';
+        const workType = document.getElementById('quick-work-type')?.value || 'RTB';
+        const estimationDate = document.getElementById('quick-estimation-date')?.value;
+        
+        // Validate required fields
+        if (!title || !description || !acceptanceCriteria) {
+            showQuickFeedbackResult({
+                success: false,
+                message: 'Please fill in all required fields (Title, Description, and Acceptance Criteria)',
+                error: 'Validation failed'
+            });
+            return;
+        }
+        
+        const feedbackData = {
+            title,
+            description,
+            acceptanceCriteria,
+            deliveryLifecycle,
+            jiraType,
+            jiraPriority,
+            workType,
+            estimationDate,
+            initiative: 'AI-Security',
+            epic: 'DevSecOps Hub Feedback',
+            sddFeedback: true
+        };
+        
+        console.log('Submitting quick feedback:', feedbackData);
+        vscode.postMessage({ command: 'submitQuickFeedback', data: feedbackData });
+    }
+    
+    function clearQuickFeedbackForm() {
+        // Clear required fields
+        const titleField = document.getElementById('quick-feedback-title');
+        const descriptionField = document.getElementById('quick-feedback-description');
+        const acceptanceField = document.getElementById('quick-feedback-acceptance');
+        
+        if (titleField) titleField.value = '';
+        if (descriptionField) descriptionField.value = '';
+        if (acceptanceField) acceptanceField.value = '';
+        
+        // Reset default configuration to defaults
+        const deliveryField = document.getElementById('quick-delivery-lifecycle');
+        const typeField = document.getElementById('quick-jira-type');
+        const priorityField = document.getElementById('quick-jira-priority');
+        const workTypeField = document.getElementById('quick-work-type');
+        const dateField = document.getElementById('quick-estimation-date');
+        
+        if (deliveryField) deliveryField.value = 'Production';
+        if (typeField) typeField.value = 'Story';
+        if (priorityField) priorityField.value = 'Major-P3';
+        if (workTypeField) workTypeField.value = 'RTB';
+        if (dateField) {
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 10);
+            dateField.value = defaultDate.toISOString().split('T')[0];
+        }
+        
+        // Clear result message
+        const resultDiv = document.getElementById('quick-feedback-result');
+        if (resultDiv) {
+            resultDiv.style.display = 'none';
+            resultDiv.innerHTML = '';
+        }
+    }
+    
+    function showQuickFeedbackResult(result) {
+        console.log('showQuickFeedbackResult called with:', result);
+        const feedbackResult = document.getElementById('quick-feedback-result');
+        
+        if (!feedbackResult) {
+            console.error('Quick feedback result element not found!');
+            return;
+        }
+        
+        if (result.success) {
+            const displayTicketId = result.ticketId || 'N/A';
+            const isTBDTicket = result.isTBD === true || (result.jiraUrl === 'TBD' && result.ticketId === 'TBD');
+            
+            feedbackResult.className = 'feedback-result success';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">✅</span>
+                    <span class="result-title">Quick Feedback Submitted Successfully</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Ticket ID:</span>
+                        <span class="result-value">${displayTicketId}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Status:</span>
+                        <span class="result-value">${result.message}</span>
+                    </div>
+                    ${result.devsecopsHubUrl ? `
+                    <div class="result-item">
+                        <span class="result-label">DevSecOps Hub:</span>
+                        <span class="result-value"><a href="${result.devsecopsHubUrl}" target="_blank">View in Hub</a></span>
+                    </div>` : ''}
+                    ${isTBDTicket ? `
+                    <div class="result-item">
+                        <span>⚠️ Ticket is not created (TBD). Please delete this record from Quick Feedback list and create again.</span>
+                    </div>` : ''}
+                </div>
+            `;
+        } else {
+            feedbackResult.className = 'feedback-result error';
+            feedbackResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">❌</span>
+                    <span class="result-title">Failed to Submit Quick Feedback</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Message:</span>
+                        <span class="result-value">${result.message}</span>
+                    </div>
+                    ${result.error ? `
+                    <div class="result-item">
+                        <span class="result-label">Error:</span>
+                        <span class="result-value error-text">${result.error}</span>
+                    </div>` : ''}
+                </div>
+            `;
+        }
+        
+        feedbackResult.style.display = 'block';
+        feedbackResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    function loadQuickFeedbackList(offset = 0, searchTerm = '') {
+        const loadingIndicator = document.getElementById('quick-feedback-loading');
+        const emptyState = document.getElementById('quick-feedback-empty-state');
+        const feedbackList = document.getElementById('quick-feedback-list');
+        
+        if (loadingIndicator) loadingIndicator.style.display = 'flex';
+        if (emptyState) emptyState.style.display = 'none';
+        if (feedbackList) feedbackList.style.display = 'none';
+        
+        const options = { 
+            limit: 10, 
+            offset: offset,
+            ...(searchTerm && { searchTerm })
+        };
+        
+        vscode.postMessage({ 
+            command: 'retrieveQuickFeedback',
+            data: options
+        });
+    }
+    
+    function displayQuickFeedbackList(feedbacks, pagination = null) {
+        console.log(`[Quick Feedback] displayQuickFeedbackList called with ${feedbacks.length} feedbacks:`, feedbacks);
+        
+        const loadingIndicator = document.getElementById('quick-feedback-loading');
+        const feedbackCount = document.getElementById('quick-feedback-count');
+        const emptyState = document.getElementById('quick-feedback-empty-state');
+        const feedbackList = document.getElementById('quick-feedback-list');
+        const paginationControls = document.getElementById('quick-feedback-pagination-controls');
+        
+        console.log('[Quick Feedback] DOM elements found:', { 
+            loadingIndicator: !!loadingIndicator, 
+            feedbackCount: !!feedbackCount, 
+            emptyState: !!emptyState, 
+            feedbackList: !!feedbackList,
+            paginationControls: !!paginationControls 
+        });
+        
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+        
+        // Store pagination state
+        currentState.quickFeedbackPagination = pagination;
+        
+        // Update count
+        if (feedbackCount) {
+            if (pagination && pagination.totalCount > 0) {
+                const startRecord = pagination.currentOffset + 1;
+                const endRecord = Math.min(pagination.currentOffset + feedbacks.length, pagination.totalCount);
+                feedbackCount.textContent = `${startRecord}-${endRecord} of ${pagination.totalCount} feedbacks`;
+            } else {
+                feedbackCount.textContent = `${feedbacks.length} feedback${feedbacks.length !== 1 ? 's' : ''}`;
+            }
+        }
+        
+        if (feedbacks.length === 0) {
+            // Show empty state
+            if (emptyState) {
+                const searchText = pagination?.searchTerm ? ` matching "${pagination.searchTerm}"` : '';
+                emptyState.innerHTML = `<p>No quick feedback found${searchText}.</p>`;
+                emptyState.style.display = 'block';
+            }
+            if (feedbackList) feedbackList.style.display = 'none';
+            if (paginationControls) paginationControls.style.display = 'none';
+            return;
+        }
+        
+        // Hide empty state and show list
+        if (emptyState) emptyState.style.display = 'none';
+        if (feedbackList) {
+            feedbackList.style.display = 'block';
+            feedbackList.innerHTML = feedbacks.map(feedback => createQuickFeedbackItemHTML(feedback)).join('');
+            
+            // Add event listeners for action buttons after a small delay to ensure DOM is ready
+            setTimeout(() => {
+                console.log('[Quick Feedback] Attaching event listeners to buttons');
+                addQuickFeedbackActionListeners();
+            }, 100);
+        }
+        
+        // Update pagination controls
+        if (pagination && paginationControls) {
+            updateQuickFeedbackPaginationControls(pagination);
+            paginationControls.style.display = 'flex';
+        } else if (paginationControls) {
+            paginationControls.style.display = 'none';
+        }
+    }
+    
+    function createQuickFeedbackItemHTML(feedback) {
+        const ticketNumber = extractTicketNumber(feedback.Jira_Link__c);
+        const description = feedback.Description__c || 'No description available';
+        const truncatedDescription = description.length > 100 ? description.substring(0, 100) + '...' : description;
+        
+        const devsecopsHubUrl = `https://ciscolearningservices--clnuat4.sandbox.lightning.force.com/lightning/r/Feedback__c/${feedback.Id}/view`;
+        const jiraUrl = feedback.Jira_Link__c || '#';
+        
+        return `
+            <div class="task-item" data-feedback-id="${feedback.Id}">
+                <div class="task-main-content">
+                    <div class="task-header">
+                        <h4 class="task-name"><a href="${devsecopsHubUrl}" class="task-title-link" title="Open in DevSecOps Hub">${feedback.Name}</a></h4>
+                        <span class="task-ticket"><a href="${jiraUrl}" class="task-jira-link" title="Open in JIRA">${ticketNumber}</a></span>
+                    </div>
+                    <p class="task-description">${truncatedDescription}</p>
+                    <div class="task-meta">
+                        <span class="task-status ${getStatusClass(feedback.Status__c)}">${feedback.Status__c || 'Unknown'}</span>
+                        <span class="task-type ${getTypeClass(feedback.Type__c)}">${feedback.Type__c || 'Unknown'}</span>
+                        ${feedback.Estimated_Effort_Hours__c ? `<span class="task-effort">${feedback.Estimated_Effort_Hours__c}h</span>` : ''}
+                    </div>
+                </div>
+                <div class="task-actions">
+                    <button class="task-action-btn delete" data-action="delete" data-feedback-id="${feedback.Id}" data-feedback-name="${feedback.Name}" data-ticket-number="${ticketNumber}">
+                        Delete
+                    </button>
+                    <button class="task-action-btn view" data-action="view" data-feedback-id="${feedback.Id}" data-feedback-data='${JSON.stringify(feedback).replace(/'/g, "&apos;")}'>
+                        View
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    function addQuickFeedbackActionListeners() {
+        const actionButtons = document.querySelectorAll('#quick-feedback-list .task-action-btn');
+        console.log('[Quick Feedback] Adding listeners to', actionButtons.length, 'buttons');
+        
+        actionButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const action = button.getAttribute('data-action');
+                const feedbackId = button.getAttribute('data-feedback-id');
+                const feedbackName = button.getAttribute('data-feedback-name');
+                
+                console.log('[Quick Feedback] Button clicked:', action, feedbackId);
+                
+                switch (action) {
+                    case 'delete':
+                        const ticketNumber = button.getAttribute('data-ticket-number');
+                        console.log('[Quick Feedback] Sending delete command:', feedbackId);
+                        vscode.postMessage({ 
+                            command: 'deleteQuickFeedback', 
+                            data: { feedbackId, feedbackName, ticketNumber } 
+                        });
+                        break;
+                    case 'view':
+                        console.log('[Quick Feedback] Opening view modal');
+                        const feedbackDataAttr = button.getAttribute('data-feedback-data');
+                        if (feedbackDataAttr && feedbackDataAttr.trim() !== '') {
+                            try {
+                                const feedbackData = JSON.parse(feedbackDataAttr.replace(/&apos;/g, "'"));
+                                if (feedbackData && feedbackData.Id && feedbackData.Name) {
+                                    showTaskViewModal(feedbackData);
+                                } else {
+                                    console.warn('Invalid feedback data for view modal:', feedbackData);
+                                }
+                            } catch (error) {
+                                console.error('Error parsing feedback data:', error, feedbackDataAttr);
+                            }
+                        } else {
+                            console.warn('No feedback data attribute found for view button');
+                        }
+                        break;
+                }
+            });
+        });
+        
+        // Add event listeners for title and JIRA links
+        const titleLinks = document.querySelectorAll('#quick-feedback-list .task-title-link');
+        const jiraLinks = document.querySelectorAll('#quick-feedback-list .task-jira-link');
+        
+        titleLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = link.getAttribute('href');
+                if (url && url !== '#') {
+                    vscode.postMessage({ command: 'openExternalLink', url: url });
+                }
+            });
+        });
+        
+        jiraLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = link.getAttribute('href');
+                if (url && url !== '#') {
+                    vscode.postMessage({ command: 'openExternalLink', url: url });
+                }
+            });
+        });
+    }
+    
+    function updateQuickFeedbackPaginationControls(pagination) {
+        const prevBtn = document.getElementById('quick-feedback-prev-page-btn');
+        const nextBtn = document.getElementById('quick-feedback-next-page-btn');
+        const paginationInfo = document.getElementById('quick-feedback-pagination-info');
+
+        if (prevBtn) {
+            prevBtn.disabled = pagination.currentOffset === 0;
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled = !pagination.hasMore;
+        }
+
+        if (paginationInfo) {
+            const currentPage = Math.floor(pagination.currentOffset / pagination.currentLimit) + 1;
+            const totalPages = Math.ceil(pagination.totalCount / pagination.currentLimit);
+            const searchText = pagination.searchTerm ? ` (filtered)` : '';
+            paginationInfo.textContent = `Page ${currentPage} of ${totalPages}${searchText}`;
         }
     }
 
