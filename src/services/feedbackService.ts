@@ -702,7 +702,7 @@ export class FeedbackService {
 
                 return {
                     success: true,
-                    message: 'Feature submitted to Salesforce successfully!',
+                    message: 'Feature submitted to Hub successfully!',
                     ticketId: jiraTicketNumber,
                     jiraUrl: jiraUrl,
                     feedbackId: feedbackId,
@@ -1232,6 +1232,77 @@ export class FeedbackService {
     }
 
     /**
+     * Get Quick Feedback Initiative and Epic IDs using hybrid approach:
+     * 1. Use hardcoded IDs from config (fastest - no validation needed)
+     * 2. If submission fails with hardcoded IDs, fetch from API and cache
+     */
+    private async getQuickFeedbackIds(accessToken: string): Promise<{ initiativeId: string; epicId: string }> {
+        // Step 1: Check cache first (if exists and not expired)
+        const cachedInitiativeId = this.context.globalState.get<string>('quickFeedback.initiativeId');
+        const cachedEpicId = this.context.globalState.get<string>('quickFeedback.epicId');
+        const cacheTimestamp = this.context.globalState.get<number>('quickFeedback.cacheTimestamp');
+        
+        // If cache exists and is valid, use it
+        const isCacheValid = cachedInitiativeId && cachedEpicId && cacheTimestamp && 
+            (Date.now() - cacheTimestamp < CONFIG.quickFeedback.cache.ttl);
+        
+        if (isCacheValid) {
+            console.log('[SDD:Feedback] INFO | Using cached Quick Feedback IDs');
+            return { initiativeId: cachedInitiativeId!, epicId: cachedEpicId! };
+        }
+        
+        // Step 2: Use hardcoded IDs (no validation - trust the config)
+        const hardcodedInitiativeId = CONFIG.quickFeedback.defaults.initiativeId;
+        const hardcodedEpicId = CONFIG.quickFeedback.defaults.epicId;
+        
+        console.log('[SDD:Feedback] INFO | Using hardcoded Quick Feedback IDs (no validation for speed):', { 
+            initiativeId: hardcodedInitiativeId, 
+            epicId: hardcodedEpicId 
+        });
+        
+        return { initiativeId: hardcodedInitiativeId, epicId: hardcodedEpicId };
+    }
+    
+    /**
+     * Fallback method to fetch and cache Quick Feedback IDs from API
+     * Called when hardcoded IDs fail during submission
+     */
+    private async fetchAndCacheQuickFeedbackIds(): Promise<{ initiativeId: string; epicId: string }> {
+        console.log('[SDD:Feedback] INFO | Fetching Quick Feedback IDs from API (hardcoded IDs failed)...');
+        
+        const initiatives = await this.getInitiatives();
+        const aiSecurityInitiative = initiatives.find(init => 
+            init.name === CONFIG.quickFeedback.defaults.initiativeName || 
+            init.name === 'AI-Security'  // Fallback for old naming
+        );
+        
+        if (!aiSecurityInitiative) {
+            const availableNames = initiatives.map(i => i.name).join(', ');
+            throw new Error(`${CONFIG.quickFeedback.defaults.initiativeName} initiative not found. Available: ${availableNames}`);
+        }
+        
+        const epics = await this.getEpics();
+        const hubFeedbackEpic = epics.find(epic => epic.name === CONFIG.quickFeedback.defaults.epicName);
+        
+        if (!hubFeedbackEpic) {
+            const availableNames = epics.map(e => e.name).join(', ');
+            throw new Error(`${CONFIG.quickFeedback.defaults.epicName} epic not found. Available: ${availableNames}`);
+        }
+        
+        // Cache the fetched IDs
+        await this.context.globalState.update('quickFeedback.initiativeId', aiSecurityInitiative.id);
+        await this.context.globalState.update('quickFeedback.epicId', hubFeedbackEpic.id);
+        await this.context.globalState.update('quickFeedback.cacheTimestamp', Date.now());
+        
+        console.log('[SDD:Feedback] INFO | Fetched and cached Quick Feedback IDs:', {
+            initiativeId: aiSecurityInitiative.id,
+            epicId: hubFeedbackEpic.id
+        });
+        
+        return { initiativeId: aiSecurityInitiative.id, epicId: hubFeedbackEpic.id };
+    }
+
+    /**
      * Submit SDD quick feedback with fixed Initiative and Epic
      */
     public async submitSddFeedback(feedbackData: QuickFeedbackData, userEmail: string): Promise<FeedbackSubmissionResult> {
@@ -1244,27 +1315,8 @@ export class FeedbackService {
             // Get user information for assignee field
             const username = await this.userService.getUsernameFromEmail();
 
-            // Find "AI-Security" initiative ID
-            const initiatives = await this.getInitiatives();
-            console.log('[SDD:Feedback] INFO | Available initiatives:', initiatives.map(i => ({ id: i.id, name: i.name })));
-            
-            const aiSecurityInitiative = initiatives.find(init => init.name === 'AI-Security');
-            
-            if (!aiSecurityInitiative) {
-                const availableNames = initiatives.map(i => i.name).join(', ');
-                throw new Error(`AI-Security initiative not found. Available initiatives: ${availableNames}`);
-            }
-
-            // Find "DevSecOps Hub Feedback" epic ID
-            const epics = await this.getEpics();
-            console.log('[SDD:Feedback] INFO | Available epics:', epics.map(e => ({ id: e.id, name: e.name })));
-            
-            const hubFeedbackEpic = epics.find(epic => epic.name === 'DevSecOps Hub Feedback');
-            
-            if (!hubFeedbackEpic) {
-                const availableNames = epics.map(e => e.name).join(', ');
-                throw new Error(`DevSecOps Hub Feedback epic not found. Available epics: ${availableNames}`);
-            }
+            // Try to get IDs using hybrid approach (hardcoded -> cache -> API lookup)
+            const { initiativeId, epicId } = await this.getQuickFeedbackIds(accessToken);
 
             // Prepare Salesforce payload
             const salesforcePayload: any = {
@@ -1274,8 +1326,8 @@ export class FeedbackService {
                 Type__c: feedbackData.jiraType,
                 Jira_Priority__c: feedbackData.jiraPriority,
                 Work_Type__c: feedbackData.workType,
-                Initiative__c: aiSecurityInitiative.id,
-                Epic__c: hubFeedbackEpic.id,
+                Initiative__c: initiativeId,
+                Epic__c: epicId,
                 Delivery_Lifecycle__c: feedbackData.deliveryLifecycle,
                 SDD_Feedback__c: true, // Mark as Quick Feedback
                 From_External_VS__c: true,
@@ -1430,26 +1482,24 @@ export class FeedbackService {
             const limit = options.limit || 10;
             const searchTerm = options.searchTerm || '';
 
+            // Build WHERE clause with user filter (email OR assignee) - consistent with task service
+            let whereClause = `WHERE SDD_Feedback__c = true AND (CreatedBy.Email = '${userEmail}' OR Assignee_through_VS__c = '${username}')`;
+            
+            if (searchTerm) {
+                // Escape single quotes for SOQL (consistent with task service)
+                const escapedSearchTerm = searchTerm.trim().replace(/'/g, "\\'");
+                // Note: Description__c is excluded from LIKE search as it's a long text field that cannot be filtered
+                whereClause += ` AND (Name LIKE '%${escapedSearchTerm}%' OR Jira_Link__c LIKE '%${escapedSearchTerm}%')`;
+            }
+
             // Build query - get quick feedback for current user (by email OR assignee)
-            let query = `SELECT Id,Name,Description__c,Jira_Link__c,Status__c,Type__c,Estimated_Effort_Hours__c,Jira_Priority__c,Jira_Acceptance_Criteria__c,` +
+            const query = `SELECT Id,Name,Description__c,Jira_Link__c,Status__c,Type__c,Estimated_Effort_Hours__c,Jira_Priority__c,Jira_Acceptance_Criteria__c,` +
                         `Work_Type__c,Jira_Component__c,Jira_Sprint_Details__c,Actual_Effort_Hours__c,Resolution__c,Epic__c,Deployment_Date__c,AI_Adopted__c,` +
                         `CreatedBy.Email,Assignee_through_VS__c ` +
                         `FROM Feedback__c ` +
-                        `WHERE SDD_Feedback__c = true `;
-            
-            if (searchTerm) {
-                // Escape special characters in search term for SOQL
-                // Escape single quotes, backslashes, and wildcards
-                const escapedSearchTerm = searchTerm
-                    .replace(/\\/g, "\\\\")
-                    .replace(/'/g, "\\'")
-                    .replace(/%/g, "\\%")
-                    .replace(/_/g, "\\_");
-                query += `AND (Name LIKE '%${escapedSearchTerm}%' OR Description__c LIKE '%${escapedSearchTerm}%' OR Jira_Link__c LIKE '%${escapedSearchTerm}%') `;
-            }
-            
-            query += `ORDER BY CreatedDate DESC ` +
-                     `LIMIT ${limit + 1} OFFSET ${offset}`;
+                        `${whereClause} ` +
+                        `ORDER BY CreatedDate DESC ` +
+                        `LIMIT ${limit} OFFSET ${offset}`;
 
             const encodedQuery = encodeURIComponent(query);
 
@@ -1464,28 +1514,49 @@ export class FeedbackService {
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to retrieve quick feedback: ${response.status} ${response.statusText}`);
+                let errorDetails = `${response.status} ${response.statusText}`;
+                try {
+                    const errorBody = await response.text();
+                    console.error('[SDD:Feedback] ERROR | Salesforce error response:', errorBody);
+                    errorDetails += ` - ${errorBody}`;
+                } catch (e) {
+                    // Ignore error reading response body
+                }
+                throw new Error(`Failed to retrieve quick feedback: ${errorDetails}`);
             }
 
             const data = await response.json();
-            // Filter feedbacks by current user email OR assignee (client-side filtering)
-            const allFeedbacks = data.records || [];
-            const feedbacks = allFeedbacks.filter((record: any) => 
-                (record.CreatedBy && record.CreatedBy.Email === userEmail) ||
-                (record.Assignee_through_VS__c === username)
+            
+            // Get total count for pagination
+            const countQuery = encodeURIComponent(
+                `SELECT COUNT() FROM Feedback__c ${whereClause}`
             );
             
-            // Check if there are more records
-            const hasMore = feedbacks.length > limit;
-            const returnFeedbacks = hasMore ? feedbacks.slice(0, limit) : feedbacks;
+            let totalCount = data.records?.length || 0;
+            try {
+                const countResponse = await fetch(getSalesforceQueryUrl(countQuery), {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (countResponse.ok) {
+                    const countData = await countResponse.json();
+                    totalCount = countData.totalSize || 0;
+                }
+            } catch (error) {
+                console.warn('[SDD:Feedback] WARN | Failed to get quick feedback total count, using records length');
+            }
 
-            // Total count is based on filtered feedbacks (client-side)
-            const totalCount = feedbacks.length;
+            const feedbacks = data.records || [];
+            const hasMore = (offset + limit) < totalCount;
 
-            console.log(`[SDD:Feedback] INFO | Retrieved ${returnFeedbacks.length} quick feedback items (total: ${totalCount})`);
+            console.log(`[SDD:Feedback] INFO | Retrieved ${feedbacks.length} quick feedback items (total: ${totalCount})`);
 
             return {
-                feedbacks: returnFeedbacks,
+                feedbacks: feedbacks,
                 totalCount: totalCount,
                 hasMore: hasMore
             };

@@ -274,13 +274,61 @@
 .primary-button, .secondary-button {
     padding: 8px 16px;
     border: none;
-    border-radius: 2px;
+    border-radius: 3px;
     cursor: pointer;
     font-family: inherit;
     font-size: 11px;
-    transition: background-color 0.2s ease;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
+/* AWS Configuration buttons - match task action button size */
+#aws-button-group {
+    gap: 10px;
+}
+
+#aws-button-group .primary-button,
+#aws-button-group .secondary-button,
+#aws-button-group .danger-button {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    min-width: 50px;
+}
+
+#aws-button-group .primary-button {
+    background-color: rgba(0, 188, 235, 0.2);
+    color: #ffffff;
+    border: 1px solid rgba(0, 188, 235, 0.3);
+}
+
+#aws-button-group .primary-button:hover:not(:disabled) {
+    background-color: rgba(0, 188, 235, 0.3);
+}
+
+#aws-button-group .secondary-button {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    margin-left: 2px;
+}
+
+#aws-button-group .secondary-button:hover {
+    background-color: rgba(34, 197, 94, 0.3);
+}
+
+#aws-button-group .danger-button {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    margin-left: 4px;
+}
+
+#aws-button-group .danger-button:hover {
+    background-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Default button styles for other areas */
 .primary-button {
     background-color: var(--cisco-blue);
     color: white;
@@ -492,6 +540,20 @@
 
 .connection-info {
     padding: 15px;
+}
+
+/* Validation box styling - left aligned white text */
+#secret-validation-card .connection-info {
+    text-align: left;
+}
+
+#secret-validation-card .info-row {
+    justify-content: flex-start;
+}
+
+#secret-validation-card .info-value {
+    color: #ffffff;
+    text-align: left;
 }
 
 .info-row {

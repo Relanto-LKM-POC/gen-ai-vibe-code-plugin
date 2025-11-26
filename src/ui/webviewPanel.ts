@@ -455,46 +455,35 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         <div class="tab-content active" id="aws-config">
                             <div class="status-section">
                                 <div class="status-indicator" id="aws-status-indicator">
-                                    <span class="status-dot status-disconnected"></span>
-                                    <span class="status-text" id="aws-status-text">Not Connected</span>
+                                    <span class="status-dot"></span>
+                                    <span class="status-text" id="aws-status-text">Checking connection status...</span>
                                 </div>
                             </div>
                             
                             <div class="section">
-                                <h3>AWS CLI Integration</h3>
-                                <ul class="feature-list">
-                                    <li>• Uses your local AWS CLI credentials</li>
-                                    <li>• Automatic credential detection</li>
-                                    <li>• Secure connection to Secrets Manager</li>
-                                </ul>
+                                <h3>AWS Configuration</h3>
                                 
-                                <!-- Secret Validation Section - Always visible, matching Connection Details style -->
-                                <div class="secret-validation-section" id="secret-validation-section" style="margin-top: 15px;">
-                                    <h4>Secret Validation:</h4>
+                                <!-- Credential Validation -->
+                                <div class="secret-validation-section" id="secret-validation-section" style="margin-top: 15px; display: none;">
                                     <div class="connection-status-card" id="secret-validation-card">
                                         <div class="connection-header">
-                                            <span class="connection-icon" id="secret-validation-icon">🔍</span>
-                                            <span class="connection-title" id="secret-validation-title">Checking Secret...</span>
+                                            <span class="connection-icon" id="secret-validation-icon"></span>
+                                            <span class="connection-title" id="secret-validation-title">Not Connected</span>
                                         </div>
                                         <div class="connection-info" id="secret-validation-info">
                                             <div class="info-row">
-                                                <span class="info-label">Status:</span>
-                                                <span class="info-value" id="secret-status-value">Pending validation</span>
+                                                <span class="info-value" id="secret-status-value">Connect to validate credentials</span>
                                             </div>
-                                            <div class="info-row">
-                                                <span class="info-label">Missing Fields:</span>
-                                                <span class="info-value" id="secret-missing-fields">Checking...</span>
-                                            </div>
-                                            <div class="info-row" id="secret-details-row" style="display: none;">
-                                                <span class="info-label">Details:</span>
-                                                <span class="info-value" id="secret-details-value">-</span>
+                                            <div class="info-row" id="secret-missing-row" style="display: none;">
+                                                <span class="info-label">Missing:</span>
+                                                <span class="info-value" id="secret-missing-fields">N/A</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <div class="button-group">
-                                    <button class="primary-button" id="connect-aws-btn">
+                                <div class="button-group" id="aws-button-group" style="display: none;">
+                                    <button class="primary-button" id="connect-aws-btn" style="display: none;">
                                         🔌 Connect to AWS SM
                                     </button>
                                     <button class="secondary-button" id="refresh-aws-btn" style="display: none;">
@@ -505,8 +494,10 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                     </button>
                                 </div>
                                 
+                                <!-- Error/Status Messages -->
+                                <div class="feedback-result" id="aws-error-result"></div>
+                                
                                 <div class="connection-details" id="aws-connection-details" style="display: none;">
-                                    <h4>Connection Details:</h4>
                                     <div id="aws-details-content"></div>
                                 </div>
                                 
@@ -865,41 +856,23 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                 <div class="accordion-content" id="quick-feedback-accordion-content">
                                     <div class="config-row">
                                         <span class="config-label">Delivery Lifecycle:</span>
-                                        <select id="quick-delivery-lifecycle" class="config-input">
-                                            <option value="Production">Production</option>
-                                            <option value="Development">Development</option>
-                                            <option value="Testing">Testing</option>
-                                        </select>
+                                        <span class="config-value">Production</span>
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Jira Type:</span>
-                                        <select id="quick-jira-type" class="config-input">
-                                            <option value="Story">Story</option>
-                                            <option value="Bug">Bug</option>
-                                            <option value="Defect">Defect</option>
-                                        </select>
+                                        <span class="config-value">Story</span>
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Jira Priority:</span>
-                                        <select id="quick-jira-priority" class="config-input">
-                                            <option value="Major-P3" selected>Major-P3</option>
-                                            <option value="Severe-P1">Severe-P1</option>
-                                            <option value="Critical-P2">Critical-P2</option>
-                                            <option value="Minor-P4">Minor-P4</option>
-                                        </select>
+                                        <span class="config-value">Major-P3</span>
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Work Type:</span>
-                                        <select id="quick-work-type" class="config-input">
-                                            <option value="RTB" selected>RTB</option>
-                                            <option value="New Functionality / Feature">New Functionality / Feature</option>
-                                            <option value="Enabler / Innovation">Enabler / Innovation</option>
-                                            <option value="Quality">Quality</option>
-                                        </select>
+                                        <span class="config-value">RTB</span>
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Initiative:</span>
-                                        <span class="config-value">AI-Security</span>
+                                        <span class="config-value">AI Security</span>
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Epic:</span>
@@ -907,7 +880,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                     </div>
                                     <div class="config-row">
                                         <span class="config-label">Estimation Date:</span>
-                                        <input type="date" id="quick-estimation-date" class="config-input" />
+                                        <span class="config-value" id="quick-estimation-date-display"></span>
                                     </div>
                                 </div>
                             </div>
@@ -942,7 +915,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                         
                         <!-- My Quick Feedback List -->
                         <div class="section" style="margin-top: 20px;">
-                            <h3>My Quick Feedback</h3>
+                            <h3>My Feedback</h3>
                             
                             <!-- Search Bar -->
                             <div class="search-container" id="quick-feedback-search-container">
@@ -956,7 +929,7 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                             <!-- Quick Feedback List Container -->
                             <div class="task-list-container" id="quick-feedback-list-container">
                                 <div class="task-list-header">
-                                    <h4 id="quick-feedback-list-title">My Quick Feedback (SDD_Feedback__c = true)</h4>
+                                    <h4 id="quick-feedback-list-title">Feedback List</h4>
                                     <div class="task-count" id="quick-feedback-count">0 feedbacks</div>
                                 </div>
                                 

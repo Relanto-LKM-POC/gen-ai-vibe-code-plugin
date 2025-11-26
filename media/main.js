@@ -48,8 +48,26 @@
 
     // Initialize UI state to prevent glitches
     function initializeUIState() {
-        // Initialize secret validation to disconnected state
-        updateSecretValidationForDisconnected();
+        // Set initial clean loading state - don't show anything confusing
+        const statusText = document.getElementById('aws-status-text');
+        const statusDot = document.querySelector('.status-dot');
+        if (statusText) {
+            statusText.textContent = 'Checking connection status...';
+        }
+        if (statusDot) {
+            statusDot.className = 'status-dot'; // Remove any status classes
+        }
+        
+        // Keep secret validation and buttons hidden until we know the real state
+        const secretSection = document.getElementById('secret-validation-section');
+        const buttonGroup = document.getElementById('aws-button-group');
+        if (secretSection) {
+            secretSection.style.display = 'none';
+        }
+        if (buttonGroup) {
+            buttonGroup.style.display = 'none';
+        }
+        
         // Initialize feedback form state
         updateFeedbackFormState();
         // Ensure task edit modal is hidden on initialization
@@ -124,9 +142,9 @@
         connectBtn.addEventListener('click', () => {
             updateAWSStatus({ status: 'connecting' });
             showLoadingSteps([
-                'Loading AWS CLI credentials...',
-                'Testing Secrets Manager access...',
-                'Fetching Salesforce credentials...'
+                'Loading credentials...',
+                'Validating access...',
+                'Establishing connection...'
             ]);
             vscode.postMessage({ command: 'connectAWS' });
         });
@@ -658,6 +676,23 @@
         const disconnectBtn = document.getElementById('disconnect-aws-btn');
         const connectionDetails = document.getElementById('aws-connection-details');
         const loading = document.getElementById('aws-loading');
+        const secretSection = document.getElementById('secret-validation-section');
+        const buttonGroup = document.getElementById('aws-button-group');
+
+        // Show the UI elements now that we have real status
+        if (secretSection) {
+            secretSection.style.display = 'block';
+        }
+        if (buttonGroup) {
+            buttonGroup.style.display = 'block';
+        }
+        
+        // Clear error messages when status changes
+        const errorResult = document.getElementById('aws-error-result');
+        if (errorResult && status.status !== 'error') {
+            errorResult.style.display = 'none';
+            errorResult.innerHTML = '';
+        }
 
         // Update status indicator
         statusDot.className = 'status-dot';
@@ -754,132 +789,165 @@
     }
 
     function updateEnhancedAWSStatus(enhancedStatus) {
-        // Update the secret validation card with new structure
         const secretIcon = document.getElementById('secret-validation-icon');
         const secretTitle = document.getElementById('secret-validation-title');
         const secretStatusValue = document.getElementById('secret-status-value');
         const secretMissingFields = document.getElementById('secret-missing-fields');
-        const secretDetailsRow = document.getElementById('secret-details-row');
-        const secretDetailsValue = document.getElementById('secret-details-value');
+        const secretMissingRow = document.getElementById('secret-missing-row');
         
-        // Always process enhanced status regardless of current connection state
-        // This allows for proper error handling and status updates
-        
-        if (secretIcon && secretTitle && secretStatusValue && secretMissingFields) {
+        if (secretIcon && secretTitle && secretStatusValue) {
             switch (enhancedStatus.status) {
                 case 'ready':
-                    secretIcon.textContent = '✅';
-                    secretTitle.textContent = 'Secret Validation Complete';
-                    secretStatusValue.textContent = 'All required fields found';
-                    secretMissingFields.textContent = 'none';
+                    secretIcon.textContent = '';
+                    secretTitle.textContent = 'Credentials Valid';
+                    secretStatusValue.textContent = 'All required fields present';
+                    if (secretMissingRow) secretMissingRow.style.display = 'none';
                     break;
                 case 'secret-invalid':
-                    secretIcon.textContent = '⚠️';
-                    secretTitle.textContent = 'Secret Invalid';
+                    // Change main status to error when credentials are invalid
+                    updateMainStatusToError('Configuration Error', 'Missing required fields');
+                    secretIcon.textContent = '';
+                    secretTitle.textContent = 'Invalid Credentials';
                     secretStatusValue.textContent = 'Missing required fields';
-                    secretMissingFields.textContent = enhancedStatus.missingFields ? enhancedStatus.missingFields.join(', ') : 'Unknown fields';
+                    if (secretMissingFields) {
+                        secretMissingFields.textContent = enhancedStatus.missingFields ? enhancedStatus.missingFields.join(', ') : 'Unknown';
+                    }
+                    if (secretMissingRow) secretMissingRow.style.display = 'flex';
                     break;
                 case 'secret-not-found':
-                    secretIcon.textContent = '⚠️';
-                    secretTitle.textContent = 'Secret Not Found';
-                    secretStatusValue.textContent = 'Secret does not exist';
-                    secretMissingFields.textContent = 'N/A';
+                    // Change main status to error when credentials not found
+                    updateMainStatusToError('Configuration Error', 'Credentials not configured');
+                    secretIcon.textContent = '';
+                    secretTitle.textContent = 'Not Found';
+                    secretStatusValue.textContent = 'Credentials not configured';
+                    if (secretMissingRow) secretMissingRow.style.display = 'none';
                     break;
                 case 'aws-not-configured':
-                    secretIcon.textContent = '❌';
-                    secretTitle.textContent = 'AWS Not Configured';
-                    secretStatusValue.textContent = 'AWS CLI not configured';
-                    secretMissingFields.textContent = 'N/A';
+                    // Change main status to error when AWS not configured
+                    updateMainStatusToError('Configuration Error', 'AWS CLI not set up');
+                    secretIcon.textContent = '';
+                    secretTitle.textContent = 'Not Configured';
+                    secretStatusValue.textContent = 'AWS CLI not set up';
+                    if (secretMissingRow) secretMissingRow.style.display = 'none';
                     break;
                 case 'error':
-                    secretIcon.textContent = '❌';
+                    // Change main status to error
+                    updateMainStatusToError('Validation Error', 'Failed to validate');
+                    secretIcon.textContent = '';
                     secretTitle.textContent = 'Validation Error';
-                    secretStatusValue.textContent = 'Failed to validate secret';
-                    secretMissingFields.textContent = 'N/A';
+                    secretStatusValue.textContent = 'Failed to validate';
+                    if (secretMissingRow) secretMissingRow.style.display = 'none';
                     break;
                 default:
-                    secretIcon.textContent = '🔍';
-                    secretTitle.textContent = 'Checking Secret...';
-                    secretStatusValue.textContent = 'Validation in progress';
-                    secretMissingFields.textContent = 'Checking...';
-            }
-            
-            // Show details if available
-            if (enhancedStatus.details && secretDetailsRow && secretDetailsValue) {
-                secretDetailsValue.textContent = enhancedStatus.details;
-                secretDetailsRow.style.display = 'flex';
-            } else if (secretDetailsRow) {
-                secretDetailsRow.style.display = 'none';
+                    secretIcon.textContent = '';
+                    secretTitle.textContent = 'Validating...';
+                    secretStatusValue.textContent = 'Checking credentials';
+                    if (secretMissingRow) secretMissingRow.style.display = 'none';
             }
         }
         
-        // Update prerequisites based on enhanced status
         updatePrerequisites();
+    }
+
+    // Helper function to update main status to error state
+    function updateMainStatusToError(title, message) {
+        const statusIndicator = document.getElementById('aws-status-indicator');
+        const statusDot = statusIndicator?.querySelector('.status-dot');
+        const statusText = document.getElementById('aws-status-text');
+        const connectBtn = document.getElementById('connect-aws-btn');
+        const refreshBtn = document.getElementById('refresh-aws-btn');
+        const disconnectBtn = document.getElementById('disconnect-aws-btn');
+        const connectionDetails = document.getElementById('aws-connection-details');
+        const errorResult = document.getElementById('aws-error-result');
+        
+        if (statusDot) {
+            statusDot.className = 'status-dot status-disconnected';
+        }
+        if (statusText) {
+            statusText.textContent = `🔴 ${title}`;
+        }
+        if (connectBtn) connectBtn.style.display = 'inline-block';
+        if (refreshBtn) refreshBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        if (connectionDetails) connectionDetails.style.display = 'none';
+        
+        // Display error message in the same format as Manage Features tab
+        if (errorResult) {
+            errorResult.className = 'feedback-result error';
+            errorResult.innerHTML = `
+                <div class="result-header">
+                    <span class="result-icon">❌</span>
+                    <span class="result-title">${title}</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-item">
+                        <span class="result-label">Message:</span>
+                        <span class="result-value">${message}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Action:</span>
+                        <span class="result-value">Please check your AWS credentials and configuration.</span>
+                    </div>
+                </div>
+            `;
+            errorResult.style.display = 'block';
+        }
     }
 
     function updateSecretValidationForConnecting() {
         const secretIcon = document.getElementById('secret-validation-icon');
         const secretTitle = document.getElementById('secret-validation-title');
         const secretStatusValue = document.getElementById('secret-status-value');
-        const secretMissingFields = document.getElementById('secret-missing-fields');
-        const secretDetailsRow = document.getElementById('secret-details-row');
+        const secretMissingRow = document.getElementById('secret-missing-row');
         
-        if (secretIcon) secretIcon.textContent = '🔄';
-        if (secretTitle) secretTitle.textContent = 'Preparing Validation...';
-        if (secretStatusValue) secretStatusValue.textContent = 'Establishing AWS connection';
-        if (secretMissingFields) secretMissingFields.textContent = 'Pending...';
-        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+        if (secretIcon) secretIcon.textContent = '';
+        if (secretTitle) secretTitle.textContent = 'Connecting...';
+        if (secretStatusValue) secretStatusValue.textContent = 'Establishing connection';
+        if (secretMissingRow) secretMissingRow.style.display = 'none';
     }
 
     function updateSecretValidationForError() {
         const secretIcon = document.getElementById('secret-validation-icon');
         const secretTitle = document.getElementById('secret-validation-title');
         const secretStatusValue = document.getElementById('secret-status-value');
-        const secretMissingFields = document.getElementById('secret-missing-fields');
-        const secretDetailsRow = document.getElementById('secret-details-row');
+        const secretMissingRow = document.getElementById('secret-missing-row');
         
-        if (secretIcon) secretIcon.textContent = '❌';
+        if (secretIcon) secretIcon.textContent = '';
         if (secretTitle) secretTitle.textContent = 'Connection Failed';
-        if (secretStatusValue) secretStatusValue.textContent = 'Unable to connect to AWS';
-        if (secretMissingFields) secretMissingFields.textContent = 'N/A';
-        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+        if (secretStatusValue) secretStatusValue.textContent = 'Unable to connect';
+        if (secretMissingRow) secretMissingRow.style.display = 'none';
     }
 
     function updateSecretValidationForDisconnected() {
         const secretIcon = document.getElementById('secret-validation-icon');
         const secretTitle = document.getElementById('secret-validation-title');
         const secretStatusValue = document.getElementById('secret-status-value');
-        const secretMissingFields = document.getElementById('secret-missing-fields');
-        const secretDetailsRow = document.getElementById('secret-details-row');
+        const secretMissingRow = document.getElementById('secret-missing-row');
         
-        if (secretIcon) secretIcon.textContent = '⏸️';
+        if (secretIcon) secretIcon.textContent = '';
         if (secretTitle) secretTitle.textContent = 'Not Connected';
-        if (secretStatusValue) secretStatusValue.textContent = 'Connect to AWS to validate';
-        if (secretMissingFields) secretMissingFields.textContent = 'N/A';
-        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+        if (secretStatusValue) secretStatusValue.textContent = 'Connect to validate credentials';
+        if (secretMissingRow) secretMissingRow.style.display = 'none';
     }
 
     function updateSecretValidationForValidating() {
         const secretIcon = document.getElementById('secret-validation-icon');
         const secretTitle = document.getElementById('secret-validation-title');
         const secretStatusValue = document.getElementById('secret-status-value');
-        const secretMissingFields = document.getElementById('secret-missing-fields');
-        const secretDetailsRow = document.getElementById('secret-details-row');
+        const secretMissingRow = document.getElementById('secret-missing-row');
         
-        if (secretIcon) secretIcon.textContent = '🔍';
-        if (secretTitle) secretTitle.textContent = 'Validating Secret...';
-        if (secretStatusValue) secretStatusValue.textContent = 'Checking Salesforce credentials';
-        if (secretMissingFields) secretMissingFields.textContent = 'Validating...';
-        if (secretDetailsRow) secretDetailsRow.style.display = 'none';
+        if (secretIcon) secretIcon.textContent = '';
+        if (secretTitle) secretTitle.textContent = 'Validating...';
+        if (secretStatusValue) secretStatusValue.textContent = 'Checking credentials';
+        if (secretMissingRow) secretMissingRow.style.display = 'none';
     }
 
     function updateConnectionDetails(status) {
         const detailsContent = document.getElementById('aws-details-content');
         const connectionTime = new Date().toLocaleTimeString();
         
-        // Calculate session expiry display
-        let sessionExpiryDisplay = 'Unknown';
-        let timeRemaining = '';
+        // Calculate session expiry
+        let sessionDisplay = 'Active';
         
         if (status.sessionExpiry) {
             const expiryDate = new Date(status.sessionExpiry);
@@ -891,36 +959,31 @@
                 const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
                 
                 if (hours > 0) {
-                    timeRemaining = `${hours}h ${minutes}m remaining`;
+                    sessionDisplay = `${hours}h ${minutes}m remaining`;
                 } else if (minutes > 0) {
-                    timeRemaining = `${minutes}m remaining`;
+                    sessionDisplay = `${minutes}m remaining`;
                 } else {
-                    timeRemaining = 'Expiring soon';
+                    sessionDisplay = 'Expiring soon';
                 }
-                sessionExpiryDisplay = timeRemaining;
             } else {
-                sessionExpiryDisplay = 'Session expired';
+                sessionDisplay = 'Expired';
             }
         }
         
         detailsContent.innerHTML = `
             <div class="connection-status-card">
                 <div class="connection-header">
-                    <span class="connection-icon">🔗</span>
-                    <span class="connection-title">AWS Connection Active</span>
+                    <span class="connection-icon"></span>
+                    <span class="connection-title">Active Connection</span>
                 </div>
                 <div class="connection-info">
                     <div class="info-row">
-                        <span class="info-label">Connected at:</span>
+                        <span class="info-label">Connected:</span>
                         <span class="info-value">${connectionTime}</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Session status:</span>
-                        <span class="info-value session-expiry">${sessionExpiryDisplay}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Services:</span>
-                        <span class="info-value">${status.secretsManagerAccess ? '✅ Secrets Manager Ready' : '❌ Limited Access'}</span>
+                        <span class="info-label">Session:</span>
+                        <span class="info-value session-expiry">${sessionDisplay}</span>
                     </div>
                 </div>
             </div>
@@ -1019,7 +1082,7 @@
                     ${result.recordUrl ? `
                     <div class="result-item">
                         <span class="result-label">URL:</span>
-                        <span class="result-value"><a href="${result.recordUrl}" target="_blank">View in Salesforce</a></span>
+                        <span class="result-value"><a href="${result.recordUrl}" target="_blank">View in Hub</a></span>
                     </div>` : ''}
                 </div>
             `;
@@ -1089,7 +1152,7 @@
                     </div>
                     ${result.devsecopsHubUrl ? `
                     <div class="result-item">
-                        <span class="result-label">Salesforce Link:</span>
+                        <span class="result-label">Hub Link:</span>
                         <span class="result-value"><a href="${result.devsecopsHubUrl}" target="_blank">View</a></span>
                     </div>` : ''}
                     ${isTBDTicket ? `
@@ -1264,32 +1327,7 @@
         
         console.warn('Failed to load initiatives:', error);
         
-        // Show a non-intrusive notification to the user
-        const notification = document.createElement('div');
-        notification.className = 'error-notification';
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--vscode-errorBackground);
-            color: var(--vscode-errorForeground);
-            padding: 8px 12px;
-            border-radius: 4px;
-            border: 1px solid var(--vscode-errorBorder);
-            font-size: 12px;
-            z-index: 1000;
-            max-width: 300px;
-        `;
-        notification.textContent = `Initiative loading failed: ${errorMessage}. TaskMaster import will still work.`;
-        
-        document.body.appendChild(notification);
-        
-        // Auto-remove notification after 8 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                document.body.removeChild(notification);
-            }
-        }, 8000);
+        // Error is already shown in dropdown - no need for floating notification
     }
 
     // Populate epics dropdown (searchable)
@@ -2972,10 +3010,14 @@ Do you want to submit it again?`);
         });
         
         // Set default estimation date (current date + 10 business days, excluding weekends)
-        const estimationDateField = document.getElementById('quick-estimation-date');
-        if (estimationDateField) {
+        const estimationDateDisplay = document.getElementById('quick-estimation-date-display');
+        if (estimationDateDisplay) {
             const defaultDate = addBusinessDays(new Date(), 10);
-            estimationDateField.value = defaultDate.toISOString().split('T')[0];
+            estimationDateDisplay.textContent = defaultDate.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
         }
         
         // Submit button
@@ -3054,12 +3096,14 @@ Do you want to submit it again?`);
         const description = document.getElementById('quick-feedback-description')?.value;
         const acceptanceCriteria = document.getElementById('quick-feedback-acceptance')?.value;
         
-        // Get default configuration values
-        const deliveryLifecycle = document.getElementById('quick-delivery-lifecycle')?.value || 'Production';
-        const jiraType = document.getElementById('quick-jira-type')?.value || 'Story';
-        const jiraPriority = document.getElementById('quick-jira-priority')?.value || 'Major-P3';
-        const workType = document.getElementById('quick-work-type')?.value || 'RTB';
-        const estimationDate = document.getElementById('quick-estimation-date')?.value;
+        // Use hardcoded default configuration values (all fields are now read-only static text)
+        const deliveryLifecycle = 'Production';
+        const jiraType = 'Story';
+        const jiraPriority = 'Major-P3';
+        const workType = 'RTB';
+        
+        // Calculate estimation date (current date + 10 business days)
+        const estimationDate = addBusinessDays(new Date(), 10).toISOString().split('T')[0];
         
         // Validate required fields
         if (!title || !description || !acceptanceCriteria) {
@@ -3080,7 +3124,7 @@ Do you want to submit it again?`);
             jiraPriority,
             workType,
             estimationDate,
-            initiative: 'AI-Security',
+            initiative: 'AI Security',
             epic: 'DevSecOps Hub Feedback',
             sddFeedback: true
         };
@@ -3099,22 +3143,7 @@ Do you want to submit it again?`);
         if (descriptionField) descriptionField.value = '';
         if (acceptanceField) acceptanceField.value = '';
         
-        // Reset default configuration to defaults
-        const deliveryField = document.getElementById('quick-delivery-lifecycle');
-        const typeField = document.getElementById('quick-jira-type');
-        const priorityField = document.getElementById('quick-jira-priority');
-        const workTypeField = document.getElementById('quick-work-type');
-        const dateField = document.getElementById('quick-estimation-date');
-        
-        if (deliveryField) deliveryField.value = 'Production';
-        if (typeField) typeField.value = 'Story';
-        if (priorityField) priorityField.value = 'Major-P3';
-        if (workTypeField) workTypeField.value = 'RTB';
-        if (dateField) {
-            const defaultDate = new Date();
-            defaultDate.setDate(defaultDate.getDate() + 10);
-            dateField.value = defaultDate.toISOString().split('T')[0];
-        }
+        // Note: Default configuration fields are now read-only static text (no reset needed)
         
         // Clear result message
         const resultDiv = document.getElementById('quick-feedback-result');

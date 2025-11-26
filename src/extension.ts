@@ -634,14 +634,8 @@ function registerCommands(context: vscode.ExtensionContext) {
 
     const connectAWSCommand = vscode.commands.registerCommand('specDrivenDevelopment.connectAWS', async () => {
         try {
-            const status = await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Connecting to AWS...',
-                cancellable: false
-            }, async (progress) => {
-                progress.report({ increment: 0, message: 'Testing AWS CLI credentials...' });
-                return await awsService.connectToAWS();
-            });
+            // Connection progress is handled inside awsService
+            const status = await awsService.connectToAWS();
             
             // Update UI with the status
             if (specDrivenDevelopmentPanel) {
@@ -856,14 +850,9 @@ function registerCommands(context: vscode.ExtensionContext) {
             const errorMessage = (error as Error).message;
             console.error('[SDD:Core] ERROR | Failed to load initiatives:', errorMessage);
             
-            // Send user-friendly error message to UI instead of showing intrusive popup
+            // Send user-friendly error message to UI - no popup notification
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendInitiativesError(errorMessage);
-            }
-            
-            // Only show VS Code notification for critical errors
-            if (errorMessage.includes('AWS connection') || errorMessage.includes('credentials')) {
-                vscode.window.showWarningMessage(`Initiatives unavailable: ${errorMessage}`);
             }
         }
     });
@@ -875,7 +864,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.sendEpics(epics);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load epics: ${(error as Error).message}`);
+            console.error('[SDD:Core] ERROR | Failed to load epics:', (error as Error).message);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendEpics([]);
             }
@@ -890,7 +879,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.sendEpics(epics);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load epics for initiative: ${(error as Error).message}`);
+            console.error('[SDD:Core] ERROR | Failed to load epics for initiative:', (error as Error).message);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendEpics([]);
             }
@@ -904,7 +893,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.sendSprintDetails(sprints);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load sprint details: ${(error as Error).message}`);
+            console.error('[SDD:Core] ERROR | Failed to load sprint details:', (error as Error).message);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendSprintDetails([]);
             }
@@ -919,7 +908,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 specDrivenDevelopmentPanel.sendSprintDetails(sprints);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load sprints for team: ${(error as Error).message}`);
+            console.error('[SDD:Core] ERROR | Failed to load sprints for team:', (error as Error).message);
             if (specDrivenDevelopmentPanel) {
                 specDrivenDevelopmentPanel.sendSprintDetails([]);
             }
@@ -1247,7 +1236,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 await vscode.window.showTextDocument(doc);
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to load feedback history: ${(error as Error).message}`);
+            console.error('[SDD:Core] ERROR | Failed to load feedback history:', (error as Error).message);
         }
     });
 
