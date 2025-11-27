@@ -734,7 +734,6 @@ export class SpecDrivenDevelopmentPanel implements vscode.WebviewViewProvider {
                                         <span class="config-label">Jira Type:</span>
                                         <select id="quick-feedback-type" class="config-dropdown">
                                             <option value="Story" selected>Story</option>
-                                            <option value="Bug">Bug</option>
                                             <option value="Defect">Defect</option>
                                         </select>
                                     </div>
