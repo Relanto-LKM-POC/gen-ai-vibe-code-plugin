@@ -3352,14 +3352,20 @@ Do you want to submit it again?`);
                     <button class="task-action-btn edit" data-action="edit" data-feedback-id="${feedback.Id}" data-feedback-data='${JSON.stringify(feedback).replace(/'/g, "&apos;")}'>
                         Edit
                     </button>
+                    <button class="task-action-btn delete" data-action="delete" data-feedback-id="${feedback.Id}" data-feedback-name="${feedback.Name}" data-ticket-number="${ticketNumber}">
+                        Delete
+                    </button>
+                    <button class="task-action-btn cleanup" data-action="done" data-feedback-id="${feedback.Id}" data-feedback-name="${feedback.Name}">
+                        Done
+                    </button>
                     ` : `
                     <button class="task-action-btn view" data-action="view" data-feedback-id="${feedback.Id}" data-feedback-data='${JSON.stringify(feedback).replace(/'/g, "&apos;")}'>
                         View
                     </button>
-                    `}
                     <button class="task-action-btn delete" data-action="delete" data-feedback-id="${feedback.Id}" data-feedback-name="${feedback.Name}" data-ticket-number="${ticketNumber}">
                         Delete
                     </button>
+                    `}
                 </div>
             </div>
         `;
@@ -3401,6 +3407,14 @@ Do you want to submit it again?`);
                         vscode.postMessage({ 
                             command: 'deleteQuickFeedback', 
                             data: { feedbackId, feedbackName, ticketNumber } 
+                        });
+                        break;
+                    case 'done':
+                        // Mark quick feedback as done (same functionality as WIP Tickets)
+                        console.log('[Quick Feedback] Sending done command:', feedbackId);
+                        vscode.postMessage({ 
+                            command: 'cleanupTask', 
+                            data: { taskId: feedbackId, taskName: feedbackName } 
                         });
                         break;
                     case 'view':
