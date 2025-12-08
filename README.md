@@ -22,7 +22,7 @@
 
 ### 🚀 **Development Setup**
 
-**Step 0: Connect to AWS Development Account**
+**Step 0: Connect to AWS Development Account** (Manual - Required)
 ```
 Windows:
 > .\duo-sso_windows_amd64 -duo-idp -session-duration 3600 -factor push
@@ -32,6 +32,44 @@ Mac:
 
 Then, Select the `532054877749` account with `developer` role
 ```
+
+**Steps 1-4: Automated Setup** (Choose your platform)
+
+📁 **Clone the Repository First:**
+```bash
+git clone <your-git-repo-link>
+cd spec-driven-development
+```
+
+**Windows (Command Prompt):**
+```cmd
+setup.bat
+```
+
+**macOS:**
+```bash
+chmod +x setup.sh (one time)
+./setup.sh
+```
+
+**Linux:**
+```bash
+chmod +x setup.sh (one time)
+./setup.sh
+```
+
+> **🎯 What the automated setup does:**
+> - Installs dependencies (`npm install`)
+> - Fixes Security vulnerabilities if detected and displays clear success/error messages with instructions
+> - Compiles the extension (`npm run compile`) 
+> - Packages the extension (`npm run package`)
+> - Installs in VS Code (`code --install-extension`)
+> - Provides clear success/error messages
+> - Validates prerequisites (Node.js, VS Code CLI)
+
+**Manual Setup (Alternative):**
+<details>
+<summary>Click to expand manual setup steps</summary>
 
 **Step 1: Clone and Install**
 ```bash
@@ -48,21 +86,38 @@ npm run compile
 **Step 3: Run the Extension**
 ```bash
 npm run package
-
 code --install-extension spec-driven-development-1.0.0.vsix
-````
+```
+</details>
 
 ---
 
 #### To uninstall the extension
 ```bash
 code --uninstall-extension Gen-Ai-publisher.spec-driven-development
-and Open Command Palette(Ctrl+Shift+p) and select `Developer: Reload Window" from the dropdown
+and Open Command Palette(Ctrl+Shift+p) and select "Developer: Reload Window" from the dropdown
 ```
 
 ---
 
 ## 🛠️ Troubleshooting
+
+### ⚠️ **Script Execution Issues**
+
+**Windows Batch Script (`setup.bat`):**
+- Run from Command Prompt as Administrator if permission issues occur
+- Ensure Node.js and VS Code are in your system PATH
+
+**Unix/Linux Shell Script (`setup.sh`):**
+- Make executable: `chmod +x setup.sh`
+- If permission denied: `sudo chmod +x setup.sh`
+- Ensure bash is available: `which bash`
+
+**Common Issues Across All Platforms:**
+- **Node.js not found**: Install Node.js v14+ from [nodejs.org](https://nodejs.org/)
+- **VS Code CLI not available**: Add VS Code to PATH during installation or manually
+- **npm install fails**: Check internet connection and npm registry access
+- **Extension already exists**: Scripts automatically uninstall previous versions
 
 ### ❌ **AWS Connection Issues**
 
